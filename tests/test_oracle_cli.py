@@ -658,6 +658,92 @@ def test_dvr_collect_cli_refreshes_post_run_outputs(tmp_path, capsys):
     assert "Updated #DVR" in out
 
 
+def test_dvr_run_cli_uses_xyzin_request_and_collects_outputs(tmp_path, monkeypatch, capsys):
+    from oracle_dvr import DVRRequest, dvr_section_from_request, read_dvr_section, write_dvr_section
+
+    xyzin = tmp_path / "molecule.xyzin"
+    outdir = tmp_path / "dvr"
+    xyzin.write_text("1\ncomment\nH 0.0 0.0 0.0\n", encoding="utf-8")
+    request = DVRRequest(
+        repo_root=tmp_path,
+        log_path=tmp_path / "scan.log",
+        outdir=outdir,
+        figdir=tmp_path / "fig",
+        prefix="demo",
+    )
+    write_dvr_section(xyzin, dvr_section_from_request(request))
+    calls = {}
+
+    def fake_run(run_request, *, timeout=None):
+        calls["request"] = run_request
+        calls["timeout"] = timeout
+        _write_cli_dvr_outputs(run_request.outdir, run_request.normalized_prefix)
+        manifest = run_request.outdir / f"{run_request.normalized_prefix}_manifest.json"
+        manifest.write_text("{}\n", encoding="utf-8")
+        return SimpleNamespace(manifest_path=manifest, status="complete")
+
+    monkeypatch.setattr("oracle_dvr.run_dvr_request", fake_run)
+
+    rc = oracle_run.main(["dvr", "run", "--xyzin", str(xyzin), "--timeout", "3"])
+    out = capsys.readouterr().out
+    section = read_dvr_section(xyzin)
+
+    assert rc == 0
+    assert calls["request"].log_path == tmp_path / "scan.log"
+    assert calls["request"].outdir == outdir
+    assert calls["timeout"] == 3.0
+    assert section.status == "complete"
+    assert section.outputs["levels"] == outdir / "demo_levels.csv"
+    assert "manifest:" in out
+    assert "status: complete" in out
+    assert "Updated #DVR" in out
+
+
+def test_dvr_run_cli_builds_log_request_and_updates_xyzin(tmp_path, monkeypatch, capsys):
+    from oracle_dvr import read_dvr_section
+
+    log = tmp_path / "scan.log"
+    xyzin = tmp_path / "molecule.xyzin"
+    outdir = tmp_path / "dvr"
+    log.write_text("scan\n", encoding="utf-8")
+    xyzin.write_text("1\ncomment\nH 0.0 0.0 0.0\n", encoding="utf-8")
+    calls = {}
+
+    def fake_run(run_request, *, timeout=None):
+        calls["request"] = run_request
+        _write_cli_dvr_outputs(run_request.outdir, run_request.normalized_prefix)
+        manifest = run_request.outdir / f"{run_request.normalized_prefix}_manifest.json"
+        manifest.write_text("{}\n", encoding="utf-8")
+        return SimpleNamespace(manifest_path=manifest, status="complete")
+
+    monkeypatch.setattr("oracle_dvr.run_dvr_request", fake_run)
+
+    rc = oracle_run.main(
+        [
+            "dvr",
+            "run",
+            str(log),
+            "--outdir",
+            str(outdir),
+            "--prefix",
+            "demo",
+            "--solver",
+            "sinc-dvr",
+            "--xyzin",
+            str(xyzin),
+        ]
+    )
+    section = read_dvr_section(xyzin)
+
+    assert rc == 0
+    assert calls["request"].log_path == log
+    assert calls["request"].outdir == outdir
+    assert calls["request"].solver == "sinc-dvr"
+    assert section.status == "complete"
+    assert section.manifest_path == outdir / "demo_manifest.json"
+    assert "Updated #DVR" in capsys.readouterr().out
+
+
 def test_fragments_plan_cli_calls_writer(tmp_path, monkeypatch, capsys):
     calls = {}
     path = tmp_path / "molecule.xyz"
@@ -1088,3 +1174,19 @@ def test_gicforge_gaussian_input_cli_calls_writer(tmp_path, monkeypatch, capsys)
         "multiplicity": 2,
     }
     assert "Wrote Gaussian input" in capsys.readouterr().out
+
+
+def _write_cli_dvr_outputs(outdir: Path, prefix: str) -> None:
+    outdir.mkdir(parents=True, exist_ok=True)
+    (outdir / f"{prefix}_summary.txt").write_text(
+        "Mass-weighted path Hamiltonian\n",
+        encoding="utf-8",
+    )
+    (outdir / f"{prefix}_levels.csv").write_text(
+        "state,energy_cm-1,energy_above_ground_cm-1\n0,10.0,0.0\n",
+        encoding="utf-8",
+    )
+    (outdir / f"{prefix}_grid.csv").write_text(
+        "grid,s_au,s_sqrtamu_angstrom,V_cm-1\n0,0.0,0.0,0.0\n",
+        encoding="utf-8",
+    )

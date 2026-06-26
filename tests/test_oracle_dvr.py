@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
+from types import SimpleNamespace
 
 from oracle_dvr import (
     DVRRequest,
@@ -9,9 +11,11 @@ from oracle_dvr import (
     build_path_analysis_args,
     collect_dvr_outputs,
     dvr_output_summary_lines,
+    dvr_request_from_section,
     dvr_section_from_request,
     read_dvr_section,
     refresh_dvr_section,
+    run_dvr_request,
     write_dvr_section,
 )
 from oracle_engines import (
@@ -106,6 +110,76 @@ def test_dvr_section_roundtrip_preserves_workflow_request(tmp_path):
     assert not section.compute_rotconst
     assert section.label_cremer_pople
     assert section.check_only
+    restored = dvr_request_from_section(section, repo_root=tmp_path, python_executable="py")
+    assert restored.repo_root == tmp_path
+    assert restored.log_path == request.log_path
+    assert restored.outdir == request.outdir
+    assert restored.figdir == request.figdir
+    assert restored.solver == request.solver
+    assert restored.python_executable == "py"
+
+
+def test_run_dvr_request_executes_python_backend_and_writes_manifest(tmp_path, monkeypatch):
+    request = DVRRequest(
+        repo_root=tmp_path,
+        log_path=tmp_path / "scan.log",
+        outdir=tmp_path / "out",
+        figdir=tmp_path / "fig",
+        prefix="demo",
+        python_executable="/usr/bin/python3",
+    )
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append((tuple(command), kwargs))
+        _write_dvr_outputs(request.outdir, "demo")
+        return SimpleNamespace(returncode=0, stdout="ok", stderr="")
+
+    monkeypatch.setattr("oracle_dvr.workflow.subprocess.run", fake_run)
+
+    result = run_dvr_request(request, timeout=2.5)
+    manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
+
+    assert result.status == "complete"
+    assert result.python_args[0].endswith("mw_path_dvr.py")
+    assert result.commands[0].stdout == "ok"
+    assert calls[0][0][0] == "/usr/bin/python3"
+    assert calls[0][1]["timeout"] == 2.5
+    assert manifest["workflow"] == "dvr"
+    assert manifest["status"] == "complete"
+    assert manifest["outputs"]["levels"] == str(request.outdir / "demo_levels.csv")
+
+
+def test_run_dvr_request_executes_fortran_bridge_after_grid(tmp_path, monkeypatch):
+    request = DVRRequest(
+        repo_root=tmp_path,
+        log_path=tmp_path / "scan.log",
+        outdir=tmp_path / "out",
+        figdir=tmp_path / "fig",
+        prefix="demo",
+        solver="fortran-gaussian",
+        python_executable="/usr/bin/python3",
+    )
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append(tuple(command))
+        _write_dvr_outputs(request.outdir, "demo")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr("oracle_dvr.workflow.subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "oracle_dvr.workflow.resolve_dvr_executable",
+        lambda repo_root: tmp_path / "bin" / "path_dvr.x",
+    )
+
+    result = run_dvr_request(request)
+
+    assert len(calls) == 2
+    assert calls[0][1].endswith("mw_path_dvr.py")
+    assert calls[1][1].endswith("run_fortran_dvr.py")
+    assert "--mode" in result.bridge_args
+    assert "gaussian" in result.bridge_args
 
 
 def test_dvr_output_reader_normalizes_post_run_files(tmp_path):

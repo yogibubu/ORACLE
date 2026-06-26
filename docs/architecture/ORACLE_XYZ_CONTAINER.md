@@ -122,14 +122,18 @@ outputs, records `OUTPUT_*` pointers and sets the section status to `complete`,
 The raw Gaussian log remains an external adapter input. `oracle dvr prepare`
 normalizes the request, writes an `oracle.run.v1` manifest and, when an `xyzin`
 is supplied, updates `#DVR` so the GUI and later workflow steps can discover
-the same run state without duplicating parser logic.
+the same run state without duplicating parser logic. `oracle dvr run` executes
+the same normalized request directly: either from `LOG --outdir` or from an
+existing `#DVR` section with `--xyzin`.
 
 After the backend has run, `oracle dvr collect molecule.xyzin` reads the
 produced summary/levels/grid/expectation files, detects optional 2D,
 anharmonic and Fortran outputs, updates `#DVR` with `OUTPUT_*` pointers and
-sets the section status to `complete`, `partial` or `prepared`. GUI controllers
-must consume this normalized state through `oracle-dvr` rather than scanning
-the run directory themselves.
+sets the section status to `complete`, `partial` or `prepared`. The command
+`oracle dvr run --xyzin molecule.xyzin` performs this collection immediately
+after a successful backend execution. GUI controllers must consume this
+normalized state through `oracle-dvr` rather than scanning the run directory
+themselves.
 
 ## GIC State
 

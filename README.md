@@ -111,6 +111,8 @@ python -m oracle gf --xyzin molecule.xyzin
 python -m oracle vpt2-vci --xyzin molecule.xyzin --run-dir runs/vpt2_vci
 python -m oracle vpt2-vci --collect molecule.xyzin
 python -m oracle dvr prepare scan.log --outdir runs/dvr --xyzin molecule.xyzin
+python -m oracle dvr run scan.log --outdir runs/dvr --xyzin molecule.xyzin
+python -m oracle dvr run --xyzin molecule.xyzin
 python -m oracle dvr collect molecule.xyzin
 ```
 

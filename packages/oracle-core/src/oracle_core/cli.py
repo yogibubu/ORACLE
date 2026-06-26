@@ -258,6 +258,26 @@ def build_parser(*, repo_root: Path | None = None) -> argparse.ArgumentParser:
     dvr_prepare.add_argument("--no-cremer-pople", action="store_true")
     dvr_prepare.add_argument("--check-only", action="store_true")
     dvr_prepare.add_argument("--xyzin", type=Path, help="Update this ORACLE xyzin with #DVR")
+    dvr_run = dvr_sub.add_parser("run", help="Run DVR directly and update #DVR outputs")
+    dvr_run.add_argument("log", type=Path, nargs="?")
+    dvr_run.add_argument("--outdir", type=Path)
+    dvr_run.add_argument("--figdir", type=Path)
+    dvr_run.add_argument("--prefix", default="puckering_dvr")
+    dvr_run.add_argument("--boundary", default="periodic")
+    dvr_run.add_argument(
+        "--solver",
+        choices=("fourier", "sinc-dvr", "fortran-sinc-dvr", "fortran-gaussian"),
+        default="fourier",
+    )
+    dvr_run.add_argument("--no-rotconst", action="store_true")
+    dvr_run.add_argument("--no-cremer-pople", action="store_true")
+    dvr_run.add_argument("--check-only", action="store_true")
+    dvr_run.add_argument(
+        "--xyzin",
+        type=Path,
+        help="Read #DVR when LOG is omitted; otherwise update this ORACLE xyzin",
+    )
+    dvr_run.add_argument("--timeout", type=float)
     dvr_collect = dvr_sub.add_parser("collect", help="Collect post-run DVR outputs into #DVR")
     dvr_collect.add_argument("xyzin", type=Path)
     dvr_collect.add_argument(
@@ -947,6 +967,54 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
             print(f"Updated #DVR: {args.xyzin}")
         print(f"manifest: {manifest}")
         print(f"command: {command}")
+        return 0
+    if args.command == "dvr" and args.dvr_command == "run":
+        from oracle_dvr import (
+            DVRRequest,
+            dvr_output_summary_lines,
+            dvr_request_from_section,
+            dvr_section_from_request,
+            read_dvr_section,
+            refresh_dvr_section,
+            run_dvr_request,
+            write_dvr_section,
+        )
+
+        if args.log is None:
+            if args.xyzin is None:
+                raise ValueError("dvr run needs LOG --outdir, or --xyzin containing #DVR")
+            request = dvr_request_from_section(read_dvr_section(args.xyzin), repo_root=root)
+        else:
+            if args.outdir is None:
+                raise ValueError("dvr run with LOG needs --outdir")
+            request = DVRRequest(
+                repo_root=root,
+                log_path=args.log,
+                outdir=args.outdir,
+                figdir=args.figdir or (args.outdir / "figures"),
+                prefix=args.prefix,
+                boundary=args.boundary,
+                solver=args.solver,
+                compute_rotconst=not args.no_rotconst,
+                label_cremer_pople=not args.no_cremer_pople,
+                check_only=args.check_only,
+            )
+
+        result = run_dvr_request(request, timeout=args.timeout)
+        print(f"manifest: {result.manifest_path}")
+        print(f"status: {result.status}")
+        if args.xyzin is not None:
+            write_dvr_section(
+                args.xyzin,
+                dvr_section_from_request(
+                    request,
+                    manifest_path=result.manifest_path,
+                    status=result.status,
+                ),
+            )
+            snapshot = refresh_dvr_section(args.xyzin)
+            print("\n".join(dvr_output_summary_lines(snapshot)))
+            print(f"Updated #DVR: {args.xyzin}")
         return 0
     if args.command == "dvr" and args.dvr_command == "collect":
         from oracle_dvr import (

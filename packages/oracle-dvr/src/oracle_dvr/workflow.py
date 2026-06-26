@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+import subprocess
 import sys
 
 from oracle_core import (
@@ -116,6 +117,28 @@ class DVRSection:
         )
 
 
+@dataclass(frozen=True)
+class DVRCommandResult:
+    args: tuple[str, ...]
+    returncode: int
+    stdout: str = ""
+    stderr: str = ""
+
+
+@dataclass(frozen=True)
+class DVRRunResult:
+    request: DVRRequest
+    manifest_path: Path
+    python_args: tuple[str, ...]
+    bridge_args: tuple[str, ...] = ()
+    commands: tuple[DVRCommandResult, ...] = ()
+    status: str = "complete"
+
+
+class DVRRunError(RuntimeError):
+    """Raised when a DVR backend command exits unsuccessfully."""
+
+
 def is_fortran_solver(solver: str) -> bool:
     return solver in FORTRAN_SOLVERS
 
@@ -214,6 +237,81 @@ def write_dvr_manifest(request: DVRRequest, args: list[str], *, status: str = "p
         backend={"python_executable": request.python_executable, "args": args},
     )
     return manifest.write(request.outdir / f"{request.normalized_prefix}_manifest.json")
+
+
+def dvr_request_from_section(
+    section: DVRSection,
+    *,
+    repo_root: Path,
+    python_executable: str = sys.executable,
+) -> DVRRequest:
+    return DVRRequest(
+        repo_root=repo_root,
+        log_path=section.log_path,
+        outdir=section.outdir,
+        figdir=section.figdir,
+        prefix=section.prefix,
+        boundary=section.boundary,
+        solver=section.solver,
+        compute_rotconst=section.compute_rotconst,
+        label_cremer_pople=section.label_cremer_pople,
+        check_only=section.check_only,
+        python_executable=python_executable,
+    )
+
+
+def run_dvr_request(
+    request: DVRRequest,
+    *,
+    timeout: float | None = None,
+    fortran_exe: Path | None = None,
+) -> DVRRunResult:
+    """Execute the normalized DVR request and write the completed run manifest."""
+    request.outdir.mkdir(parents=True, exist_ok=True)
+    request.figdir.mkdir(parents=True, exist_ok=True)
+    python_args = build_path_analysis_args(request)
+    manifest_args = python_args
+    commands: list[DVRCommandResult] = []
+
+    try:
+        python_result = _run_backend_command(
+            [request.python_executable, *python_args],
+            timeout=timeout,
+        )
+    except DVRRunError:
+        write_dvr_manifest(request, manifest_args, status="failed")
+        raise
+    commands.append(python_result)
+    if python_result.returncode != 0:
+        write_dvr_manifest(request, manifest_args, status="failed")
+        raise DVRRunError(_failed_command_message("DVR path analysis", python_result))
+
+    bridge_args: list[str] = []
+    if is_fortran_solver(request.solver):
+        executable = fortran_exe if fortran_exe is not None else resolve_dvr_executable(request.repo_root)
+        bridge_args = build_fortran_bridge_args(request, executable)
+        manifest_args = [build_fortran_shell_command(request, python_args, bridge_args)]
+        try:
+            bridge_result = _run_backend_command(
+                [request.python_executable, *bridge_args],
+                timeout=timeout,
+            )
+        except DVRRunError:
+            write_dvr_manifest(request, manifest_args, status="failed")
+            raise
+        commands.append(bridge_result)
+        if bridge_result.returncode != 0:
+            write_dvr_manifest(request, manifest_args, status="failed")
+            raise DVRRunError(_failed_command_message("DVR Fortran bridge", bridge_result))
+
+    manifest_path = write_dvr_manifest(request, manifest_args, status="complete")
+    return DVRRunResult(
+        request=request,
+        manifest_path=manifest_path,
+        python_args=tuple(python_args),
+        bridge_args=tuple(bridge_args),
+        commands=tuple(commands),
+    )
 
 
 def dvr_section_from_request(
@@ -324,6 +422,32 @@ def read_dvr_section(path: Path | str) -> DVRSection:
 
 def write_dvr_section(path: Path | str, section: DVRSection) -> None:
     replace_section(Path(path), "DVR", dvr_section_lines(section))
+
+
+def _run_backend_command(command: list[str], *, timeout: float | None) -> DVRCommandResult:
+    try:
+        completed = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise DVRRunError(f"DVR backend command timed out after {exc.timeout} s: {command}") from exc
+    return DVRCommandResult(
+        args=tuple(str(arg) for arg in command),
+        returncode=int(completed.returncode),
+        stdout=completed.stdout or "",
+        stderr=completed.stderr or "",
+    )
+
+
+def _failed_command_message(label: str, result: DVRCommandResult) -> str:
+    detail = result.stderr.strip() or result.stdout.strip()
+    if detail:
+        return f"{label} failed with exit code {result.returncode}: {detail}"
+    return f"{label} failed with exit code {result.returncode}"
 
 
 def _optional_path(raw: str | None) -> Path | None:
