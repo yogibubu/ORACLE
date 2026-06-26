@@ -93,3 +93,22 @@ Recommended next patch in `merlino3.0`:
    artifacts, benchmark goldens or regenerated paper outputs.
 4. Move local runtime outputs out of source control only after preserving the
    current dirty state.
+
+## Parser Consolidation Targets
+
+Known geometry/QM parser duplicates in Merlino should become compatibility
+wrappers around ORACLE:
+
+- `gui/xyz_reader.py`
+- `gui/zmat_reader.py`
+- `gui/readers.py`
+- `gui/gaussian.py`
+- `gui/molpro.py`
+- `gui/mrcc.py`
+- `merlino_core/xyzin_geometry.py`
+- `merlino_gaussian/parsers.py`
+- `merlino_semiexp/geometry_input.py`
+- `merlino_fit/survibfit/gaussian_log.py`
+- `merlino_vpt2_vci/gaussian_qff.py`
+
+No new parser logic should be added to these paths.

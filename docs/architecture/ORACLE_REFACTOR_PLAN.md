@@ -153,6 +153,7 @@ This constraint is formalized in
 
 - Atoms, masses, isotopes, XYZ, inertia, topology, rings, symmetry and primitive
   geometry utilities.
+- Owns canonical geometry data models and plain/enriched XYZ parsers.
 - This should absorb the stable parts of `geometry`, `topology` and topology
   pieces now under `merlino_fit`.
 - Descriptor topology and atomic synthons are first-class chemistry primitives,
@@ -189,6 +190,9 @@ This constraint is formalized in
 
 - Gaussian input writing, log/FCHK/QFF parsing and normalized correction tables.
 - Gaussian is an adapter, not an internal model.
+- Gaussian geometry/log parsers must return shared ORACLE models such as
+  `oracle_chem.MolecularGeometry`; downstream tools must not parse Gaussian text
+  directly.
 
 `oracle-engines`
 

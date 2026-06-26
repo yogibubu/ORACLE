@@ -12,7 +12,8 @@ packages are separated behind stable service, CLI and manifest contracts.
   common errors.
 - `oracle-chem`: atoms, masses, geometry, topology, rings and symmetry.
   Descriptor topology and atomic synthons live here as shared chemistry
-  primitives.
+  primitives. It owns the canonical `MolecularGeometry` model and plain/enriched
+  XYZ parsers.
 - `oracle-gicforge`: non-redundant GIC construction, frozen schemas, SYCART and
   B-matrix evaluation.
 - `oracle-morpheus`: semiexperimental geometry refinement, constraints,
@@ -34,6 +35,9 @@ imports stay valid until ORACLE-native tests cover the new public APIs.
 ORACLE modules must not reinvent shared operations. Common tasks such as
 sectioned XYZ I/O, atom and isotope data, topology, symmetry, GIC construction,
 Gaussian parsing, backend execution and manifests belong to shared libraries.
+
+Geometry and QM-program parsers are unified: they return shared ORACLE models
+and live in parser packages, not GUI or workflow modules.
 
 Python and strict Fortran77 implementations may intentionally coexist for the
 same scientific kernel. In that case they are backends behind one ORACLE service
