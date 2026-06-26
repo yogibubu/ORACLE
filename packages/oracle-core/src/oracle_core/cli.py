@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import sys
 from pathlib import Path
+from typing import TypeVar
+
+
+_T = TypeVar("_T")
 
 
 def find_repo_root(start: Path | None = None) -> Path:
@@ -106,6 +111,89 @@ def build_parser(*, repo_root: Path | None = None) -> argparse.ArgumentParser:
         default=0.5,
         help="Scale factor for 1-4 electrostatic and UFF-vdW terms",
     )
+
+    semiexp = sub.add_parser(
+        "semiexp",
+        help="Fit semiexperimental equilibrium geometry with ORACLE-MORPHEUS",
+    )
+    semiexp.add_argument(
+        "--job",
+        type=Path,
+        help="ORACLE/Merlino semiexperimental job file or legacy MSR file",
+    )
+    semiexp.add_argument(
+        "--xyz",
+        "--geometry",
+        dest="xyz",
+        type=Path,
+        help="Initial parent Cartesian geometry in XYZ or Gaussian .com/.gjf format",
+    )
+    semiexp.add_argument(
+        "--observations",
+        type=Path,
+        help="CSV/JSON/TOML with isotopologue B0 constants and corrections, or legacy MSR file",
+    )
+    semiexp.add_argument(
+        "--xyzin",
+        type=Path,
+        help="Canonical ORACLE xyzin container to create/update before SEfit",
+    )
+    semiexp.add_argument("--outdir", type=Path, required=True)
+    semiexp.add_argument("--backend", choices=("python", "fortran77"), default="python")
+    semiexp.add_argument(
+        "--fixed",
+        default="",
+        help="Comma/semicolon-separated fixed GIC patterns or Gaussian-style constraints",
+    )
+    semiexp.add_argument("--fix-hydrogens", action="store_true")
+    semiexp.add_argument("--max-iter", type=int, default=None)
+    semiexp.add_argument("--step", type=float, default=1.0e-4)
+    semiexp.add_argument("--damping", type=float, default=1.0e-8)
+    semiexp.add_argument("--max-step", type=float, default=0.25)
+    semiexp.add_argument("--prune-condition", type=float, default=0.0)
+    semiexp.add_argument(
+        "--robust-loss",
+        choices=("none", "huber", "soft_l1", "cauchy"),
+        default="none",
+    )
+    semiexp.add_argument("--robust-scale", type=float, default=0.0)
+    semiexp.add_argument("--leave-one-out", action="store_true")
+    semiexp.add_argument("--checkpoint", type=Path, default=None)
+    semiexp.add_argument("--restart", type=Path, default=None)
+    semiexp.add_argument(
+        "--observable",
+        choices=("moments", "rotational_constants", "auto"),
+        default="moments",
+    )
+    semiexp.add_argument(
+        "--coordinate-model",
+        choices=("gic", "cartesian_symmetry"),
+        default="gic",
+    )
+    semiexp.add_argument(
+        "--rotational-components",
+        choices=("auto", "ABC", "AB", "AC", "BC"),
+        default="auto",
+    )
+    semiexp.add_argument(
+        "--qm-predicate",
+        action="append",
+        default=[],
+        help="QM prior as label_pattern:value:sigma[:source]; can be repeated",
+    )
+    semiexp.add_argument(
+        "--parameter-class",
+        action="append",
+        default=[],
+        help="Class constraint as name:shared|fixed:pattern[|pattern...]; can be repeated",
+    )
+
+    semiexp_ensemble = sub.add_parser(
+        "semiexp-ensemble",
+        help="Fit shared class corrections across multiple semiexperimental molecule jobs",
+    )
+    semiexp_ensemble.add_argument("--job", type=Path, required=True)
+    semiexp_ensemble.add_argument("--outdir", type=Path, required=True)
 
     gicforge = sub.add_parser("gicforge", help="Plan GICForge post-validation sections")
     gicforge_sub = gicforge.add_subparsers(dest="gicforge_command")
@@ -287,6 +375,203 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
             written = write_csv_tables(report, args.csv_dir, prefix=prefix)
             print(f"Wrote GF/PED CSV tables: {len(written)} files in {args.csv_dir}")
         return 0
+    if args.command == "semiexp":
+        from oracle_morpheus import (
+            DEFAULT_SEMIEXP_OBSERVABLE,
+            DEFAULT_SEMIEXP_ROBUST_LOSS,
+            DEFAULT_SEMIEXP_ROTATIONAL_COMPONENTS,
+            HYDROGEN_PARAMETER_CONSTRAINT,
+            ParameterClassConstraint,
+            QMParameterPredicate,
+            SemiexperimentalFitRequest,
+            fit_semiexperimental_geometry,
+            is_msr_legacy_file,
+            prepare_semiexperimental_xyzin,
+            read_observations,
+            read_semiexperimental_job,
+            semiexperimental_latex_tables,
+            write_semiexperimental_html_report,
+        )
+
+        legacy_msr_job = bool(args.job and is_msr_legacy_file(args.job))
+        job = None if legacy_msr_job or not args.job else read_semiexperimental_job(args.job)
+        geometry_path = args.xyz or (job.path if job is not None else None)
+        observations_inline = job.observations_inline if job is not None else ()
+        observations_path = (
+            args.observations
+            or (None if observations_inline else (job.observations if job is not None else None))
+        )
+        if legacy_msr_job:
+            geometry_path = args.xyz or args.job
+            observations_path = args.observations or args.job
+            observations_inline = ()
+        if geometry_path is None:
+            raise ValueError("semiexp needs --geometry or --job")
+        if observations_path is None and not observations_inline:
+            raise ValueError(
+                "semiexp needs --observations, inline [[isotopologues]], "
+                "or a [files].observations entry in --job"
+            )
+        preprocess = prepare_semiexperimental_xyzin(
+            Path(geometry_path),
+            observations_source=Path(observations_path) if observations_path is not None else None,
+            observations_inline=observations_inline,
+            xyzin_path=args.xyzin,
+        )
+        geometry_path = preprocess.xyzin
+        observations = read_observations(preprocess.xyzin)
+        print(f"semiexp_xyzin: {preprocess.xyzin}")
+        if preprocess.created_or_updated_geometry:
+            print("semiexp_xyzin_geometry: updated")
+        if preprocess.updated_isotopologues:
+            print("semiexp_xyzin_isotopologues: updated")
+
+        fixed = _merge_unique(preprocess.source_fixed_parameters, job.fixed_parameters if job else ())
+        fixed = _merge_unique(fixed, _parse_fixed_parameters(args.fixed))
+        if args.fix_hydrogens:
+            fixed = _merge_unique(fixed, (HYDROGEN_PARAMETER_CONSTRAINT,))
+        observable = _job_default(
+            args.observable,
+            DEFAULT_SEMIEXP_OBSERVABLE,
+            job.observable if job else None,
+        )
+        coordinate_model = _job_default(
+            args.coordinate_model,
+            "gic",
+            job.coordinate_model if job else None,
+        )
+        rotational_components = _job_default(
+            args.rotational_components,
+            DEFAULT_SEMIEXP_ROTATIONAL_COMPONENTS,
+            job.rotational_components if job else None,
+        )
+        qm_predicates = _merge_unique(
+            job.qm_predicates if job else (),
+            _parse_qm_predicates(args.qm_predicate, QMParameterPredicate),
+        )
+        parameter_classes = _merge_unique(
+            job.parameter_classes if job else (),
+            _parse_parameter_classes(args.parameter_class, ParameterClassConstraint),
+        )
+        backend = _job_default(args.backend, "python", job.backend if job else None)
+        max_iter = args.max_iter if args.max_iter is not None else (job.max_iter if job else None)
+        step = _job_default(args.step, 1.0e-4, job.step if job else None)
+        damping = _job_default(args.damping, 1.0e-8, job.damping if job else None)
+        max_step = _job_default(args.max_step, 0.25, job.max_step if job else None)
+        prune_condition = _job_default(
+            args.prune_condition,
+            0.0,
+            job.prune_condition if job else None,
+        )
+        robust_loss = _job_default(
+            args.robust_loss,
+            DEFAULT_SEMIEXP_ROBUST_LOSS,
+            job.robust_loss if job else None,
+        )
+        robust_scale = _job_default(args.robust_scale, 0.0, job.robust_scale if job else None)
+        leave_one_out = bool(args.leave_one_out or (job.leave_one_out if job else False))
+        checkpoint = args.checkpoint if args.checkpoint is not None else (job.checkpoint if job else None)
+        restart = args.restart if args.restart is not None else (job.restart if job else None)
+        request = SemiexperimentalFitRequest(
+            initial_geometry=geometry_path,
+            observations=observations,
+            fixed_parameters=fixed,
+            observable=observable,
+            rotational_components=rotational_components,
+            qm_predicates=qm_predicates,
+            parameter_classes=parameter_classes,
+            coordinate_model=coordinate_model,
+            robust_loss=robust_loss,
+            robust_scale=robust_scale,
+            leave_one_out=leave_one_out,
+        )
+        result = fit_semiexperimental_geometry(
+            request,
+            max_iter=max_iter,
+            step=step,
+            damping=damping,
+            max_step=max_step,
+            prune_condition=prune_condition,
+            checkpoint=checkpoint,
+            restart=restart,
+            outdir=args.outdir,
+        )
+        report_path = write_semiexperimental_html_report(
+            args.outdir / "semiexp_report.html",
+            result,
+            request,
+        )
+        tables_path = args.outdir / "semiexp_tables.tex"
+        tables = semiexperimental_latex_tables(result)
+        tables_path.write_text(
+            "\n\n".join(f"% {name}\n{table}" for name, table in tables.items()),
+            encoding="utf-8",
+        )
+        _append_manifest_output(args.outdir / "semiexp_manifest.json", "html_report", report_path)
+        _append_manifest_output(args.outdir / "semiexp_manifest.json", "latex_tables", tables_path)
+        print(f"manifest: {result.manifest}")
+        print(f"report: {report_path}")
+        rms_label = "rms_MHz" if result.diagnostics.observable == "rotational_constants" else "rms_observable"
+        print(f"{rms_label}: {result.rms_MHz:.8g}")
+        rot_diffs = [row.difference_MHz for row in result.rotational_constants]
+        rotational_rms = math.sqrt(sum(diff * diff for diff in rot_diffs) / len(rot_diffs)) if rot_diffs else 0.0
+        rotational_mse = sum(diff * diff for diff in rot_diffs) / len(rot_diffs) if rot_diffs else 0.0
+        print(f"rotational_rms_MHz: {rotational_rms:.8g}")
+        print(f"rotational_mean_square_MHz2: {rotational_mse:.8g}")
+        print(f"rotational_mean_square_1e3_MHz2: {1000.0 * rotational_mse:.8g}")
+        print(f"iterations: {result.iterations}")
+        print(f"stationary_point: {result.stationary_point}")
+        print(f"convergence: {result.diagnostics.convergence_reason}")
+        print(f"rank: {result.diagnostics.rank}")
+        print(f"condition_number: {result.diagnostics.condition_number:.8g}")
+        print(f"observable: {result.diagnostics.observable}")
+        print(f"components: {','.join(result.diagnostics.components)}")
+        print(f"backend: {backend}")
+        print(f"coordinate_model: {result.diagnostics.coordinate_model}")
+        return 0
+    if args.command == "semiexp-ensemble":
+        from oracle_core.manifest import build_run_manifest
+        from oracle_morpheus import fit_ensemble_job
+
+        result = fit_ensemble_job(args.job, outdir=args.outdir)
+        outputs = _ensemble_output_paths(args.outdir)
+        build_run_manifest(
+            workflow="semiexp_ensemble",
+            status=result.acceptance.status,
+            run_dir=args.outdir,
+            inputs={"job": args.job},
+            outputs=outputs,
+            parameters={
+                "classes": len(result.classes),
+                "molecules": len(result.molecule_blocks),
+                "rank": result.rank,
+                "scaled_condition_number": result.condition_number,
+                "weighted_rms_before": result.weighted_rms_before,
+                "weighted_rms_after": result.weighted_rms_after,
+                "accepted": result.acceptance.accepted,
+            },
+            backend={"solver": "python", "model": "linearized shared class corrections"},
+            messages=list(result.acceptance.reasons) + list(result.acceptance.review_items),
+        ).write(args.outdir / "run_manifest.json")
+        print(f"report: {args.outdir / 'ensemble_class_corrections.txt'}")
+        print(f"manifest: {args.outdir / 'run_manifest.json'}")
+        print(f"classes: {len(result.classes)}")
+        print(f"molecules: {len(result.molecule_blocks)}")
+        print(f"rank: {result.rank}")
+        print(f"scaled_condition_number: {result.condition_number:.8g}")
+        print(f"acceptance_status: {result.acceptance.status}")
+        if result.acceptance.reasons:
+            print("acceptance_failures: " + " | ".join(result.acceptance.reasons))
+        if result.acceptance.review_items:
+            print("acceptance_review: " + " | ".join(result.acceptance.review_items))
+        print(f"weighted_rms_before: {result.weighted_rms_before:.8g}")
+        print(f"weighted_rms_after: {result.weighted_rms_after:.8g}")
+        for item in result.classes:
+            print(
+                f"class:{item.name}: correction={result.corrections[item.name]:.10g} "
+                f"sigma={result.sigma[item.name]:.4g}"
+            )
+        return 0
     if args.command == "gicforge" and args.gicforge_command == "plan":
         from oracle_gicforge import write_gicforge_plan_sections
 
@@ -424,3 +709,96 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
         return 0
     parser.print_help()
     return 0
+
+
+def _parse_fixed_parameters(raw: str) -> tuple[str, ...]:
+    return tuple(part.strip() for part in _split_top_level(raw, separators=",;") if part.strip())
+
+
+def _split_top_level(raw: str, *, separators: str) -> list[str]:
+    parts: list[str] = []
+    current: list[str] = []
+    round_depth = 0
+    square_depth = 0
+    brace_depth = 0
+    for char in str(raw):
+        if char == "(":
+            round_depth += 1
+        elif char == ")" and round_depth > 0:
+            round_depth -= 1
+        elif char == "[":
+            square_depth += 1
+        elif char == "]" and square_depth > 0:
+            square_depth -= 1
+        elif char == "{":
+            brace_depth += 1
+        elif char == "}" and brace_depth > 0:
+            brace_depth -= 1
+        if char in separators and round_depth == 0 and square_depth == 0 and brace_depth == 0:
+            parts.append("".join(current))
+            current = []
+            continue
+        current.append(char)
+    parts.append("".join(current))
+    return parts
+
+
+def _parse_qm_predicates(items: list[str], predicate_type: type) -> tuple:
+    predicates = []
+    for item in items:
+        parts = item.split(":")
+        if len(parts) not in {3, 4}:
+            raise ValueError("--qm-predicate must be label_pattern:value:sigma[:source]")
+        source = parts[3] if len(parts) == 4 else "qm"
+        predicates.append(predicate_type(parts[0], float(parts[1]), float(parts[2]), source=source))
+    return tuple(predicates)
+
+
+def _parse_parameter_classes(items: list[str], class_type: type) -> tuple:
+    constraints = []
+    for item in items:
+        parts = item.split(":", 2)
+        if len(parts) != 3:
+            raise ValueError("--parameter-class must be name:shared|fixed:pattern[|pattern...]")
+        patterns = tuple(part.strip() for part in parts[2].split("|") if part.strip())
+        constraints.append(class_type(parts[0].strip(), patterns, parts[1].strip()))
+    return tuple(constraints)
+
+
+def _merge_unique(left: tuple[_T, ...], right: tuple[_T, ...]) -> tuple[_T, ...]:
+    result: list[_T] = []
+    for item in (*left, *right):
+        if item not in result:
+            result.append(item)
+    return tuple(result)
+
+
+def _job_default(value: _T, default: _T, job_value: _T | None) -> _T:
+    if job_value is not None and value == default:
+        return job_value
+    return value
+
+
+def _append_manifest_output(manifest_path: Path, name: str, path: Path) -> None:
+    if not manifest_path.exists():
+        return
+    data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    data.setdefault("outputs", {})[name] = str(path)
+    if path.is_file():
+        from oracle_core.manifest import sha256_file
+
+        data.setdefault("output_sha256", {})[name] = sha256_file(path)
+    manifest_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _ensemble_output_paths(outdir: Path) -> dict[str, Path]:
+    root = Path(outdir)
+    return {
+        "text_report": root / "ensemble_class_corrections.txt",
+        "class_corrections_csv": root / "ensemble_class_corrections.csv",
+        "class_report_csv": root / "ensemble_class_report.csv",
+        "molecule_blocks_csv": root / "ensemble_molecule_blocks.csv",
+        "scientific_manifest": root / "ensemble_manifest.json",
+        "covariance_csv": root / "ensemble_covariance.csv",
+        "correlation_csv": root / "ensemble_correlation.csv",
+    }
