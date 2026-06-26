@@ -30,17 +30,49 @@ class GaussianLogSummary:
     last_orientation: MolecularGeometry | None = None
 
 
+@dataclass(frozen=True)
+class _GaussianInputBlock:
+    route_lines: tuple[str, ...]
+    title: str
+    charge: int
+    multiplicity: int
+    geometry_lines: tuple[str, ...]
+    tail_lines: tuple[str, ...]
+
+
+def read_gaussian_input(path: Path) -> MolecularGeometry:
+    """Read a Gaussian input file with Cartesian or Z-matrix geometry."""
+    target = Path(path)
+    block = _read_gaussian_input_block(target)
+    if _geometry_looks_cartesian(block.geometry_lines):
+        return _geometry_from_cartesian_block(target, block)
+    return _geometry_from_zmatrix_block(target, block)
+
+
 def read_gaussian_cartesian_input(path: Path) -> MolecularGeometry:
+    target = Path(path)
+    block = _read_gaussian_input_block(target)
+    if not _geometry_looks_cartesian(block.geometry_lines) and _route_requests_zmatrix(block.route_lines):
+        return read_gaussian_zmatrix_input(target)
+    return _geometry_from_cartesian_block(target, block)
+
+
+def read_gaussian_zmatrix_input(path: Path) -> MolecularGeometry:
+    target = Path(path)
+    block = _read_gaussian_input_block(target)
+    if _geometry_looks_cartesian(block.geometry_lines):
+        raise GeometryParseError("Gaussian input contains Cartesian coordinates, not a Z-matrix")
+    return _geometry_from_zmatrix_block(target, block)
+
+
+def _read_gaussian_input_block(path: Path) -> _GaussianInputBlock:
     target = Path(path)
     lines = target.read_text(encoding="utf-8", errors="replace").splitlines()
     route_end = _route_end(lines)
     if route_end is None:
         raise GeometryParseError("Gaussian input needs a route section starting with #")
     route_lines = _route_lines(lines)
-    if _route_requests_zmatrix(route_lines):
-        return read_gaussian_zmatrix_input(target)
-
-    idx = route_end + 1 if route_end < len(lines) else route_end
+    idx = _next_nonblank(lines, route_end)
     title_start = idx
     while idx < len(lines) and lines[idx].strip():
         idx += 1
@@ -49,46 +81,57 @@ def read_gaussian_cartesian_input(path: Path) -> MolecularGeometry:
     if idx >= len(lines) or not _is_charge_multiplicity(lines[idx]):
         raise GeometryParseError("Gaussian input needs charge and multiplicity before coordinates")
     charge, multiplicity = (int(value) for value in lines[idx].split()[:2])
-    idx += 1
-
-    atoms: list[str] = []
-    coords: list[list[float]] = []
+    idx = _next_nonblank(lines, idx + 1)
+    geometry_start = idx
     while idx < len(lines) and lines[idx].strip():
-        atom, xyz = _parse_cartesian_line(lines[idx])
-        atoms.append(atom)
-        coords.append(xyz)
         idx += 1
-    if not atoms:
-        raise GeometryParseError("Gaussian input contains no Cartesian coordinate block")
-
-    modredundant = lines[idx + 1 :] if idx < len(lines) else ()
-    return MolecularGeometry(
-        atoms=tuple(atoms),
-        coordinates_angstrom=np.asarray(coords, dtype=float),
-        comment=title or target.stem,
-        source_format="gaussian_cartesian_input",
-        source_path=target,
+    geometry_lines = tuple(lines[geometry_start:idx])
+    if not geometry_lines:
+        raise GeometryParseError("Gaussian input contains no geometry block")
+    tail_lines = tuple(lines[idx + 1 :]) if idx < len(lines) else ()
+    return _GaussianInputBlock(
+        route_lines=route_lines,
+        title=title or target.stem,
         charge=charge,
         multiplicity=multiplicity,
-        fixed_parameters=_modredundant_fixed_patterns(modredundant),
-        metadata={"route": tuple(route_lines)},
+        geometry_lines=geometry_lines,
+        tail_lines=tail_lines,
     )
 
 
-def read_gaussian_zmatrix_input(path: Path) -> MolecularGeometry:
-    target = Path(path)
-    lines = target.read_text(encoding="utf-8", errors="replace").splitlines()
-    route_end = _route_end(lines)
-    if route_end is None:
-        raise GeometryParseError("Gaussian input needs a route section starting with #")
-    idx = route_end + 1 if route_end < len(lines) else route_end
-    title_start = idx
-    while idx < len(lines) and lines[idx].strip():
-        idx += 1
-    title = " ".join(line.strip() for line in lines[title_start:idx] if line.strip()) or target.stem
-    body = "\n".join(lines[idx:])
-    zmat = parse_zmatrix_text(body, title=title)
-    return zmatrix_to_geometry(zmat, source_path=target, source_format="gaussian_zmatrix_input")
+def _geometry_from_cartesian_block(path: Path, block: _GaussianInputBlock) -> MolecularGeometry:
+    atoms: list[str] = []
+    coords: list[list[float]] = []
+    for line in block.geometry_lines:
+        atom, xyz = _parse_cartesian_line(line)
+        atoms.append(atom)
+        coords.append(xyz)
+    if not atoms:
+        raise GeometryParseError("Gaussian input contains no Cartesian coordinate block")
+    return MolecularGeometry(
+        atoms=tuple(atoms),
+        coordinates_angstrom=np.asarray(coords, dtype=float),
+        comment=block.title or path.stem,
+        source_format="gaussian_cartesian_input",
+        source_path=path,
+        charge=block.charge,
+        multiplicity=block.multiplicity,
+        fixed_parameters=_modredundant_fixed_patterns(block.tail_lines),
+        metadata={"route": block.route_lines},
+    )
+
+
+def _geometry_from_zmatrix_block(path: Path, block: _GaussianInputBlock) -> MolecularGeometry:
+    body_lines = [
+        f"{block.charge} {block.multiplicity}",
+        *block.geometry_lines,
+    ]
+    variable_lines = _leading_zmatrix_variable_lines(block.tail_lines)
+    if variable_lines:
+        body_lines.append("")
+        body_lines.extend(variable_lines)
+    zmat = parse_zmatrix_text("\n".join(body_lines), title=block.title)
+    return zmatrix_to_geometry(zmat, source_path=path, source_format="gaussian_zmatrix_input")
 
 
 def summarize_gaussian_log(path: Path) -> GaussianLogSummary:
@@ -139,6 +182,68 @@ def _route_requests_zmatrix(route_lines: tuple[str, ...]) -> bool:
     return "zmat" in route or "z-matrix" in route
 
 
+def _geometry_looks_cartesian(lines: tuple[str, ...]) -> bool:
+    if not lines:
+        return False
+    for line in lines:
+        parts = line.split()
+        if len(parts) < 4:
+            return False
+        try:
+            normalize_atom_symbol(parts[0])
+            _float_token(parts[1])
+            _float_token(parts[2])
+            _float_token(parts[3])
+        except (GeometryParseError, ValueError):
+            return False
+    return True
+
+
+def _leading_zmatrix_variable_lines(lines: tuple[str, ...]) -> tuple[str, ...]:
+    variables: list[str] = []
+    for raw in lines:
+        stripped = raw.strip()
+        if not stripped:
+            if variables:
+                break
+            continue
+        if stripped.startswith(("#", "%")):
+            break
+        if _is_zmatrix_variable_header(stripped) or _is_zmatrix_variable_line(stripped):
+            variables.append(raw)
+            continue
+        break
+    return tuple(variables)
+
+
+def _is_zmatrix_variable_header(line: str) -> bool:
+    return line.lower().rstrip(":") in {
+        "variables",
+        "variable",
+        "constants",
+        "constant",
+        "parameters",
+        "parameter",
+    }
+
+
+def _is_zmatrix_variable_line(line: str) -> bool:
+    if "=" in line:
+        name, value = line.split("=", 1)
+    else:
+        parts = line.split()
+        if len(parts) != 2:
+            return False
+        name, value = parts
+    if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", name.strip()):
+        return False
+    try:
+        _float_token(value)
+    except ValueError:
+        return False
+    return True
+
+
 def _next_nonblank(lines: list[str], idx: int) -> int:
     while idx < len(lines) and not lines[idx].strip():
         idx += 1
@@ -162,10 +267,14 @@ def _parse_cartesian_line(line: str) -> tuple[str, list[float]]:
     if len(parts) < 4:
         raise GeometryParseError(f"invalid Gaussian Cartesian line: {line}")
     try:
-        coords = [float(parts[1]), float(parts[2]), float(parts[3])]
+        coords = [_float_token(parts[1]), _float_token(parts[2]), _float_token(parts[3])]
     except ValueError as exc:
         raise GeometryParseError(f"invalid Gaussian Cartesian coordinates: {line}") from exc
     return normalize_atom_symbol(parts[0]), coords
+
+
+def _float_token(token: str) -> float:
+    return float(token.strip().replace("D", "E").replace("d", "e"))
 
 
 def _modredundant_fixed_patterns(lines: list[str] | tuple[str, ...]) -> tuple[str, ...]:

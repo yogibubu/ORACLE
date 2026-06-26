@@ -2,6 +2,7 @@
 
 from .parsers import (
     GaussianLogSummary,
+    read_gaussian_input,
     read_gaussian_cartesian_input,
     read_gaussian_zmatrix_input,
     summarize_gaussian_log,
@@ -14,6 +15,7 @@ from .writers import (
 __all__ = [
     "GaussianWriteError",
     "GaussianLogSummary",
+    "read_gaussian_input",
     "read_gaussian_cartesian_input",
     "read_gaussian_zmatrix_input",
     "summarize_gaussian_log",

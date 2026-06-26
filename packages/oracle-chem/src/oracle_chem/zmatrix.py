@@ -25,7 +25,7 @@ class ZMatrixValue:
         if key in variables:
             return float(variables[key])
         try:
-            return float(key)
+            return _float_token(key)
         except ValueError as exc:
             raise GeometryParseError(f"unresolved Z-matrix variable: {key}") from exc
 
@@ -184,7 +184,7 @@ def _parse_variables(lines: list[str]) -> dict[str, float]:
         if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", name):
             raise GeometryParseError(f"invalid Z-matrix variable name: {name}")
         try:
-            variables[name] = float(value)
+            variables[name] = _float_token(value)
         except ValueError as exc:
             raise GeometryParseError(f"invalid Z-matrix variable value: {line}") from exc
     return variables
@@ -192,9 +192,13 @@ def _parse_variables(lines: list[str]) -> dict[str, float]:
 
 def _parse_value(token: str) -> ZMatrixValue:
     try:
-        return ZMatrixValue(float(token))
+        return ZMatrixValue(_float_token(token))
     except ValueError:
         return ZMatrixValue(token.strip())
+
+
+def _float_token(token: str) -> float:
+    return float(token.strip().replace("D", "E").replace("d", "e"))
 
 
 def _parse_zmatrix_atom(index: int, line: str) -> ZMatrixAtom:

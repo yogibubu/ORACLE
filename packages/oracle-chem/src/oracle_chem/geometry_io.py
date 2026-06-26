@@ -119,4 +119,8 @@ def read_geometry(path: Path) -> MolecularGeometry:
         from .zmatrix import read_zmatrix
 
         return read_zmatrix(target)
+    if suffix in {".gjf", ".gau", ".com", ".inp"}:
+        from oracle_gaussian import read_gaussian_input
+
+        return read_gaussian_input(target)
     raise GeometryParseError(f"unsupported geometry format: {target}")

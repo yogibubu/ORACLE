@@ -1,7 +1,17 @@
 from __future__ import annotations
 
-from oracle_chem import MolecularGeometry, read_enriched_xyz, read_xyz, read_zmatrix
-from oracle_gaussian import read_gaussian_cartesian_input, read_gaussian_zmatrix_input, summarize_gaussian_log
+from pathlib import Path
+
+from oracle_chem import MolecularGeometry, read_enriched_xyz, read_geometry, read_xyz, read_zmatrix
+from oracle_gaussian import (
+    read_gaussian_cartesian_input,
+    read_gaussian_input,
+    read_gaussian_zmatrix_input,
+    summarize_gaussian_log,
+)
+
+
+CORPUS = Path(__file__).resolve().parent / "fixtures" / "test_molecules" / "molecules"
 
 
 def test_xyz_parser_normalizes_symbols_and_numbers(tmp_path):
@@ -98,7 +108,7 @@ def test_zmatrix_parser_handles_variables_and_dummy_atoms(tmp_path):
                 "H 1 rOH 2 aHOX 3 dih",
                 "",
                 "Variables:",
-                "rOH = 0.96",
+                "rOH = 9.6D-01",
                 "aHOX = 52.25",
                 "dih = 180.0",
             ]
@@ -142,6 +152,32 @@ def test_gaussian_zmatrix_input_uses_unified_zmatrix_adapter(tmp_path):
     assert geometry.atoms == ("O", "H", "H")
     assert geometry.charge == 0
     assert geometry.multiplicity == 1
+    assert geometry.source_format == "gaussian_zmatrix_input"
+
+
+def test_gaussian_input_auto_detects_cartesian_with_zmat_route():
+    geometry = read_gaussian_input(CORPUS / "h2o2zmat.inp")
+
+    assert geometry.atoms == ("H", "O", "O", "H")
+    assert geometry.charge == 0
+    assert geometry.multiplicity == 1
+    assert geometry.source_format == "gaussian_cartesian_input"
+
+
+def test_gaussian_input_ignores_following_gic_block_after_zmatrix():
+    geometry = read_gaussian_input(CORPUS / "c6h6_zmat_gic.inp")
+
+    assert geometry.natoms == 12
+    assert geometry.atoms.count("C") == 6
+    assert geometry.atoms.count("H") == 6
+    assert geometry.source_format == "gaussian_zmatrix_input"
+
+
+def test_read_geometry_dispatches_gaussian_inp_to_unified_adapter():
+    geometry = read_geometry(CORPUS / "pyridine_zmat.inp")
+
+    assert geometry.natoms == 11
+    assert geometry.atoms.count("N") == 1
     assert geometry.source_format == "gaussian_zmatrix_input"
 
 
