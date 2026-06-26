@@ -139,6 +139,11 @@ This constraint is formalized in
 `ADR-0001-SHARED-LIBRARIES-AND-XYZ-CONTAINER.md` and
 `ORACLE_XYZ_CONTAINER.md`.
 
+The preprocessing layer is ORACLE-Babel. It normalizes external sources into an
+Avogadro-compatible enriched XYZ, determines symmetry with explicit thresholds,
+builds topology once, saves synthons/descriptors and leaves downstream tools to
+reuse the saved sections.
+
 ## Subproject Responsibilities
 
 `oracle-core`

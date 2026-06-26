@@ -97,3 +97,30 @@ def replace_section_in_lines(
 def replace_section(path: Path, section_name: str, content_lines: list[str]) -> None:
     lines = read_sectioned_lines(path)
     write_sectioned_lines(path, replace_section_in_lines(lines, section_name, content_lines))
+
+
+def xyz_tail_start(lines: list[str]) -> int:
+    if not lines:
+        return 0
+    try:
+        natoms = int(lines[0].strip())
+    except ValueError:
+        return 0
+    return min(len(lines), natoms + 2)
+
+
+def replace_xyz_block_in_lines(lines: list[str], xyz_lines: list[str]) -> list[str]:
+    if len(xyz_lines) < 2:
+        raise ValueError("XYZ block needs at least atom-count and comment lines")
+    try:
+        natoms = int(xyz_lines[0].strip())
+    except ValueError as exc:
+        raise ValueError("XYZ block first line must be an atom count") from exc
+    if len(xyz_lines) < natoms + 2:
+        raise ValueError("XYZ block is incomplete")
+    return [*xyz_lines[: natoms + 2], *lines[xyz_tail_start(lines) :]]
+
+
+def replace_xyz_block(path: Path, xyz_lines: list[str]) -> None:
+    lines = read_sectioned_lines(path)
+    write_sectioned_lines(path, replace_xyz_block_in_lines(lines, xyz_lines))

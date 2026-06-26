@@ -9,6 +9,7 @@ from oracle_core import (
     ensure_workspace,
     parse_xyzin_isotopologue_records,
     replace_section,
+    replace_xyz_block,
     section_content,
     validate_xyzin_isotopologue_records,
     xyzin_isotopologue_section_lines,
@@ -110,3 +111,32 @@ def test_isotopologue_parser_accepts_merlino_schema():
 
     assert parsed[0].label == "parent"
     assert parsed[0].rotational_MHz == (1000.0, 800.0, 600.0)
+
+
+def test_replace_xyz_block_preserves_sections_after_avogadro_edit(tmp_path):
+    path = tmp_path / "molecule.xyz"
+    path.write_text(
+        "\n".join(
+            [
+                "2",
+                "old",
+                "H 0 0 0",
+                "H 0 0 1",
+                "",
+                "#SMILES",
+                "[H][H]",
+                "",
+                "#TOPOLOGY",
+                "SCHEMA oracle.xyz.topology.v1",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    replace_xyz_block(path, ["2", "edited in Avogadro", "H 0 0 0", "H 0 0 2"])
+    lines = path.read_text(encoding="utf-8").splitlines()
+
+    assert lines[:4] == ["2", "edited in Avogadro", "H 0 0 0", "H 0 0 2"]
+    assert section_content(lines, "SMILES") == ["[H][H]", ""]
+    assert section_content(lines, "TOPOLOGY") == ["SCHEMA oracle.xyz.topology.v1"]

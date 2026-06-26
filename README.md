@@ -39,6 +39,10 @@ Gaussian parsing, backend execution and manifests belong to shared libraries.
 Geometry and QM-program parsers are unified: they return shared ORACLE models
 and live in parser packages, not GUI or workflow modules.
 
+The preprocessing layer is ORACLE-Babel: it imports external sources, writes an
+Avogadro-compatible enriched XYZ, determines symmetry with explicit thresholds,
+builds topology once, and saves descriptors/synthons for downstream tools.
+
 Python and strict Fortran77 implementations may intentionally coexist for the
 same scientific kernel. In that case they are backends behind one ORACLE service
 contract, with shared schemas, shared enriched XYZ sections and shared

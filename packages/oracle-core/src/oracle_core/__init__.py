@@ -28,9 +28,12 @@ from .sectioned_xyz import (
     remove_section_from_lines,
     replace_section,
     replace_section_in_lines,
+    replace_xyz_block,
+    replace_xyz_block_in_lines,
     section_content,
     section_header,
     write_sectioned_lines,
+    xyz_tail_start,
 )
 from .workspace import WORKSPACE_DIRS, WorkspaceLayout, ensure_workspace
 
@@ -60,12 +63,15 @@ __all__ = [
     "remove_section_from_lines",
     "replace_section",
     "replace_section_in_lines",
+    "replace_xyz_block",
+    "replace_xyz_block_in_lines",
     "section_content",
     "section_header",
     "sha256_file",
     "validate_xyzin_isotopologue_file",
     "validate_xyzin_isotopologue_records",
     "write_sectioned_lines",
+    "xyz_tail_start",
     "write_xyzin_isotopologue_records",
     "xyzin_isotopologue_section_lines",
     "xyzin_isotopologue_validation_errors",
