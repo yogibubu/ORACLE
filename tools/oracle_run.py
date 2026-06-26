@@ -23,6 +23,10 @@ def build_parser() -> argparse.ArgumentParser:
     init = sub.add_parser("init", help="Create an ORACLE project workspace")
     init.add_argument("workdir", type=Path)
 
+    validate = sub.add_parser("validate", help="Validate an enriched XYZ after preprocessing")
+    validate.add_argument("xyzin", type=Path)
+    validate.add_argument("--require-fragments", action="store_true")
+
     lcb25 = sub.add_parser("lcb25", help="Manage the local ORACLE LCB25 geometry cache")
     lcb25_sub = lcb25.add_subparsers(dest="lcb25_command")
     fetch = lcb25_sub.add_parser("fetch", help="Download/extract LCB25 geometries once")
@@ -34,6 +38,13 @@ def build_parser() -> argparse.ArgumentParser:
     fragments_sub = fragments.add_subparsers(dest="fragments_command")
     plan = fragments_sub.add_parser("plan", help="Write the initial #FRAGMENTS section")
     plan.add_argument("xyzin", type=Path)
+
+    gicforge = sub.add_parser("gicforge", help="Plan GICForge post-validation sections")
+    gicforge_sub = gicforge.add_subparsers(dest="gicforge_command")
+    gic_plan = gicforge_sub.add_parser("plan", help="Write planned #GIC/#SYCART sections")
+    gic_plan.add_argument("xyzin", type=Path)
+    gic_plan.add_argument("--symmetrize", action="store_true")
+    gic_plan.add_argument("--sycart", action="store_true")
 
     sub.add_parser("merlino", help="Delegate to the current Merlino CLI during migration")
     return parser
@@ -48,6 +59,12 @@ def main(argv: list[str] | None = None) -> int:
         ensure_workspace(args.workdir)
         print(f"Created ORACLE workspace: {args.workdir}")
         return 0
+    if args.command == "validate":
+        from oracle_chem import write_validation_section
+
+        result = write_validation_section(args.xyzin, require_fragments=args.require_fragments)
+        print(f"Validated ORACLE molecule: {args.xyzin} ({result.status})")
+        return 0
     if args.command == "lcb25" and args.lcb25_command == "fetch":
         from oracle_babel import sync_lcb25_library
 
@@ -59,6 +76,16 @@ def main(argv: list[str] | None = None) -> int:
 
         write_fragment_plan_section(args.xyzin)
         print(f"Planned ORACLE fragment workflow: {args.xyzin}")
+        return 0
+    if args.command == "gicforge" and args.gicforge_command == "plan":
+        from oracle_gicforge import write_gicforge_plan_sections
+
+        write_gicforge_plan_sections(
+            args.xyzin,
+            symmetrize=args.symmetrize,
+            sycart=args.sycart,
+        )
+        print(f"Planned GICForge workflow: {args.xyzin}")
         return 0
     if args.command == "merlino":
         sys.argv = ["merlino", *remainder]

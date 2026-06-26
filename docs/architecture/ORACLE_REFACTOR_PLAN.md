@@ -170,6 +170,8 @@ reuse the saved sections.
   fragment/synthon signatures belong here so MORPHEUS, GICForge, fragment
   search, GUI diagnostics and future ML/data workflows reuse the same
   descriptors.
+- Owns `#VALIDATION`, the post-preprocessing gate that checks the enriched XYZ
+  state before GICForge and later tools consume the molecule.
 - `topology_reporting` is migrated as source material but should not become a
   public API until the remaining `survibfit` reporting dependencies are moved
   or replaced by ORACLE services.
@@ -180,6 +182,8 @@ reuse the saved sections.
   B-matrix evaluation and Python/Fortran comparison.
 - Owns the GICForge public service, normalized schema and Python/Fortran77
   backend contract.
+- Starts only from an enriched XYZ with `#VALIDATION STATUS PASS`; it then
+  writes frozen `#GIC` and optional `#SYCART` sections for downstream tools.
 
 `oracle-morpheus`
 

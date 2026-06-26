@@ -21,6 +21,14 @@ from .babel import (
     SymmetryThresholds,
     preprocess_to_enriched_xyz,
 )
+from .validation import (
+    ORACLE_XYZ_VALIDATION_SCHEMA,
+    ValidationMessage,
+    ValidationResult,
+    validate_enriched_molecule,
+    validation_section_lines,
+    write_validation_section,
+)
 from .topology.atomic_synthons import AtomicSynthons
 from .topology.pipeline import build_topology_objects
 
@@ -28,8 +36,11 @@ __all__ = [
     "AtomicSynthons",
     "GeometryParseError",
     "MolecularGeometry",
+    "ORACLE_XYZ_VALIDATION_SCHEMA",
     "BabelPreprocessResult",
     "SymmetryThresholds",
+    "ValidationMessage",
+    "ValidationResult",
     "ZMatrix",
     "ZMatrixAtom",
     "build_topology_objects",
@@ -41,5 +52,8 @@ __all__ = [
     "read_xyz",
     "read_zmatrix",
     "parse_zmatrix_text",
+    "validate_enriched_molecule",
+    "validation_section_lines",
+    "write_validation_section",
     "zmatrix_to_geometry",
 ]

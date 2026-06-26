@@ -42,6 +42,13 @@ Fragment workflows are planned against existing topology/synthon sections:
 python tools/oracle_run.py fragments plan molecule.xyzin
 ```
 
+Validation is the gate before GICForge:
+
+```bash
+python tools/oracle_run.py validate molecule.xyzin
+python tools/oracle_run.py gicforge plan molecule.xyzin --symmetrize --sycart
+```
+
 ## Migration Rule
 
 Scientific behavior is migrated package by package. Existing `merlino_*`

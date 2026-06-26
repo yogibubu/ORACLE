@@ -118,6 +118,7 @@ Initial section ownership:
   `oracle-chem`.
 - `#TOPOLOGY`: `oracle-chem`.
 - `#SYMMETRY`: `oracle-chem`.
+- `#VALIDATION`: `oracle-chem`.
 - `#GIC`: `oracle-gicforge`.
 - `#SYCART`: `oracle-gicforge`.
 - `#FRAGMENTS`: `oracle-fragments`.

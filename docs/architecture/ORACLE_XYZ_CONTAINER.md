@@ -23,8 +23,9 @@ by other tools.
 ```text
 plain XYZ
   -> oracle-chem adds #TOPOLOGY and #SYMMETRY
-  -> oracle-gicforge adds #GIC and optionally #SYCART
   -> oracle-fragments adds #FRAGMENTS, #FRAGMENT_LIBRARY or #ASSEMBLY
+  -> oracle-chem adds #VALIDATION
+  -> oracle-gicforge adds #GIC and optionally #SYCART
   -> oracle-gaussian adds #GAUSSIAN, #VIBRATIONAL or correction sections
   -> oracle-morpheus adds #ISOTOPOLOGUES and #MORPHEUS
   -> oracle-gf adds #GF_PED
