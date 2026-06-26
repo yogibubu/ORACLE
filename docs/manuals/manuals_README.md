@@ -1,4 +1,4 @@
-# Merlino/MORPHEUS Manuals
+# ORACLE/MORPHEUS Manuals
 
 This directory contains the user-facing manuals for the current MORPHEUS and
 GIC-related workflows.

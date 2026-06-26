@@ -24,7 +24,7 @@ they must not define their own incompatible geometry containers.
 - A parser may preserve program-specific metadata, but coordinates, atom labels,
   charge, multiplicity and fixed-coordinate hints must use shared fields.
 - New parser code must be covered by fixtures before any GUI or workflow uses it.
-- Old Merlino parser modules should become compatibility wrappers around the
+- Old ORACLE parser modules should become compatibility wrappers around the
   ORACLE parser stack during migration.
 
 ## Initial Parser Ownership
@@ -48,9 +48,9 @@ they must not define their own incompatible geometry containers.
 - Separate Z-matrix parsers in GUI, Gaussian or workflow code.
 - Direct downstream consumption of raw QM text when an ORACLE adapter exists.
 
-## Migration Targets From Merlino
+## Migration Targets From ORACLE
 
-Known Merlino parser locations to replace or wrap:
+Known ORACLE parser locations to replace or wrap:
 
 - `gui/xyz_reader.py`
 - `gui/zmat_reader.py`
@@ -58,11 +58,11 @@ Known Merlino parser locations to replace or wrap:
 - `gui/gaussian.py`
 - `gui/molpro.py`
 - `gui/mrcc.py`
-- `merlino_core/xyzin_geometry.py`
-- `merlino_gaussian/parsers.py`
-- `merlino_semiexp/geometry_input.py`
-- `merlino_fit/survibfit/gaussian_log.py`
-- `merlino_vpt2_vci/gaussian_qff.py`
+- `oracle_core/xyzin_geometry.py`
+- `oracle_gaussian/parsers.py`
+- `oracle_morpheus/geometry_input.py`
+- `oracle_morpheus/survibfit/gaussian_log.py`
+- `oracle_vpt2_vci/gaussian_qff.py`
 
-The first ORACLE migration step is not to delete these files in Merlino, but to
+The first ORACLE migration step is not to delete these files in ORACLE, but to
 make the ORACLE parser stack the only new implementation path.

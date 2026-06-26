@@ -1,25 +1,25 @@
-# Merlino4 Refactor Plan
+# ORACLE Refactor Plan
 
 ## Baseline
 
-Merlino4 starts from the final Merlino3 working baseline:
+ORACLE starts from the final ORACLE legacy working baseline:
 
 - Code baseline: `c704017 feat(dvr): add fortran77 path solver`
-- Closure docs: `836a418 docs: clarify merlino3 closure point`
-- Final Merlino3 freeze: `archives/freezes/merlino3.0_freeze_20260620_141839.tar.gz`
+- Closure docs: `836a418 docs: clarify oracle3 closure point`
+- Final ORACLE legacy freeze: `archives/freezes/oracle-legacy_freeze_20260620_141839.tar.gz`
 
-Merlino3 is frozen. Do not continue structural work there.
+ORACLE legacy is frozen. Do not continue structural work there.
 
 ## Refactor Goal
 
-Merlino4 must make the main functional areas independently maintainable. The GUI
+ORACLE must make the main functional areas independently maintainable. The GUI
 should orchestrate workflows, not contain scientific or backend-specific logic.
 Fortran programs should be called through narrow Python wrappers. Gaussian and
 DVR parsing/writing should have one source of truth.
 
 The planned new scientific capabilities are limited and explicit:
 
-- Harmonic GF analysis from the independent `merlino_gf` Python package and
+- Harmonic GF analysis from the independent `oracle_gf` Python package and
   `fortran/vpt2_vci/gf_core.f`.
 - VPT2/VCI from Gaussian quartic force fields, with a Davidson diagonalizer for
   large VCI spaces.
@@ -29,34 +29,34 @@ The planned new scientific capabilities are limited and explicit:
 
 ## Target Packages
 
-- `merlino_core`: configuration, paths, logging, manifests, job status and common
+- `oracle_core`: configuration, paths, logging, manifests, job status and common
   exceptions.
-- `merlino_geometry`: atoms, XYZ, masses, isotopes, topology, rings and symmetry
+- `oracle_chem`: atoms, XYZ, masses, isotopes, topology, rings and symmetry
   data structures.
-- `merlino_gic`: ring numbering, GIC construction, Gaussian GIC coordinate
+- `oracle_gicforge`: ring numbering, GIC construction, Gaussian GIC coordinate
   definitions, optional symmetry adaptation, frozen GIC schemas and reusable
   B-matrix evaluation.
-- `merlino_gf`: Cartesian-Hessian to GIC-B/GF/PED transformations, Pulay
+- `oracle_gf`: Cartesian-Hessian to GIC-B/GF/PED transformations, Pulay
   scaling and harmonic report/CSV services. This package is physically
   separated from VPT2/VCI.
-- `merlino_gaussian`: Gaussian input writing, log parsing, scan extraction,
+- `oracle_gaussian`: Gaussian input writing, log parsing, scan extraction,
   GIC-value extraction and job metadata.
-- `merlino_fortran`: executable/source discovery, build checks, subprocess
+- `oracle_engines`: executable/source discovery, build checks, subprocess
   wrappers and normalized error reporting for GICForge, DVR and source-library
   Fortran kernels.
-- `merlino_dvr`: Gaussian-log/grid to DVR workflows, Cremer-Pople mapping,
+- `oracle_dvr`: Gaussian-log/grid to DVR workflows, Cremer-Pople mapping,
   Fortran bridge integration and output readers.
-- `merlino_vpt2_vci`: Gaussian quartic force-field extraction, VPT2/VCI input
+- `oracle_vpt2_vci`: Gaussian quartic force-field extraction, VPT2/VCI input
   preparation, VCI basis control, Fortran backend orchestration and Davidson
   diagonalization outputs.
-- `merlino_semiexp`: semiexperimental equilibrium-geometry fits from
+- `oracle_morpheus`: semiexperimental equilibrium-geometry fits from
   isotopologue rotational constants, QM vibrational corrections and
   least-squares diagnostics.
-- `merlino_gui`: PySide6 windows and controllers only; all scientific work goes
+- `oracle_gui`: PySide6 windows and controllers only; all scientific work goes
   through service interfaces.
-- `merlino_data`: local libraries, catalog indexes and curated chemical data.
+- `oracle_data`: local libraries, catalog indexes and curated chemical data.
 
-The current Merlino3 folders stay in place until each area has been migrated
+The current ORACLE legacy folders stay in place until each area has been migrated
 behind tests.
 
 ## Interface Contracts
@@ -109,7 +109,7 @@ Output:
 Input:
 
 - Gaussian output containing a quadratic/cubic/quartic force field, or an
-  equivalent normalized force-field file produced by `merlino_gaussian`.
+  equivalent normalized force-field file produced by `oracle_gaussian`.
 - Normal-mode metadata, harmonic frequencies and transformation data.
 - Basis/cutoff settings for VCI.
 - Requested number of roots and Davidson convergence settings.
@@ -137,7 +137,7 @@ Input:
 - Experimental rotational constants for multiple isotopologues.
 - Isotopic compositions and atomic masses.
 - QM vibrational corrections, normally `Delta B_vib`, from Gaussian or a
-  normalized Merlino correction table.
+  normalized ORACLE correction table.
 - Initial equilibrium geometry and fit constraints.
 
 Output:
@@ -153,7 +153,7 @@ Implementation rule:
 
 - Keep least-squares fitting in Python unless a Fortran backend is demonstrably
   needed.
-- Keep vibrational-correction parsing in `merlino_gaussian`; `merlino_semiexp`
+- Keep vibrational-correction parsing in `oracle_gaussian`; `oracle_morpheus`
   should consume normalized correction data.
 - Support constrained fits and fixed parameters from the beginning, because
   isotopologue data are often insufficient for a fully free structure.
@@ -161,21 +161,21 @@ Implementation rule:
 ## Migration Sequence
 
 1. Add the new package skeletons and compatibility imports.
-2. Move path/config/logging helpers into `merlino_core`.
-3. Consolidate geometry/topology/ring primitives in `merlino_geometry`.
-4. Move GIC generation and ring numbering into `merlino_gic`.
-5. Introduce `merlino_fortran` wrappers for `gicforge.x`, `path_dvr.x` and
+2. Move path/config/logging helpers into `oracle_core`.
+3. Consolidate geometry/topology/ring primitives in `oracle_chem`.
+4. Move GIC generation and ring numbering into `oracle_gicforge`.
+5. Introduce `oracle_engines` wrappers for `gicforge.x`, `path_dvr.x` and
    source-only Fortran kernels such as `fortran/vpt2_vci/gf_core.f`.
-6. Move Gaussian parsing/writing into `merlino_gaussian`.
-7. Move DVR workflow orchestration into `merlino_dvr`.
+6. Move Gaussian parsing/writing into `oracle_gaussian`.
+7. Move DVR workflow orchestration into `oracle_dvr`.
 8. Inventory existing harmonic/anharmonic Fortran code and define normalized
    input and output files.
 9. Add the semiexperimental geometry data model and least-squares interface.
 10. Rewire GUI controllers to call service interfaces.
-11. Plan the project rename from Merlino to Oracle as a compatibility-managed
-    migration: suite name, documentation, manifests, GUI labels and public CLI
-    aliases first; package/module renames only after stable `merlino_*`
-    compatibility imports and regression tests exist.
+11. Finalize ORACLE branding as a compatibility-managed migration: suite name,
+    documentation, manifests, GUI labels and public CLI aliases first;
+    package/module renames only after stable `oracle_*` compatibility imports
+    and regression tests exist.
     Working expansion:
     **ORACLE = Operational Recognition of Atomistic Connectivity and Local
     Environments**.
@@ -207,13 +207,13 @@ Each step should end with a small commit and a green validation run.
 - Keep semiexperimental geometry fitting independent from any specific QM
   package by consuming normalized vibrational-correction tables.
 - New workflows must expose a non-Qt service or CLI path before GUI wiring.
-- Every workflow run should write a `merlino.run.v1` manifest with input/output
+- Every workflow run should write a `oracle.run.v1` manifest with input/output
   checksums, parameters and backend metadata.
 - Project workspaces should use `inputs/`, `runs/`, `outputs/`, `reports/`,
   `cache/` and `logs/` rather than writing new files directly into `working/`.
 
 ## First Milestone
 
-The first real milestone is a no-behavior-change extraction of `merlino_core`
-and `merlino_fortran`, with the existing GUI and command-line workflows still
+The first real milestone is a no-behavior-change extraction of `oracle_core`
+and `oracle_engines`, with the existing GUI and command-line workflows still
 passing `./freeze_check.sh`.

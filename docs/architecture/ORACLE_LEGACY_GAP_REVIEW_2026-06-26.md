@@ -1,13 +1,13 @@
-# Merlino3 Gap Review
+# ORACLE legacy Gap Review
 
 Date: 2026-06-26
 
-Source reviewed: `/Users/vincenzobarone/merlino3.0`
+Source reviewed: `/Users/vincenzobarone/oracle-legacy`
 
 ## Summary
 
 The main package families are represented in ORACLE, but the current ORACLE
-plan under-described several Merlino responsibilities:
+plan under-described several ORACLE responsibilities:
 
 - standalone scientific runs from an existing `xyzin`;
 - rovibrational/DeltaVib compatibility utilities;
@@ -19,25 +19,25 @@ plan under-described several Merlino responsibilities:
 These are now tracked as explicit architecture responsibilities. They should be
 migrated after the shared parser, topology and section contracts are stable.
 
-## Reviewed Merlino Areas
+## Reviewed ORACLE Areas
 
 Core/package areas:
 
-- `merlino_core`: CLI, config, manifests, workspace, `xyzin` sections and
+- `oracle_core`: CLI, config, manifests, workspace, `xyzin` sections and
   geometry helpers.
-- `merlino_gic`: GICForge Python/Fortran service, frozen GIC schema, symmetry,
+- `oracle_gicforge`: GICForge Python/Fortran service, frozen GIC schema, symmetry,
   B-matrix evaluation.
-- `merlino_semiexp`: SEFit/MORPHEUS, ensemble fitting, MSR import, Kraitchman,
+- `oracle_morpheus`: SEFit/MORPHEUS, ensemble fitting, MSR import, Kraitchman,
   reference library search, paper benchmarks.
-- `merlino_gf`: HessianInput, Wilson GF/PED, internal-coordinate transform,
+- `oracle_gf`: HessianInput, Wilson GF/PED, internal-coordinate transform,
   reports and CSV export.
-- `merlino_vpt2_vci`: QFF/FCHK adapters, VPT2, VCI, Davidson and workflow.
-- `merlino_dvr`: DVR request and manifest preparation.
-- `merlino_gaussian`: Gaussian job discovery/status plus log summaries.
-- `merlino_fortran`: backend discovery and build checks.
+- `oracle_vpt2_vci`: QFF/FCHK adapters, VPT2, VCI, Davidson and workflow.
+- `oracle_dvr`: DVR request and manifest preparation.
+- `oracle_gaussian`: Gaussian job discovery/status plus log summaries.
+- `oracle_engines`: backend discovery and build checks.
 - `geometry`: rotational, vibrational, rovib, Coriolis, Q-cent and
   thermochemistry utilities.
-- `topology` and `merlino_fit/topology`: graph/rings/synthons/descriptors.
+- `topology` and `oracle_morpheus/topology`: graph/rings/synthons/descriptors.
 - `advanced` and `gui`: GUI orchestration, launchers and viewers.
 
 Data/docs:
@@ -56,7 +56,7 @@ Data/docs:
 
 - Owns normalized `#ROTATIONAL`, `#VIBRATIONAL`, `#DELTABVIB`, `#CORIOLIS`
   and `#QCENT` contracts.
-- Migrates Merlino `geometry/rotational_pipeline.py`, `vibrational.py`,
+- Migrates ORACLE `geometry/rotational_pipeline.py`, `vibrational.py`,
   `vib_anh.py`, `rovib_pipeline.py`, `coriolis.py` and `qcent.py`.
 - Treats CeDiTT/alpha-resonances output as an external compatibility payload,
   not as ORACLE-owned theory unless explicitly migrated later.
@@ -79,13 +79,13 @@ Standalone `xyzin` mode
 Reference libraries
 
 - LCB25 is already cached in ORACLE.
-- Merlino `data/se_geometries` remains a separate source to import or merge
+- ORACLE `data/se_geometries` remains a separate source to import or merge
   into the ORACLE library/index layer after topology/synthon validation.
 
 Gaussian job helpers
 
 - ORACLE has parsers and an input writer scaffold.
-- Merlino's `merlino_gaussian.jobs` behavior, including `gauin`/`gauin.gjf`
+- ORACLE's `oracle_gaussian.jobs` behavior, including `gauin`/`gauin.gjf`
   selection and normal-termination status, remains to migrate into
   `oracle-gaussian`.
 

@@ -15,34 +15,34 @@
 \hypersetup{
   hidelinks,
   pdftitle={Multi-Structure MORPHEUS Manual},
-  pdfauthor={Merlino Development Team}
+  pdfauthor={ORACLE Development Team}
 }
 
-\definecolor{MerlinoSlate}{HTML}{4A5561}
-\definecolor{MerlinoBg}{HTML}{F7F8F6}
+\definecolor{ORACLESlate}{HTML}{4A5561}
+\definecolor{ORACLEBg}{HTML}{F7F8F6}
 \emergencystretch=2em
 
-\lstdefinestyle{merlino}{
+\lstdefinestyle{oracle}{
   basicstyle=\ttfamily\small,
   breaklines=true,
   columns=fullflexible,
   keepspaces=true,
   frame=single,
-  rulecolor=\color{MerlinoSlate!45},
-  backgroundcolor=\color{MerlinoBg},
+  rulecolor=\color{ORACLESlate!45},
+  backgroundcolor=\color{ORACLEBg},
   xleftmargin=0.5em,
   xrightmargin=0.5em
 }
 
 \newcommand{\program}{\texttt{MORPHEUS Multi-Structure}}
-\newcommand{\merlino}{\texttt{Merlino}}
+\newcommand{\oracle}{\texttt{ORACLE}}
 \newcommand{\morpheus}{\texttt{MORPHEUS}}
 \newcommand{\gicforge}{\texttt{GICForge}}
 \newcommand{\zeff}{Z_\mathrm{eff}}
 
 \title{\textbf{Multi-Structure MORPHEUS Manual}\\
 \large Shared class-correction refinement across related molecular structures}
-\author{Merlino Development Notes}
+\author{ORACLE Development Notes}
 \date{\today}
 
 \begin{document}
@@ -121,8 +121,8 @@ rank-consistent but numerically ill-conditioned.
 
 An ensemble job uses schema:
 
-\begin{lstlisting}[style=merlino]
-schema = "merlino.semiexp.ensemble.v1"
+\begin{lstlisting}[style=oracle]
+schema = "oracle.semiexp.ensemble.v1"
 title = "maleic, phthalic and succinic anhydrides shared class-correction fit"
 \end{lstlisting}
 
@@ -144,7 +144,7 @@ priors and optional synthon selectors. \\
 
 \subsection{Fit and acceptance policy}
 
-\begin{lstlisting}[style=merlino]
+\begin{lstlisting}[style=oracle]
 [fit]
 step = 1.0e-4
 rcond = 1.0e-10
@@ -167,7 +167,7 @@ class model should not be used without changing classes, priors or atom typing.
 
 \subsection{Molecule list}
 
-\begin{lstlisting}[style=merlino]
+\begin{lstlisting}[style=oracle]
 [[molecules]]
 name = "maleic_anhydride"
 job = "../maleic_anhydride/maleic_anhydride_ensemble.mse.toml"
@@ -202,7 +202,7 @@ Atom-symbol matching is chemically canonicalized by coordinate type:
   \item out-of-plane coordinates use the central atom.
 \end{itemize}
 
-\begin{lstlisting}[style=merlino]
+\begin{lstlisting}[style=oracle]
 [[classes]]
 name = "CO_carbonyl"
 kind = "stretch"
@@ -224,7 +224,7 @@ symbol classes to be split into chemically distinct subclasses.
 
 Soft priors are declared directly on classes:
 
-\begin{lstlisting}[style=merlino]
+\begin{lstlisting}[style=oracle]
 [[classes]]
 name = "CCO_bend"
 kind = "bend"
@@ -250,7 +250,7 @@ ordered signature is used: unordered pair for stretches, central atom retained
 for bends, central bond for torsions, and central atom for out-of-plane
 coordinates.
 
-\begin{lstlisting}[style=merlino]
+\begin{lstlisting}[style=oracle]
 [[classes]]
 name = "Ccarb_Ocarbonyl"
 kind = "stretch"
@@ -268,16 +268,16 @@ conformers and homologous molecules.
 
 \subsection{Production ensemble fit}
 
-\begin{lstlisting}[style=merlino]
-python -m merlino semiexp-ensemble \
+\begin{lstlisting}[style=oracle]
+python -m oracle semiexp-ensemble \
   --job examples/semiexp/anhydrides_ensemble/anhydrides_ensemble.mse-ensemble.toml \
   --outdir working/semiexp/anhydrides_ensemble
 \end{lstlisting}
 
 \subsection{Prior comparison}
 
-\begin{lstlisting}[style=merlino]
-python -m merlino semiexp-ensemble-compare \
+\begin{lstlisting}[style=oracle]
+python -m oracle semiexp-ensemble-compare \
   --job examples/semiexp/anhydrides_ensemble/anhydrides_ensemble.mse-ensemble.toml \
   --outdir working/semiexp/anhydrides_prior_comparison \
   --soft-prior-sigma 1.0e-3
@@ -290,8 +290,8 @@ is chemically informative or merely numerically regularized.
 
 \subsection{Synthon threshold scan}
 
-\begin{lstlisting}[style=merlino]
-python -m merlino semiexp-ensemble-synthon-scan \
+\begin{lstlisting}[style=oracle]
+python -m oracle semiexp-ensemble-synthon-scan \
   --job examples/semiexp/glycine_ensemble/glycine_conformers_synthon.mse-ensemble.toml \
   --outdir working/semiexp/glycine_synthon_scan \
   --thresholds 0.015,0.025,0.035,0.050
@@ -299,8 +299,8 @@ python -m merlino semiexp-ensemble-synthon-scan \
 
 \subsection{Paper artifact regeneration}
 
-\begin{lstlisting}[style=merlino]
-python -m merlino semiexp-ensemble-paper \
+\begin{lstlisting}[style=oracle]
+python -m oracle semiexp-ensemble-paper \
   --job examples/semiexp/anhydrides_ensemble/anhydrides_ensemble.mse-ensemble.toml \
   --paper-dir doc/papers/ensemble_jpcl \
   --outdir working/semiexp/anhydrides_full_analysis
@@ -374,8 +374,8 @@ Current scientific regression targets are:
   \item CLI manifest generation for scientific and workflow manifests.
 \end{itemize}
 
-\begin{lstlisting}[style=merlino]
-pytest merlino_semiexp/tests/test_ensemble.py \
+\begin{lstlisting}[style=oracle]
+pytest oracle_morpheus/tests/test_ensemble.py \
   gui/tests/test_ensemble_window_helpers.py
 \end{lstlisting}
 

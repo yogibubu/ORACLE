@@ -15,42 +15,42 @@
 \hypersetup{
   hidelinks,
   pdftitle={GF/PED Manual},
-  pdfauthor={Merlino Development Team}
+  pdfauthor={ORACLE Development Team}
 }
 
-\definecolor{MerlinoBlue}{HTML}{245C73}
-\definecolor{MerlinoSlate}{HTML}{4A5561}
-\definecolor{MerlinoGold}{HTML}{C88A2D}
-\definecolor{MerlinoBg}{HTML}{F7F8F6}
+\definecolor{ORACLEBlue}{HTML}{245C73}
+\definecolor{ORACLESlate}{HTML}{4A5561}
+\definecolor{ORACLEGold}{HTML}{C88A2D}
+\definecolor{ORACLEBg}{HTML}{F7F8F6}
 \emergencystretch=2em
 
-\lstdefinestyle{merlino}{
+\lstdefinestyle{oracle}{
   basicstyle=\ttfamily\small,
   breaklines=true,
   columns=fullflexible,
   keepspaces=true,
   frame=single,
-  rulecolor=\color{MerlinoSlate!45},
-  backgroundcolor=\color{MerlinoBg},
+  rulecolor=\color{ORACLESlate!45},
+  backgroundcolor=\color{ORACLEBg},
   xleftmargin=0.5em,
   xrightmargin=0.5em
 }
 
 \newcommand{\program}{\texttt{GF/PED}}
-\newcommand{\merlino}{\texttt{Merlino}}
+\newcommand{\oracle}{\texttt{ORACLE}}
 \newcommand{\gicforge}{\texttt{GICForge}}
 \newcommand{\bohr}{\text{bohr}}
 
 \title{\textbf{GF/PED Manual}\\
-\large Wilson GF analysis, internal-coordinate force constants and potential-energy distributions in Merlino}
-\author{Merlino Development Notes}
+\large Wilson GF analysis, internal-coordinate force constants and potential-energy distributions in ORACLE}
+\author{ORACLE Development Notes}
 \date{\today}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-\program{} is the \merlino{} workflow that transforms a Cartesian harmonic
+\program{} is the \oracle{} workflow that transforms a Cartesian harmonic
 Hessian into an internal-coordinate Wilson GF problem, solves the harmonic
 vibrational eigenproblem and reports frequencies, internal force constants,
 normal modes and potential-energy distributions (PEDs).  The production path
@@ -76,7 +76,7 @@ The preferred production workflow is \texttt{gic-gf}.  It reads a frozen
 \gicforge{} schema and a Gaussian FCHK Hessian adapter, evaluates the same GICs
 on the Hessian geometry or on an optional external geometry, transforms the
 Cartesian Hessian to the GIC basis and solves Wilson GF.  A simpler diagnostic
-workflow, \texttt{gf}, reads an FCHK file and generates a Merlino GIC basis on
+workflow, \texttt{gf}, reads an FCHK file and generates a ORACLE GIC basis on
 the fly; it is useful for quick checks but does not provide the same
 cross-module coordinate identity as a frozen \gicforge{} schema.
 
@@ -143,7 +143,7 @@ coordinate contribution pattern.
 
 \subsection{Cartesian Hessian}
 
-The canonical internal object is \texttt{merlino\_gf.HessianInput}.  It stores
+The canonical internal object is \texttt{oracle\_gf.HessianInput}.  It stores
 atomic numbers, Cartesian coordinates in bohr, atomic masses in amu, a full
 symmetric Cartesian Hessian in \(E_h/\bohr^2\), optional harmonic frequencies
 from the source adapter and provenance metadata.  The current file adapter is
@@ -166,7 +166,7 @@ data.
 
 \subsection{Frozen GIC Definition}
 
-The production branch reads a \texttt{merlino.gic.definition.v1} JSON schema
+The production branch reads a \texttt{oracle.gic.definition.v1} JSON schema
 created by \texttt{gic-define}.  The schema contains primitive coordinates, the
 GIC coefficient matrix, labels, names, irreducible representations, point group,
 symmetrization flag and the Gaussian-readable GIC block.  GF/PED evaluates that
@@ -182,10 +182,10 @@ angstrom and are converted internally to bohr before B-matrix evaluation.
 
 \subsection{Quick FCHK workflow}
 
-The quick workflow builds a Merlino GIC basis directly from the FCHK geometry:
+The quick workflow builds a ORACLE GIC basis directly from the FCHK geometry:
 
-\begin{lstlisting}[style=merlino]
-python -m merlino gf \
+\begin{lstlisting}[style=oracle]
+python -m oracle gf \
   --fchk working/gauin.fchk \
   --out working/gf_ped_report.txt \
   --csv-dir working/gf_csv
@@ -200,13 +200,13 @@ previous Gaussian input, SEfit/MORPHEUS refinement or GICForge manifest.
 
 The production workflow first freezes the coordinate model and then runs GF/PED:
 
-\begin{lstlisting}[style=merlino]
-python -m merlino gic-define \
+\begin{lstlisting}[style=oracle]
+python -m oracle gic-define \
   --geometry parent.xyz \
   --out working/gic_definition.json \
   --gaussian-out working/gauin
 
-python -m merlino gic-gf \
+python -m oracle gic-gf \
   --schema working/gic_definition.json \
   --fchk working/gauin.fchk \
   --out working/gic_gf_ped_report.txt \
@@ -217,8 +217,8 @@ python -m merlino gic-gf \
 If the B matrix must be evaluated on a geometry different from the FCHK
 geometry, pass:
 
-\begin{lstlisting}[style=merlino]
-python -m merlino gic-gf \
+\begin{lstlisting}[style=oracle]
+python -m oracle gic-gf \
   --schema working/gic_definition.json \
   --fchk working/gauin.fchk \
   --geometry working/current.xyz \
@@ -237,7 +237,7 @@ applied after transformation of the Cartesian Hessian to internal coordinates
 and before the Wilson GF eigenproblem.  A scaling file is line-oriented text or
 CSV:
 
-\begin{lstlisting}[style=merlino]
+\begin{lstlisting}[style=oracle]
 # selector factor
 default 1.000
 GIC003 0.980
@@ -260,8 +260,8 @@ Selectors may be:
 \noindent
 Inline records are supplied with repeated \texttt{--scale} options:
 
-\begin{lstlisting}[style=merlino]
-python -m merlino gic-gf \
+\begin{lstlisting}[style=oracle]
+python -m oracle gic-gf \
   --schema working/gic_definition.json \
   --fchk working/gauin.fchk \
   --scale-file working/pulay_scale.txt \

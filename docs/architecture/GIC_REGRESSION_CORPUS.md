@@ -1,6 +1,6 @@
 # GIC Regression Corpus
 
-`tests/fixtures/test_molecules` is the imported Merlino `test_molecules`
+`tests/fixtures/test_molecules` is the imported ORACLE `test_molecules`
 corpus. It contains demanding molecular inputs for GICForge, topology, ring,
 out-of-plane, Z-matrix and Gaussian-adapter regressions.
 

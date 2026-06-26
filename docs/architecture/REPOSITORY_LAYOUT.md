@@ -1,6 +1,6 @@
 # Repository Layout
 
-This file is the operational map for the Merlino repository.
+This file is the operational map for the ORACLE repository.
 
 ## Root Policy
 
@@ -14,12 +14,12 @@ the top-level README. New implementation files should not be added at root.
   viewers.
 - `geometry/`: core molecular geometry, rotational/vibrational/thermodynamic
   routines, and `xyzin` utilities.
-- `merlino_fit/`: topology, synthons, fitting, BDPCS3 correction, Gaussian GIC
+- `oracle_morpheus/`: topology, synthons, fitting, BDPCS3 correction, Gaussian GIC
   generation, and test suite.
-- `merlino_gic/`: frozen GIC definition and reusable B-matrix evaluation.
-- `merlino_gf/`: harmonic Cartesian-Hessian/GIC-B/GF/PED package, physically
+- `oracle_gicforge/`: frozen GIC definition and reusable B-matrix evaluation.
+- `oracle_gf/`: harmonic Cartesian-Hessian/GIC-B/GF/PED package, physically
   separated from VPT2/VCI.
-- `merlino_vpt2_vci/`: normal-mode anharmonic QFF, VPT2, VCI and Davidson.
+- `oracle_vpt2_vci/`: normal-mode anharmonic QFF, VPT2, VCI and Davidson.
 - `puckering_dvr/`: DVR analysis backend for completed Gaussian outputs.
 - `fortran/`: active Fortran backends. Executable code lives in
   `fortran/gicforge` and `fortran/dvr`; independent source kernels for
@@ -40,8 +40,8 @@ the top-level README. New implementation files should not be added at root.
   Python and Fortran.
 - `doc/archive/`: cleanup, freeze and triage history.
 - `doc/reports/`: larger reports and TeX artifacts.
-- Historical Merlino3 notes are not duplicated in Merlino4; use the frozen
-  Merlino3.0 tree for that archive.
+- Historical ORACLE legacy notes are not duplicated in ORACLE; use the frozen
+  `oracle-legacy` archive for that material.
 
 ## Fortran Build Policy
 

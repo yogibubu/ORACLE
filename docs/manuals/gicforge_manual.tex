@@ -15,29 +15,29 @@
 \hypersetup{
   hidelinks,
   pdftitle={GICForge Manual},
-  pdfauthor={Merlino Development Team}
+  pdfauthor={ORACLE Development Team}
 }
 
-\definecolor{MerlinoBlue}{HTML}{245C73}
-\definecolor{MerlinoSlate}{HTML}{4A5561}
-\definecolor{MerlinoGold}{HTML}{C88A2D}
-\definecolor{MerlinoBg}{HTML}{F7F8F6}
+\definecolor{ORACLEBlue}{HTML}{245C73}
+\definecolor{ORACLESlate}{HTML}{4A5561}
+\definecolor{ORACLEGold}{HTML}{C88A2D}
+\definecolor{ORACLEBg}{HTML}{F7F8F6}
 \emergencystretch=2em
 
-\lstdefinestyle{merlino}{
+\lstdefinestyle{oracle}{
   basicstyle=\ttfamily\small,
   breaklines=true,
   columns=fullflexible,
   keepspaces=true,
   frame=single,
-  rulecolor=\color{MerlinoSlate!45},
-  backgroundcolor=\color{MerlinoBg},
+  rulecolor=\color{ORACLESlate!45},
+  backgroundcolor=\color{ORACLEBg},
   xleftmargin=0.5em,
   xrightmargin=0.5em
 }
 
 \newcommand{\program}{\texttt{GICForge}}
-\newcommand{\merlino}{\texttt{Merlino}}
+\newcommand{\oracle}{\texttt{ORACLE}}
 \newcommand{\xyzin}{\texttt{xyzin}}
 \newcommand{\provin}{\texttt{provin}}
 \newcommand{\provout}{\texttt{provout}}
@@ -46,15 +46,15 @@
 \newcommand{\angstrom}{\text{\AA}}
 
 \title{\textbf{GICForge Manual}\\
-\large Non-redundant generalized internal coordinates and symmetry-adapted coordinate bases in Merlino}
-\author{Merlino Development Notes}
+\large Non-redundant generalized internal coordinates and symmetry-adapted coordinate bases in ORACLE}
+\author{ORACLE Development Notes}
 \date{\today}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-\program{} is the \merlino{} geometry backend that converts Cartesian molecular
+\program{} is the \oracle{} geometry backend that converts Cartesian molecular
 structures into non-redundant generalized internal coordinates (GICs), optional
 symmetry-adapted GICs, and symmetry-adapted Cartesian coordinates.  It is used
 as a library service by MORPHEUS, SEfit and future geometry optimizers, and can
@@ -71,7 +71,7 @@ files, Python/Fortran identity checks and recommended regression tests.
 \program{} has one responsibility: starting from a Cartesian molecular
 structure, it constructs a chemically interpretable, rank-complete coordinate
 basis.  The basis can be used directly as a Gaussian ReadGIC block, frozen as a
-machine-readable \merlino{} schema, evaluated analytically on later Cartesian
+machine-readable \oracle{} schema, evaluated analytically on later Cartesian
 geometries, or converted into symmetry-adapted Cartesian displacements.
 
 \program{} deliberately does not own project management, SMILES handling,
@@ -132,11 +132,11 @@ coordinate generator fails rather than writing an ambiguous basis.
 
 The molecular geometry input is the XYZ-format file \xyzin{} in the working
 directory.  Atomic symbols and atomic numbers must be equivalent and must cover
-the full periodic table through the shared \merlino{} periodic-table utilities.
+the full periodic table through the shared \oracle{} periodic-table utilities.
 The \provin{} file contains only keywords, title, charge and multiplicity; it
 must not contain Cartesian coordinates, Z-matrices or FCHK-derived geometry.
 
-\begin{lstlisting}[style=merlino]
+\begin{lstlisting}[style=oracle]
 # GNIC BMAT GICSYM
 
 Pyrene GICForge example
@@ -153,7 +153,7 @@ only production path.
 
 The active Fortran backend is built with:
 
-\begin{lstlisting}[style=merlino]
+\begin{lstlisting}[style=oracle]
 cd fortran/gicforge
 ./compile_MAC
 \end{lstlisting}
@@ -163,13 +163,13 @@ The build writes \texttt{fortran/gicforge/build/gicforge} and installs the
 runtime executable as \texttt{bin/gicforge.x}.  The compatibility alias
 \texttt{bin/prova.x} is kept only for older launchers.
 
-The recommended command-line entry point is the shared \merlino{} CLI:
+The recommended command-line entry point is the shared \oracle{} CLI:
 
-\begin{lstlisting}[style=merlino]
-python -m merlino gic --workdir work/gicforge
-python -m merlino gic-define geometry.xyz --workdir work/gicdefine
-python -m merlino gic-bmatrix merlino.gic.definition.json geometry.xyz
-python -m merlino gic-contract --geometry geometry.xyz --workdir work/contract
+\begin{lstlisting}[style=oracle]
+python -m oracle gic --workdir work/gicforge
+python -m oracle gic-define geometry.xyz --workdir work/gicdefine
+python -m oracle gic-bmatrix oracle.gic.definition.json geometry.xyz
+python -m oracle gic-contract --geometry geometry.xyz --workdir work/contract
 \end{lstlisting}
 
 \noindent
@@ -264,7 +264,7 @@ Coordinate definitions are printed in a Gaussian ReadGIC-compatible form.  Each
 line has a name on the left-hand side, an equal sign, and either one primitive
 or a normalized linear combination of primitives on the right-hand side:
 
-\begin{lstlisting}[style=merlino]
+\begin{lstlisting}[style=oracle]
 Str0001 = R(1,2)
 Bend0007 = A(2,1,6)
 Tors0014 = D(3,4,5,6)
@@ -343,7 +343,7 @@ an active final coordinate.
 For a five-membered ring, the report therefore separates the coordinate
 construction from the active coordinates:
 
-\begin{lstlisting}[style=merlino]
+\begin{lstlisting}[style=oracle]
 Endocyclic Dihedral Angles
   5-Membered Ring (  13  12  16   1   2):  2 Dihedral angles
 
@@ -543,8 +543,8 @@ or force-field projection more seriously than a clean stop.
 \section{Frozen Schema and Public API}
 
 The production public API is the \texttt{GICForge} service in
-\texttt{merlino\_gic}.  A fresh definition run writes a
-\texttt{merlino.gic.definition.v1} schema containing:
+\texttt{oracle\_gic}.  A fresh definition run writes a
+\texttt{oracle.gic.definition.v1} schema containing:
 
 \begin{itemize}
   \item primitive coordinate expressions;
@@ -585,7 +585,7 @@ active. \\
 \texttt{ringin} & Canonical ring data used by the ring-coordinate generator. \\
 \texttt{sycart.xyz} & Symmetry-adapted Cartesian coordinates when
 \texttt{SYCART} is active. \\
-\texttt{merlino.gic.definition.}\newline\texttt{v1.json} & Frozen reusable GIC schema written by
+\texttt{oracle.gic.definition.}\newline\texttt{v1.json} & Frozen reusable GIC schema written by
 \texttt{gic-define}. \\
 \bottomrule
 \end{longtable}
@@ -633,13 +633,13 @@ basis silently.  The contract checks:
 \noindent
 Run the contract with:
 
-\begin{lstlisting}[style=merlino]
-python -m merlino gic-contract --geometry examples/pyrene.xyz \
+\begin{lstlisting}[style=oracle]
+python -m oracle gic-contract --geometry examples/pyrene.xyz \
   --workdir work/gic_contract_pyrene
 \end{lstlisting}
 
 \noindent
-The Python port in \texttt{merlino\_gic.gicforge\_python} is a faithful porting
+The Python port in \texttt{oracle\_gic.gicforge\_python} is a faithful porting
 target, not an independent production generator.  It must match Fortran on
 ordering, primitive orientation, coordinate families, type-local pruning,
 symmetry labels and B rows before it can replace a backend path.

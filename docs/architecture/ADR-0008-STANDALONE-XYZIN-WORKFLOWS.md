@@ -8,7 +8,7 @@ Accepted
 
 ## Context
 
-Merlino tools are not only steps inside a single GUI/pipeline. SEFit/MORPHEUS,
+ORACLE tools are not only steps inside a single GUI/pipeline. SEFit/MORPHEUS,
 GF/PED, thermochemistry and anharmonic programs can also be run independently
 when the user already has a valid `xyzin`/enriched XYZ file.
 
@@ -55,7 +55,7 @@ Examples:
 ## Consequences
 
 - `xyzin` is a public interchange file, not an internal cache.
-- Existing Merlino fixtures that already contain enough sections remain useful
+- Existing ORACLE fixtures that already contain enough sections remain useful
   regression tests.
 - ORACLE-Babel and validation are recommended producers of clean state, but
   standalone tools can consume externally prepared compatible state.

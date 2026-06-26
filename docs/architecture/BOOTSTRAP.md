@@ -12,8 +12,8 @@ PYTHONPATH=packages/oracle-core/src python -m pytest
 
 ## Shell Helpers
 
-ORACLE mirrors the Merlino `merlino-set`, `merlino-run`, `merlino-run-check`
-and test helpers with sourceable shell functions:
+ORACLE provides sourceable shell helpers for environment setup, launch checks
+and tests:
 
 ```bash
 source /Users/vincenzobarone/ORACLE/scripts/oracle_env.sh
@@ -32,11 +32,10 @@ cd /Users/vincenzobarone/ORACLE
 PYTHONPATH=packages/oracle-core/src python tools/oracle_run.py init /tmp/oracle-demo
 ```
 
-## Delegate To Merlino During Migration
+## Inspect The CLI
 
-When the Merlino repository is importable in `PYTHONPATH`, the temporary CLI can
-delegate:
+The temporary CLI is available directly from the repository:
 
 ```bash
-PYTHONPATH=/Users/vincenzobarone/merlino3.0 python tools/oracle_run.py merlino --help
+python tools/oracle_run.py --help
 ```

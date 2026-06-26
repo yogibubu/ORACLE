@@ -1,6 +1,6 @@
 # ORACLE Environment Helpers
 
-ORACLE keeps Merlino-style shell helpers in the repository instead of editing a
+ORACLE keeps ORACLE-style shell helpers in the repository instead of editing a
 personal shell startup file implicitly. Source the helper once per shell:
 
 ```bash
@@ -25,7 +25,7 @@ The helper defines:
   remove ordinary runtime logs while preserving `tests/fixtures`.
 - `oracle-gic-corpus-list`: list imported demanding GIC input files.
 
-Default variables mirror the Merlino helpers but use ORACLE names:
+Default variables mirror the ORACLE helpers but use ORACLE names:
 
 ```bash
 ORACLE_HOME=/Users/vincenzobarone/ORACLE

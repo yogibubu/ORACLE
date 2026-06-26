@@ -2,8 +2,8 @@
 
 **Operational Recognition of Atomistic Connectivity and Local Environments**
 
-ORACLE is the suite-level refactor of the current Merlino/MORPHEUS codebase.
-The first releases keep Merlino compatibility aliases while the scientific
+ORACLE is the suite-level refactor of the current ORACLE/MORPHEUS codebase.
+The first releases keep ORACLE compatibility aliases while the scientific
 packages are separated behind stable service, CLI and manifest contracts.
 
 ## Initial Scope
@@ -39,7 +39,7 @@ committed source files:
 python tools/oracle_run.py lcb25 fetch
 ```
 
-Merlino-style shell helpers are available for ORACLE without editing personal
+ORACLE-style shell helpers are available for ORACLE without editing personal
 startup files automatically:
 
 ```bash
@@ -49,7 +49,7 @@ oracle-run --help
 oracle-test-all
 ```
 
-The demanding Merlino `test_molecules` corpus is versioned under
+The demanding ORACLE `test_molecules` corpus is versioned under
 `tests/fixtures/test_molecules` for GICForge/parser regressions.
 
 Fragment workflows are planned against existing topology/synthon sections:
@@ -68,7 +68,7 @@ python tools/oracle_run.py gicforge gaussian-input molecule.xyzin job.gjf
 
 ## Migration Rule
 
-Scientific behavior is migrated package by package. Existing `merlino_*`
+Scientific behavior is migrated package by package. Existing `oracle_*`
 imports stay valid until ORACLE-native tests cover the new public APIs.
 
 ## Core Architecture Rule

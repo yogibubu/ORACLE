@@ -177,5 +177,5 @@ may use `oracle-chem`, but `oracle-chem` must not import `oracle-gicforge`.
 - Tools can add value incrementally: import geometry, add topology, add GICs,
   add isotopologues, add MORPHEUS results, add GF/PED tables, and so on.
 - Tests must check section preservation whenever a tool updates the container.
-- Compatibility readers can accept old `merlino.xyzin.*` schemas, but new
+- Compatibility readers can accept legacy `oracle.xyzin.*` schemas, but new
   output should use `oracle.xyz.*` schemas.

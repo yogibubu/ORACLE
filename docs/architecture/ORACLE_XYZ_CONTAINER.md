@@ -44,11 +44,11 @@ from an already prepared `xyzin` file when the sections it needs are present.
 
 ## Compatibility
 
-The Merlino `xyzin` format is the historical source:
+The ORACLE `xyzin` format is the historical source:
 
 - ordinary XYZ block first;
 - uppercase appended sections;
 - section replacement must preserve all unrelated sections.
 
-ORACLE keeps this behavior and upgrades schema names from `merlino.xyzin.*` to
-`oracle.xyz.*` as modules migrate.
+ORACLE keeps this behavior and upgrades legacy section schemas from
+`oracle.xyzin.*` to `oracle.xyz.*` as modules migrate.

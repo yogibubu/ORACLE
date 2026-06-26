@@ -38,7 +38,7 @@ It may then write:
 The initial implementation only records a planned `#FRAGMENTS` section after
 validating the topology/synthon prerequisites. Fragment extraction, library
 indexing and assembly algorithms are deferred until the shared topology contract
-is robust across Merlino cases and LCB25.
+is robust across ORACLE cases and LCB25.
 
 The initial command is:
 

@@ -78,7 +78,7 @@ The GUI uses the enriched XYZ as its state source:
 - import edited coordinates by replacing the first XYZ block;
 - show a 2D depiction for task navigation.
 
-The 2D depiction follows the current Merlino rule: prefer `#SMILES` and RDKit
+The 2D depiction follows the current ORACLE rule: prefer `#SMILES` and RDKit
 2D depiction when available. If `#SMILES` is absent, the GUI may later fall back
 to a topology-derived depiction, but that fallback must use the saved
 `#TOPOLOGY`/`#SYNTHONS` sections rather than reparsing chemistry privately.

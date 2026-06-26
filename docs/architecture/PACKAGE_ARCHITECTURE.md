@@ -1,46 +1,46 @@
-# Merlino4 Package Architecture
+# ORACLE Package Architecture
 
-Merlino4 is organized as narrow packages with explicit data contracts. The GUI
+ORACLE is organized as narrow packages with explicit data contracts. The GUI
 orchestrates these packages; it must not duplicate scientific logic.
 
 ## Package Boundaries
 
-- `merlino_core`: CLI, configuration, manifests, workspace handling and common
+- `oracle_core`: CLI, configuration, manifests, workspace handling and common
   validation/errors.
-- `merlino_gic`: GIC definition and B-matrix evaluation. It owns topology-driven
+- `oracle_gicforge`: GIC definition and B-matrix evaluation. It owns topology-driven
   GIC construction, optional symmetry adaptation, frozen GIC schemas and
   Gaussian-readable GIC blocks.
-- `merlino_gf`: harmonic Cartesian-Hessian to internal-coordinate GF/PED. It
+- `oracle_gf`: harmonic Cartesian-Hessian to internal-coordinate GF/PED. It
   owns `HessianInput`, Wilson GF linear algebra, frozen-GIC Hessian
   transformation, Pulay scaling and GF/PED report/CSV services.
-- `merlino_vpt2_vci`: anharmonic normal-mode VPT2/VCI. It owns QFF data,
+- `oracle_vpt2_vci`: anharmonic normal-mode VPT2/VCI. It owns QFF data,
   normal-mode basis selection, VPT2, VCI and Davidson diagonalization. It does
   not build or evaluate GICs.
-- `merlino_semiexp`: semiexperimental geometry refinement. Its default model
-  calls `merlino_gic` for frozen GIC definitions and B matrices, then performs
+- `oracle_morpheus`: semiexperimental geometry refinement. Its default model
+  calls `oracle_gicforge` for frozen GIC definitions and B matrices, then performs
   least-squares refinement and uncertainty propagation. Its optional
   symmetry-Cartesian model builds a Hessian-free translation/rotation-free
   Cartesian displacement basis, filters totally symmetric directions and
   propagates final errors to primitive internal coordinates without using a GIC
   B matrix.
-- `merlino_dvr`: scan/grid to DVR levels and wavefunctions.
-- `merlino_gaussian`: Gaussian input/output adapters. Gaussian is a file-format
+- `oracle_dvr`: scan/grid to DVR levels and wavefunctions.
+- `oracle_gaussian`: Gaussian input/output adapters. Gaussian is a file-format
   source, not a solver dependency.
-- `merlino_fortran`: active executable/source discovery and build checks for
+- `oracle_engines`: active executable/source discovery and build checks for
   Fortran kernels.
-- `merlino_gui` and `advanced`: PySide6 windows/controllers only. They call the
+- `oracle_gui` and `advanced`: PySide6 windows/controllers only. They call the
   package services and CLI workflows.
 
 ## GIC Data Flow
 
 ```text
 Cartesian reference geometry
-  -> merlino_gic.define_gics_from_cartesian(symmetrize=True|False)
-  -> merlino.gic.definition.v1
+  -> oracle_gicforge.define_gics_from_cartesian(symmetrize=True|False)
+  -> oracle.gic.definition.v1
        primitives, U matrix, labels, names, irreps, point group, symmetrized flag
 
 Current Cartesian geometry
-  -> merlino_gic.evaluate_gic_definition(schema, geometry)
+  -> oracle_gicforge.evaluate_gic_definition(schema, geometry)
   -> values, primitive B, GIC B, labels, names, irreps, point group
 ```
 
@@ -51,23 +51,23 @@ must consume the frozen labels and irreps; they must not re-symmetrize.
 
 ```text
 Hessian adapter
-  -> merlino_gf.HessianInput
+  -> oracle_gf.HessianInput
 Frozen GIC definition + current geometry
-  -> merlino_gic.evaluate_gic_definition
+  -> oracle_gicforge.evaluate_gic_definition
 HessianInput + B(GIC)
-  -> merlino_gf internal Hessian/G matrix
+  -> oracle_gf internal Hessian/G matrix
   -> optional Pulay scaling
   -> Wilson GF, frequencies, normal modes, PED
 ```
 
-`merlino_gf` is physically separate from `merlino_vpt2_vci` so additional
+`oracle_gf` is physically separate from `oracle_vpt2_vci` so additional
 harmonic analyses can be added without touching VPT2/VCI.
 
 ## VPT2/VCI Flow
 
 ```text
 QFF adapter or normalized QFF text
-  -> merlino_vpt2_vci.QuarticForceField
+  -> oracle_vpt2_vci.QuarticForceField
   -> active-mode selection/pruning/symmetry blocks
   -> VPT2 and/or VCI
   -> Davidson for large VCI spaces
@@ -82,7 +82,7 @@ Default GIC model:
 
 ```text
 Cartesian parent geometry
-  -> merlino_gic.define_gics_from_cartesian(symmetrize=True)
+  -> oracle_gicforge.define_gics_from_cartesian(symmetrize=True)
   -> GICForge post-pruning GICSYM schema/manifest
   -> totally symmetric frozen GIC subspace
   -> analytic B / Cartesian projector as needed
@@ -110,9 +110,9 @@ GICForge API and consume the frozen post-pruning schema or SYCART coordinates.
 
 Reusable SEfit submodules:
 
-- `merlino_semiexp.constraints`: public Gaussian-style constraint parsing,
+- `oracle_morpheus.constraints`: public Gaussian-style constraint parsing,
   expression values/targets and analytic-vs-finite-difference B-matrix checks.
-- `merlino_semiexp.diagnostics`: public SVD, uncertainty and iteration-trace
+- `oracle_morpheus.diagnostics`: public SVD, uncertainty and iteration-trace
   CSV helpers.
-- `merlino_semiexp.performance`: cached isotope-aware mass vectors used by
+- `oracle_morpheus.performance`: cached isotope-aware mass vectors used by
   observable and Jacobian builders.

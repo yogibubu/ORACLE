@@ -15,43 +15,43 @@
 \hypersetup{
   hidelinks,
   pdftitle={MORPHEUS Manual},
-  pdfauthor={Merlino Development Team}
+  pdfauthor={ORACLE Development Team}
 }
 
-\definecolor{MerlinoBlue}{HTML}{245C73}
-\definecolor{MerlinoSlate}{HTML}{4A5561}
-\definecolor{MerlinoGold}{HTML}{C88A2D}
-\definecolor{MerlinoBg}{HTML}{F7F8F6}
+\definecolor{ORACLEBlue}{HTML}{245C73}
+\definecolor{ORACLESlate}{HTML}{4A5561}
+\definecolor{ORACLEGold}{HTML}{C88A2D}
+\definecolor{ORACLEBg}{HTML}{F7F8F6}
 \emergencystretch=2em
 
-\lstdefinestyle{merlino}{
+\lstdefinestyle{oracle}{
   basicstyle=\ttfamily\small,
   breaklines=true,
   columns=fullflexible,
   keepspaces=true,
   frame=single,
-  rulecolor=\color{MerlinoSlate!45},
-  backgroundcolor=\color{MerlinoBg},
+  rulecolor=\color{ORACLESlate!45},
+  backgroundcolor=\color{ORACLEBg},
   xleftmargin=0.5em,
   xrightmargin=0.5em
 }
 
 \newcommand{\program}{\texttt{MORPHEUS}}
-\newcommand{\merlino}{\texttt{Merlino}}
+\newcommand{\oracle}{\texttt{ORACLE}}
 \newcommand{\xyzin}{\texttt{xyzin}}
 \newcommand{\gicforge}{\texttt{GICForge}}
 \newcommand{\angstrom}{\text{\AA}}
 
 \title{\textbf{MORPHEUS Manual}\\
-\large Algorithmic model generation and semiexperimental refinement in Merlino}
-\author{Merlino Development Notes}
+\large Algorithmic model generation and semiexperimental refinement in ORACLE}
+\author{ORACLE Development Notes}
 \date{\today}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-\program{} is the \merlino{} program for semiexperimental equilibrium-structure
+\program{} is the \oracle{} program for semiexperimental equilibrium-structure
 refinement from rotational constants of isotopologues, vibrational and
 electronic corrections, and optional reference structural information.  The
 program fits Cartesian molecular structures while automatically constructing a
@@ -157,9 +157,9 @@ than allowing the model itself to change during refinement.
 
 The standard project setup is:
 
-\begin{lstlisting}[style=merlino]
-merlino-set
-merlino-run
+\begin{lstlisting}[style=oracle]
+oracle-set
+oracle-run
 \end{lstlisting}
 
 \noindent
@@ -168,14 +168,14 @@ line, including RDKit and PySide6 when available.  The Fortran backends are
 kept as independent executables and are selected explicitly from the GUI or
 with the \texttt{--backend} option.  Check the resolved configuration with:
 
-\begin{lstlisting}[style=merlino]
-python -m merlino config
-python -m merlino backends
+\begin{lstlisting}[style=oracle]
+python -m oracle config
+python -m oracle backends
 \end{lstlisting}
 
 \noindent
 The current production backend for MORPHEUS/SEfit is Python.  The Fortran77 backend
-is maintained where required for common Merlino services, especially
+is maintained where required for common ORACLE services, especially
 \gicforge{} consistency, but the Python MORPHEUS implementation is the
 reference path for the full adaptive least-squares solver and reports.
 
@@ -193,7 +193,7 @@ A reproducible \program{} calculation has five stages.
 \end{enumerate}
 
 External files are import sources only.  Once a \xyzin{} file exists, all
-\merlino{} modules should read geometry, symmetry, rotational, vibrational and
+\oracle{} modules should read geometry, symmetry, rotational, vibrational and
 isotopologue information from that single container.  \program{} can update the
 container during preprocessing, but the fit itself rereads the canonical data.
 
@@ -203,7 +203,7 @@ container during preprocessing, but the fit itself rereads the canonical data.
 
 The default active model is:
 
-\begin{lstlisting}[style=merlino]
+\begin{lstlisting}[style=oracle]
 coordinate_model = "gic"
 \end{lstlisting}
 
@@ -224,7 +224,7 @@ when an external geometry optimization should preserve symmetry.
 
 The alternative active model is:
 
-\begin{lstlisting}[style=merlino]
+\begin{lstlisting}[style=oracle]
 coordinate_model = "cartesian_symmetry"
 \end{lstlisting}
 
@@ -248,13 +248,13 @@ geometrical parameters and their uncertainties are propagated.
 
 \subsection{Canonical \texttt{xyzin} container}
 
-\xyzin{} is the common \merlino{} molecular container.  It starts with a normal
+\xyzin{} is the common \oracle{} molecular container.  It starts with a normal
 XYZ block and then stores optional uppercase sections.  The section used by
 \program{} is \texttt{\#ISOTOPOLOGUES}.
 
-\begin{lstlisting}[style=merlino]
+\begin{lstlisting}[style=oracle]
 #ISOTOPOLOGUES
-SCHEMA merlino.xyzin.isotopologues.v1
+SCHEMA oracle.xyzin.isotopologues.v1
 UNITS ROTATIONAL=MHz DELTAVIB=MHz DELTAEL=MHz SIGMA=MHz
 INDEXING ATOMS=ONE_BASED
 BEGIN parent
@@ -279,21 +279,21 @@ one positive finite component weight.
 
 Validate a container with:
 
-\begin{lstlisting}[style=merlino]
-python -m merlino xyzin-validate --xyzin working/xyzin
-python -m merlino xyzin-validate --xyzin working/xyzin --require-semiexp-observations
+\begin{lstlisting}[style=oracle]
+python -m oracle xyzin-validate --xyzin working/xyzin
+python -m oracle xyzin-validate --xyzin working/xyzin --require-semiexp-observations
 \end{lstlisting}
 
 \subsection{Standalone job file}
 
 The recommended standalone input extension is \texttt{.mse.toml}.  The schema
 identifier is:
-\begin{lstlisting}[style=merlino]
-merlino.semiexp.job.v1
+\begin{lstlisting}[style=oracle]
+oracle.semiexp.job.v1
 \end{lstlisting}
 
-\begin{lstlisting}[style=merlino]
-schema = "merlino.semiexp.job.v1"
+\begin{lstlisting}[style=oracle]
+schema = "oracle.semiexp.job.v1"
 title = "example MORPHEUS fit"
 
 [fit]
@@ -348,7 +348,7 @@ Hard constraints remove directions from the least-squares space.  They can be
 specified as primitive freezes, Gaussian ModRedundant lines or Gaussian-style
 GIC expressions.
 
-\begin{lstlisting}[style=merlino]
+\begin{lstlisting}[style=oracle]
 R(1,2) Frozen
 A 2 1 3 F
 DRCH(Frozen,Value=0.0)=R(5,8)-R(5,7)
@@ -366,8 +366,8 @@ Predicates are weighted structural observations rather than exact constraints.
 They are useful when accurate electronic-structure or library information
 should stabilize an underdetermined refinement without being treated as exact.
 
-\begin{lstlisting}[style=merlino]
-python -m merlino semiexp --job input.mse.toml --outdir run \
+\begin{lstlisting}[style=oracle]
+python -m oracle semiexp --job input.mse.toml --outdir run \
   --qm-predicate "R(2,3):0.9683:0.002:reference"
 \end{lstlisting}
 
@@ -383,8 +383,8 @@ correction in the active least-squares space.  This is appropriate when
 related parameters are not independently determined by the available
 isotopologues.
 
-\begin{lstlisting}[style=merlino]
-python -m merlino semiexp --job input.mse.toml --outdir run \
+\begin{lstlisting}[style=oracle]
+python -m oracle semiexp --job input.mse.toml --outdir run \
   --parameter-class "CH_stretches:shared:R(1,6)|R(2,7)|R(3,8)"
 \end{lstlisting}
 
@@ -411,8 +411,8 @@ information.  Typical actions are:
   \item report weak or poorly observed directions before the fit.
 \end{itemize}
 
-\begin{lstlisting}[style=merlino]
-python -m merlino semiexp --job input.mse.toml --outdir run \
+\begin{lstlisting}[style=oracle]
+python -m oracle semiexp --job input.mse.toml --outdir run \
   --fix-hydrogens \
   --qm-predicate "R(2,3):0.9683:0.002:reference" \
   --parameter-class "CH_stretches:shared:R(1,6)|R(2,7)|R(3,8)"
@@ -472,14 +472,14 @@ rotational component is still calculated and reported as a diagnostic.
 
 \subsection{Input validation}
 
-\begin{lstlisting}[style=merlino]
-python -m merlino xyzin-validate --xyzin working/xyzin
-python -m merlino xyzin-validate --xyzin working/xyzin \
+\begin{lstlisting}[style=oracle]
+python -m oracle xyzin-validate --xyzin working/xyzin
+python -m oracle xyzin-validate --xyzin working/xyzin \
   --require-semiexp-observations
 \end{lstlisting}
 
 \noindent
-The validation commands check the canonical Merlino container before a
+The validation commands check the canonical ORACLE container before a
 production fit.  A full MORPHEUS run then materializes or updates \xyzin{},
 constructs the coordinate model, applies requested constraints/classes and
 writes rank, conditioning, planar-component choice and warning diagnostics to
@@ -487,8 +487,8 @@ the output manifest.
 
 \subsection{Production fit}
 
-\begin{lstlisting}[style=merlino]
-python -m merlino semiexp \
+\begin{lstlisting}[style=oracle]
+python -m oracle semiexp \
   --job input.mse.toml \
   --xyzin working/xyzin \
   --outdir working/morpheus/run01 \
@@ -503,9 +503,9 @@ python -m merlino semiexp \
 To test whether shared classes are justified, run the same input twice: once
 without the class and once with the proposed shared or fixed class.
 
-\begin{lstlisting}[style=merlino]
-python -m merlino semiexp --job p-EBN.msr.inp --outdir run_no_class
-python -m merlino semiexp --job p-EBN.msr.inp --outdir run_classed \
+\begin{lstlisting}[style=oracle]
+python -m oracle semiexp --job p-EBN.msr.inp --outdir run_no_class
+python -m oracle semiexp --job p-EBN.msr.inp --outdir run_classed \
   --parameter-class "example:shared:R(1,2)|R(3,4)"
 \end{lstlisting}
 
@@ -520,8 +520,8 @@ parameter.
 For debugging or method reporting, \gicforge{} definitions can be exported with
 dominant primitive contributions:
 
-\begin{lstlisting}[style=merlino]
-python -m merlino gic-define --geometry parent.xyz \
+\begin{lstlisting}[style=oracle]
+python -m oracle gic-define --geometry parent.xyz \
   --out gic_definition.json \
   --explain-out gic_explain.json \
   --explain-csv gic_explain.csv
@@ -537,7 +537,7 @@ weight fractions.
 The GUI uses the same services as the command line.  A typical GUI run is:
 
 \begin{enumerate}
-  \item create or load a Merlino project;
+  \item create or load a ORACLE project;
   \item import Cartesian geometry or a legacy/job input;
   \item inspect or edit isotopologue definitions, rotational constants,
         vibrational corrections, electronic corrections and standard
@@ -628,7 +628,7 @@ Check constraints, symmetry, data consistency and the reference geometry. \\
 
 The main scientific contract tests are:
 
-\begin{lstlisting}[style=merlino]
+\begin{lstlisting}[style=oracle]
 python -m pytest gui/tests/test_scientific_contracts.py -q
 \end{lstlisting}
 

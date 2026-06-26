@@ -4,34 +4,33 @@ Date: 2026-06-26
 
 ## Goal
 
-Create a clean ORACLE repository from the current `merlino3.0`/Merlino4
-workspace without losing the working scientific code, manuals, regression
-fixtures or GUI workflows.
+Create a clean ORACLE repository from the legacy workspace without losing the
+working scientific code, manuals, regression fixtures or GUI workflows.
 
 ORACLE means **Operational Recognition of Atomistic Connectivity and Local
-Environments**. It should be the suite-level project. Existing Merlino module
+Environments**. It should be the suite-level project. Existing legacy module
 names remain compatibility aliases until the package boundaries are stable and
 covered by tests.
 
 ## Current Situation
 
-The repository already contains useful Merlino4 package boundaries:
+The repository already contains useful ORACLE package boundaries:
 
-- `merlino_core`: configuration, workspace layout, manifests and shared errors.
-- `merlino_gic`: GICForge service, frozen GIC schemas and B-matrix evaluation.
-- `merlino_semiexp`: MORPHEUS/SEfit single- and multi-structure refinement.
-- `merlino_gf`: frozen-GIC GF/PED analysis.
-- `merlino_gaussian`: Gaussian adapters.
-- `merlino_fortran`: backend discovery and wrappers.
-- `merlino_dvr`: DVR workflow wrapper.
-- `merlino_vpt2_vci`: QFF, VPT2/VCI and Davidson prototypes.
-- `merlino_gui`: newer workflow dashboard.
+- `oracle_core`: configuration, workspace layout, manifests and shared errors.
+- `oracle_gicforge`: GICForge service, frozen GIC schemas and B-matrix evaluation.
+- `oracle_morpheus`: MORPHEUS/SEfit single- and multi-structure refinement.
+- `oracle_gf`: frozen-GIC GF/PED analysis.
+- `oracle_gaussian`: Gaussian adapters.
+- `oracle_engines`: backend discovery and wrappers.
+- `oracle_dvr`: DVR workflow wrapper.
+- `oracle_vpt2_vci`: QFF, VPT2/VCI and Davidson prototypes.
+- `oracle_gui`: newer workflow dashboard.
 
 The same tree also still contains legacy or mixed-responsibility areas:
 
 - `gui` and `advanced` still orchestrate scientific services directly.
-- `geometry`, `topology` and `merlino_fit` overlap and create cross-package
-  dependencies.
+- `geometry`, `topology` and the legacy fitting stack overlap and create
+  cross-package dependencies.
 - `working`, `tmp`, generated paper artifacts and LaTeX build files pollute
   the checkout.
 - `doc/papers` mixes source manuscripts, generated tables, analysis results and
@@ -75,7 +74,7 @@ ORACLE/
     architecture/
     manuals/
     papers/
-    archive/merlino3/
+    archive/oracle3/
   packages/
     oracle-core/
       src/oracle_core/
@@ -122,7 +121,7 @@ ORACLE/
     regression/
   tools/
     oracle_run.py
-    migrate_merlino.py
+    migrate_oracle.py
 ```
 
 ## Central Architecture Constraint
@@ -171,7 +170,7 @@ reuse the saved sections.
 - Owns the unified Z-matrix parser. GUI, Gaussian and legacy adapters must call
   this parser rather than keeping private Z-matrix readers.
 - This should absorb the stable parts of `geometry`, `topology` and topology
-  pieces now under `merlino_fit`.
+  pieces now under `oracle_morpheus`.
 - Descriptor topology and atomic synthons are first-class chemistry primitives,
   not side tools. `AtomicSynthons`, descriptor parameters, aromaticity and
   fragment/synthon signatures belong here so MORPHEUS, GICForge, fragment
@@ -234,8 +233,8 @@ reuse the saved sections.
 - Rotational and vibrational section contracts, DeltaVib/alpha bridge values,
   Coriolis and Q-cent compatibility.
 - Provides standalone `xyzin` readers/writers for `#ROTATIONAL` and
-  `#VIBRATIONAL`, plus summary tooling for existing Merlino containers.
-- Migrates Merlino `geometry/rotational_pipeline.py`, `vibrational.py`,
+  `#VIBRATIONAL`, plus summary tooling for existing ORACLE containers.
+- Migrates ORACLE `geometry/rotational_pipeline.py`, `vibrational.py`,
   `vib_anh.py`, `rovib_pipeline.py`, `coriolis.py` and `qcent.py`.
 - Treats external CeDiTT/alpha-resonances payloads as imported data that enrich
   `#ROTATIONAL`, not as private parser logic in downstream tools.
@@ -244,7 +243,7 @@ reuse the saved sections.
 
 - Thermochemistry from enriched XYZ state.
 - Reads `#BASIC`, `#ROTATIONAL` and optional `#VIBRATIONAL`.
-- Owns `#THERMO` and migrates Merlino `geometry/thermo_*` modules.
+- Owns `#THERMO` and migrates ORACLE `geometry/thermo_*` modules.
 
 `oracle-engines`
 
@@ -298,7 +297,7 @@ Every run writes an `oracle.run.v1` manifest with:
 - git commit and dirty flag when available
 - status and user-facing messages
 
-During compatibility migration, accept and emit `merlino.run.v1` where needed,
+During compatibility migration, accept and emit `oracle.run.v1` where needed,
 but the new ORACLE manifest should be the forward contract.
 
 Every workflow should also accept or produce an enriched XYZ file as the
@@ -315,7 +314,7 @@ recommended but not required for those direct runs.
 
 ### Phase 0: Freeze and Inventory
 
-1. Create a clean archive or branch from the current dirty `merlino3.0` state.
+1. Create a clean archive or branch from the current dirty `oracle-legacy` state.
 2. Split pending changes into groups: code, examples, benchmarks, papers,
    generated artifacts and local runtime outputs.
 3. Add missing ignore rules for LaTeX build files and runtime outputs that are
@@ -332,24 +331,24 @@ Exit criteria:
 ### Phase 1: ORACLE Skeleton
 
 1. Create the ORACLE monorepo skeleton with workspace-aware `pyproject.toml`.
-2. Add package placeholders and compatibility aliases:
-   `merlino_core -> oracle_core`, `merlino_gic -> oracle_gicforge`, etc.
+2. Add package placeholders and compatibility aliases from legacy imports to
+   ORACLE packages.
 3. Move only docs and metadata first; do not move scientific code in the first
    commit.
-4. Add an `oracle` CLI that initially delegates to `python -m merlino`.
+4. Add `tools/oracle_run.py` as the initial ORACLE CLI.
 
 Exit criteria:
 
-- `oracle --help` works.
-- Existing Merlino imports still work.
+- `python tools/oracle_run.py --help` works.
+- Existing compatibility imports still work.
 - No scientific behavior changed.
 
 ### Phase 2: Core and Engines
 
-1. Extract `oracle-core` from `merlino_core`.
-2. Extract `oracle-engines` from `merlino_fortran` plus backend build checks.
-3. Normalize manifest schema to `oracle.run.v1` while preserving
-   `merlino.run.v1` readers.
+1. Extract core services into `oracle-core`.
+2. Extract engine discovery and backend build checks into `oracle-engines`.
+3. Normalize manifest schema to `oracle.run.v1` while preserving legacy
+   manifest readers.
 4. Replace direct subprocess calls in services with engine wrappers.
 
 Exit criteria:
@@ -360,9 +359,9 @@ Exit criteria:
 
 ### Phase 3: Chemistry Foundation
 
-1. Merge stable `geometry`, `topology` and selected `merlino_fit.topology`
+1. Merge stable `geometry`, `topology` and selected `oracle_morpheus.topology`
    services into `oracle-chem`.
-2. Remove circular dependencies between topology and `merlino_fit`.
+2. Remove circular dependencies between topology and `oracle_morpheus`.
 3. Define one public molecular model for atoms, coordinates, masses, graph,
    rings and symmetry metadata.
 
@@ -379,14 +378,14 @@ Exit criteria:
    `oracle-morpheus`.
 3. Keep the manuals as contract docs and add examples that match each manual.
 4. Add regression fixtures for GICForge, SYCART, single MORPHEUS and ensemble
-   MORPHEUS. The imported Merlino `test_molecules` corpus is the first
+   MORPHEUS. The imported ORACLE `test_molecules` corpus is the first
    demanding GICForge/parser fixture set.
 
 Exit criteria:
 
 - `oracle gicforge define`, `oracle morpheus fit` and
   `oracle morpheus ensemble` run without importing GUI modules.
-- Existing semiexp tests pass under ORACLE names and Merlino aliases.
+- Existing semiexp tests pass under ORACLE names and ORACLE aliases.
 
 ### Phase 5: Analysis Engines
 
@@ -417,17 +416,17 @@ Exit criteria:
 
 ### Phase 7: Cleanup and Release
 
-1. Move old manuscripts and historical files into `docs/archive/merlino3`.
+1. Move old manuscripts and historical files into `docs/archive/oracle3`.
 2. Remove duplicated generated artifacts from source control.
 3. Keep benchmark inputs and golden outputs, but regenerate reports through
    explicit commands.
-4. Publish ORACLE 0.1 as a compatibility release with Merlino aliases.
+4. Publish ORACLE 0.1 as a compatibility release with ORACLE aliases.
 
 Exit criteria:
 
 - Clean `git status` after a documented build/test run.
 - New clone can run tests without local `working/` state.
-- Documentation explains Merlino-to-ORACLE mapping.
+- Documentation explains legacy-to-ORACLE mapping.
 
 ## Immediate First Tasks
 
@@ -436,9 +435,8 @@ Exit criteria:
    ignore LaTeX build products, keep generated paper outputs out of ordinary
    status, and untrack runtime-only files after review.
 3. Create ORACLE skeleton in a separate directory or branch.
-4. Copy `doc/MERLINO4_REFACTOR_PLAN.md`,
-   `doc/PACKAGE_ARCHITECTURE.md`, `doc/REPOSITORY_LAYOUT.md` and the manuals
-   into ORACLE docs.
+4. Copy transition plans, package architecture notes, repository layout notes
+   and manuals into ORACLE docs.
 5. Implement only `oracle-core` and compatibility aliases first.
 6. Run the smallest validation set before each migration step.
 
@@ -448,13 +446,13 @@ Exit criteria:
   migration are mixed.
 - GUI coupling: medium-high risk; GUI imports many scientific packages and must
   be rewired last.
-- Topology/GIC coupling: high risk; `merlino_gic` and `merlino_semiexp` still
-  depend on `merlino_fit` and legacy topology code.
+- Topology/GIC coupling: high risk; `oracle_gicforge` and `oracle_morpheus` still
+  depend on `oracle_morpheus` and legacy topology code.
 - Generated paper artifacts: medium risk; useful for publications but noisy for
   source control.
 - Fortran/vendored engines: medium risk; treat as stable engines with narrow
   wrappers.
-- Rename risk: high if modules are renamed too early. Keep Merlino aliases until
+- Rename risk: high if modules are renamed too early. Keep ORACLE aliases until
   ORACLE tests are green.
 
 ## Validation Matrix
