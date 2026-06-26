@@ -154,14 +154,12 @@ only production path.
 The active Fortran backend is built with:
 
 \begin{lstlisting}[style=oracle]
-cd fortran/gicforge
-./compile_MAC
+cd engines/fortran/gicforge
+./compile_legacy
 \end{lstlisting}
 
 \noindent
-The build writes \texttt{fortran/gicforge/build/gicforge} and installs the
-runtime executable as \texttt{bin/gicforge.x}.  The compatibility alias
-\texttt{bin/prova.x} is kept only for older launchers.
+The build writes \texttt{engines/fortran/gicforge/build/gicforge\_legacy}.
 
 The recommended command-line entry point is the shared \oracle{} CLI:
 

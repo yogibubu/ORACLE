@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+mkdir -p build
+gfortran -std=legacy -ffixed-form -Wall -Wextra -c gf_core.f -o build/gf_core.o
+gfortran -std=legacy -ffixed-form -Wall -Wextra -c vci_core.f -o build/vci_core.o
+gfortran -std=legacy -ffixed-form -Wall -Wextra -c davidson_core.f -o build/davidson_core.o
+gfortran -std=legacy -ffixed-form -Wall -Wextra -c vpt2_core.f -o build/vpt2_core.o

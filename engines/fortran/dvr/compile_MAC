@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+FC="${FC:-gfortran}"
+SDK_LIB="/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib"
+BUILD_DIR="build"
+LOG="$BUILD_DIR/dvr_build.log"
+TARGET="$BUILD_DIR/path_dvr"
+
+mkdir -p "$BUILD_DIR"
+rm -f "$LOG"
+
+"$FC" \
+  -std=legacy \
+  -w \
+  -L"$SDK_LIB" \
+  path_dvr.f dvr_hqrii.f \
+  -o "$TARGET" \
+  >"$LOG" 2>&1
+
+mkdir -p ../../../bin
+cp "$TARGET" ../../../bin/path_dvr.x
+echo "Built engines/fortran/dvr/build/path_dvr and bin/path_dvr.x"
