@@ -120,7 +120,10 @@ def read_geometry(path: Path) -> MolecularGeometry:
 
         return read_zmatrix(target)
     if suffix in {".gjf", ".gau", ".com", ".inp"}:
+        from oracle_babel import is_legacy_smiles_input, read_legacy_smiles_input
         from oracle_gaussian import read_gaussian_input
 
+        if is_legacy_smiles_input(target):
+            return read_legacy_smiles_input(target)
         return read_gaussian_input(target)
     raise GeometryParseError(f"unsupported geometry format: {target}")

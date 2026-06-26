@@ -89,6 +89,8 @@ and live in parser packages, not GUI or workflow modules.
 The preprocessing layer is ORACLE-Babel: it imports external sources, writes an
 Avogadro-compatible enriched XYZ, determines symmetry with explicit thresholds,
 builds topology once, and saves descriptors/synthons for downstream tools.
+SMILES imports are handled in ORACLE-Babel through RDKit when the active
+environment provides it.
 
 Python and strict Fortran77 implementations may intentionally coexist for the
 same scientific kernel. In that case they are backends behind one ORACLE service

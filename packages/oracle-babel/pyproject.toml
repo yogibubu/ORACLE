@@ -8,5 +8,8 @@ version = "0.1.0"
 description = "ORACLE Babel import and database adapters"
 requires-python = ">=3.11"
 
+[project.optional-dependencies]
+rdkit = ["rdkit>=2024.3"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
