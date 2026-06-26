@@ -6,9 +6,9 @@ import re
 
 import numpy as np
 
-from merlino_core.xyzin_geometry import read_xyzin_geometry
-from merlino_fit.survibfit.modify_geom import read_xyz
-from topology.elements import atomic_number, atomic_symbol
+from oracle_chem.geometry_io import read_xyz_atoms_coords
+from oracle_chem.topology.elements import atomic_number, atomic_symbol
+from oracle_core.xyzin_geometry import read_xyzin_geometry
 
 
 @dataclass(frozen=True)
@@ -42,7 +42,7 @@ def read_geometry_input(path: Path) -> SemiexperimentalGeometryInput:
                 "xyzin",
             )
     if suffix == ".xyz":
-        atoms, coords, comment = read_xyz(target)
+        atoms, coords, comment = read_xyz_atoms_coords(target)
         return SemiexperimentalGeometryInput(tuple(atoms), np.asarray(coords, dtype=float), comment, (), "xyz")
     if suffix in {".com", ".gjf"}:
         return read_gaussian_cartesian_input(target)

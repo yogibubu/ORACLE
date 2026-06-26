@@ -78,7 +78,7 @@ def run_legacy_gicforge(
     """Run the vendored Merlino GICForge executable on a normalized XYZ input."""
     target = Path(workdir)
     target.mkdir(parents=True, exist_ok=True)
-    executable = _legacy_executable(repo_root)
+    executable = legacy_gicforge_executable(repo_root)
     _write_provin(
         target / "provin",
         keywords=keywords,
@@ -119,7 +119,8 @@ def read_legacy_gicforge_run(workdir: Path) -> LegacyGICForgeRun:
     )
 
 
-def _legacy_executable(repo_root: Path | None) -> Path:
+def legacy_gicforge_executable(repo_root: Path | None = None) -> Path:
+    """Return the compiled ORACLE GICForge executable, compiling it if needed."""
     layout = gicforge_fortran_layout(repo_root)
     if not layout.legacy_executable.is_file():
         subprocess.run(

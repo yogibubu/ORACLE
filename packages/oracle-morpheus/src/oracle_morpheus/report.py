@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
-from merlino_core.numerics import rank_condition
+from oracle_core.numerics import rank_condition
 
 from .contracts import IsotopologueObservation, ParameterClassConstraint, SemiexperimentalFitRequest
 from .fit import (

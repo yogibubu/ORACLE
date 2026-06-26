@@ -11,8 +11,8 @@ from .pipeline import _load_topology_elements
 from .synthon_similarity import compare_against_library
 from .symmetry_detector import orient_coords, symmetry_elements_from_geometry, is_linear
 from .symmetry_classifier import group_label
-from topology.pipeline import build_topology_objects
-from topology.topology_reporting import print_topology_report
+from oracle_chem.topology.pipeline import build_topology_objects
+from oracle_chem.topology.topology_reporting import print_topology_report
 
 
 def _point_group_from_xyz(xyz: Path):

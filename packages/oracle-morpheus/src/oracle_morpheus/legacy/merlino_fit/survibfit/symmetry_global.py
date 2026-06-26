@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import re
 
-from topology.elements import atomic_symbol
+from oracle_chem.topology.elements import atomic_symbol
 
 from .symmetry_classifier import (
     group_label as _group_label,

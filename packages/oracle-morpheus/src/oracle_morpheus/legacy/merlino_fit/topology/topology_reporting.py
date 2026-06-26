@@ -104,7 +104,7 @@ def _symmetry_summary(
 
     def _mass_weights(Zvals):
         try:
-            from geometry.average_atomic_masses import atomic_mass
+            from oracle_chem.average_atomic_masses import atomic_mass
             return np.array([atomic_mass(int(z)) for z in Zvals], dtype=float)
         except Exception:
             return np.array(Zvals, dtype=float)
@@ -317,10 +317,12 @@ def print_topology_report(
         # Representation
         # ========================================================
         try:
-            from geometry.thermo_trasl import parse_xyzin_basic_section
-            rep = parse_xyzin_basic_section(Path(filename).with_name("xyzin")).get(
-                "REPRESENTATION", "Ir"
+            from oracle_core import parse_key_value_section, read_sectioned_lines, section_content
+
+            values = parse_key_value_section(
+                section_content(read_sectioned_lines(Path(filename).with_name("xyzin")), "BASIC")
             )
+            rep = values.get("REPRESENTATION", "Ir")
         except Exception:
             rep = "Ir"
         fh.write(f"Representation: {rep}\n")

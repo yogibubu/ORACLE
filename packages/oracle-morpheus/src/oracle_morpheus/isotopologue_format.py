@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from merlino_core.isotopologues import (
+from oracle_core.isotopologues import (
     format_substitutions,
     mass_number,
     parse_substitutions,

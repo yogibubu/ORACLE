@@ -8,7 +8,7 @@ from typing import Iterable
 
 import numpy as np
 
-from topology.elements import atomic_number, atomic_symbol
+from oracle_chem.topology.elements import atomic_number, atomic_symbol
 
 from .contracts import (
     ElectronicCorrection,

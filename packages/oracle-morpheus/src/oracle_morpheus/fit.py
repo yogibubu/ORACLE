@@ -14,21 +14,21 @@ import tempfile
 
 import numpy as np
 
-from geometry.average_atomic_masses import atomic_mass
-from geometry.elements import atomic_number as geometry_atomic_number
-from geometry.isotopes_table import get_default_isotope, get_isotope
-from geometry.physical_constants import Phy, get_physical_constants
-from geometry.rotational import rotational_constants_MHz
-from geometry.structure import Structure
-from merlino_core import ScientificValidationError, build_run_manifest
+from oracle_chem.average_atomic_masses import atomic_mass
+from oracle_chem.isotopes_table import get_default_isotope, get_isotope
+from oracle_chem.physical_constants import Phy, get_physical_constants
+from oracle_chem.rotational import rotational_constants_MHz
+from oracle_chem.structure import Structure
 from merlino_gic import GICDefinition, GICForge, define_gics_from_cartesian, run_gicforge
 from merlino_gic.gic_symmetry import SYMM_INERTIA_TOL as GIC_SYMM_INERTIA_TOL
 from merlino_gic.gic_symmetry import SYMM_TOL as GIC_SYMM_TOL
-from merlino_core.numerics import limit_step, objective, rank_condition
-from topology.elements import atomic_symbol
-from merlino_fit.topology.covalent_radii import covalent_radius
-from merlino_fit.topology.pipeline import build_topology_objects
-from merlino_fit.survibfit.modify_geom import write_xyz
+from oracle_chem.geometry_io import write_xyz
+from oracle_chem.topology.covalent_radii import covalent_radius
+from oracle_chem.topology.elements import atomic_number as geometry_atomic_number
+from oracle_chem.topology.elements import atomic_symbol
+from oracle_chem.topology.pipeline import build_topology_objects
+from oracle_core import ScientificValidationError, build_run_manifest
+from oracle_core.numerics import limit_step, objective, rank_condition
 from merlino_fit.survibfit.pipeline import b_matrix_analytic
 from merlino_fit.survibfit.primitives import Primitive, build_primitives, eval_primitives
 from merlino_fit.survibfit.symmetry_detector import orient_coords, symmetry_elements_from_geometry
@@ -7592,9 +7592,7 @@ def _bond_label(pair: tuple[int, int]) -> str:
 
 
 def _atomic_number(symbol: str) -> int:
-    from geometry.elements import atomic_number
-
-    z = atomic_number(symbol)
+    z = geometry_atomic_number(symbol)
     if z is None:
         raise ScientificValidationError(f"Unknown element symbol {symbol}")
     return int(z)

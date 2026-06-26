@@ -19,7 +19,14 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _checksums(paths: Mapping[str, Path]) -> dict[str, str]:
+def write_manifest(path: Path, data: Mapping[str, Any]) -> Path:
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(dict(data), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return target
+
+
+def file_checksums(paths: Mapping[str, Path]) -> dict[str, str]:
     return {
         name: sha256_file(path)
         for name, path in sorted(paths.items())
@@ -49,9 +56,7 @@ class RunManifest:
 
     def write(self, path: Path | None = None) -> Path:
         target = Path(path) if path is not None else self.run_dir / "manifest.json"
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n")
-        return target
+        return write_manifest(target, self.to_dict())
 
 
 def build_run_manifest(
@@ -73,10 +78,9 @@ def build_run_manifest(
         run_dir=Path(run_dir),
         inputs={name: str(path) for name, path in sorted(input_paths.items())},
         outputs={name: str(path) for name, path in sorted(output_paths.items())},
-        input_sha256=_checksums(input_paths),
-        output_sha256=_checksums(output_paths),
+        input_sha256=file_checksums(input_paths),
+        output_sha256=file_checksums(output_paths),
         parameters=dict(parameters or {}),
         backend=dict(backend or {}),
         messages=list(messages or []),
     )
-

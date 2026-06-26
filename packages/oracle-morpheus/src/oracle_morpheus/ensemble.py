@@ -9,8 +9,8 @@ import tomllib
 
 import numpy as np
 
-from merlino_core.numerics import RankCondition, rank_condition
-from merlino_fit.topology.pipeline import build_topology_objects
+from oracle_chem.topology.pipeline import build_topology_objects
+from oracle_core.numerics import RankCondition, rank_condition
 
 from .contracts import SemiexperimentalFitRequest
 from .fit import (

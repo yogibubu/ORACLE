@@ -10,13 +10,13 @@ from typing import Callable
 
 import numpy as np
 
-from merlino_core import sha256_file
-from merlino_core.paths import repo_root
-from merlino_fit.topology.covalent_radii import covalent_radius
-from merlino_fit.topology.pipeline import build_topology_objects
+from oracle_chem.topology.covalent_radii import covalent_radius
+from oracle_chem.topology.elements import atomic_number, atomic_symbol
+from oracle_chem.topology.pipeline import build_topology_objects
+from oracle_core import sha256_file
+from oracle_core.paths import repo_root
 from merlino_fit.survibfit.pipeline import b_matrix_analytic
 from merlino_fit.survibfit.primitives import Primitive, eval_primitives
-from topology.elements import atomic_number, atomic_symbol
 
 from .gicforge_service import GICForgeResult, run_gicforge
 

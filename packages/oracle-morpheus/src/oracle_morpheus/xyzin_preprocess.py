@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from merlino_core.xyzin_geometry import replace_xyzin_geometry
+from oracle_core.xyzin_geometry import replace_xyzin_geometry
 
 from .contracts import IsotopologueObservation
 from .geometry_input import read_geometry_input

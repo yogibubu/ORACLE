@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import shutil
 
-from merlino_core.paths import repo_root
+from oracle_core.paths import repo_root
 
 
 @dataclass(frozen=True)

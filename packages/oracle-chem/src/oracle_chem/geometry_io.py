@@ -89,6 +89,34 @@ def read_xyz(path: Path) -> MolecularGeometry:
     )
 
 
+def read_xyz_atoms_coords(path: Path) -> tuple[tuple[str, ...], np.ndarray, str]:
+    geometry = read_xyz(path)
+    return geometry.atoms, geometry.coordinates_angstrom, geometry.comment
+
+
+def write_xyz(
+    path: Path,
+    atoms,
+    coordinates_angstrom,
+    *,
+    comment: str = "",
+    extra_lines=None,
+) -> Path:
+    target = Path(path)
+    coords = np.asarray(coordinates_angstrom, dtype=float)
+    atoms_tuple = tuple(str(atom) for atom in atoms)
+    if coords.shape != (len(atoms_tuple), 3):
+        raise GeometryParseError("XYZ coordinates must have shape natoms x 3")
+    lines = [str(len(atoms_tuple)), str(comment)]
+    for atom, (x, y, z) in zip(atoms_tuple, coords):
+        lines.append(f"{atom:2s} {x:15.8f} {y:15.8f} {z:15.8f}")
+    if extra_lines:
+        lines.extend(str(line) for line in extra_lines)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    return target
+
+
 def read_enriched_xyz(path: Path) -> MolecularGeometry:
     target = Path(path)
     lines = target.read_text(encoding="utf-8", errors="replace").splitlines()

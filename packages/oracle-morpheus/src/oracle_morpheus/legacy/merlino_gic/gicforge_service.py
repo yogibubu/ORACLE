@@ -6,9 +6,9 @@ from pathlib import Path
 import subprocess
 from typing import Iterable
 
-from merlino_core import build_run_manifest, sha256_file, write_manifest
-from merlino_core.paths import repo_root
-from merlino_fortran import resolve_backend
+from oracle_core import build_run_manifest, sha256_file, write_manifest
+from oracle_core.paths import repo_root
+from oracle_engines import legacy_gicforge_executable
 from .gic_symmetry import gicsym_requested, symmetry_postprocess_requested, write_gic_symmetry_files
 
 
@@ -52,7 +52,7 @@ def run_gicforge(
     """Run GICForge in `workdir` and write a normalized manifest."""
     run_dir = Path(workdir)
     run_dir.mkdir(parents=True, exist_ok=True)
-    exe = Path(executable) if executable is not None else resolve_backend("gicforge")
+    exe = Path(executable) if executable is not None else legacy_gicforge_executable()
     logfile = run_dir / "gicforge.log"
 
     try:

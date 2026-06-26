@@ -5,11 +5,7 @@ import sys
 
 
 _ALIASES = (
-    "geometry",
-    "merlino_core",
-    "merlino_fortran",
     "merlino_fit",
-    "topology",
     "merlino_gic",
 )
 

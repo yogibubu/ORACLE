@@ -4,11 +4,11 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from geometry.elements import atomic_number
-from geometry.inertia import center_of_mass, inertia_tensor
-from geometry.isotopes_table import get_default_isotope, get_isotope
-from geometry.physical_constants import Phy, get_physical_constants
-from geometry.structure import Structure
+from oracle_chem.inertia import center_of_mass, inertia_tensor
+from oracle_chem.isotopes_table import get_default_isotope, get_isotope
+from oracle_chem.physical_constants import Phy, get_physical_constants
+from oracle_chem.structure import Structure
+from oracle_chem.topology.elements import atomic_number
 
 from .contracts import IsotopologueObservation
 

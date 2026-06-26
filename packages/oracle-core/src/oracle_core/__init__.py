@@ -1,6 +1,16 @@
 """Core ORACLE infrastructure."""
 
-from .manifest import ORACLE_MANIFEST_SCHEMA, RunManifest, build_run_manifest, sha256_file
+from .errors import BackendError, InputError, OracleError, ParseError, ScientificValidationError
+from .manifest import (
+    ORACLE_MANIFEST_SCHEMA,
+    RunManifest,
+    build_run_manifest,
+    file_checksums,
+    sha256_file,
+    write_manifest,
+)
+from .numerics import RankCondition, damped_normal_step, limit_step, objective, rank_condition
+from .paths import repo_root
 from .isotopologues import (
     MERLINO_XYZIN_ISOTOPOLOGUES_SCHEMA,
     ORACLE_XYZ_ISOTOPOLOGUES_SCHEMA,
@@ -49,45 +59,61 @@ from .sections import (
     write_basic_section,
 )
 from .workspace import WORKSPACE_DIRS, WorkspaceLayout, ensure_workspace
+from .xyzin_geometry import XyzinGeometry, read_xyzin_geometry, replace_xyzin_geometry
 
 __all__ = [
+    "BackendError",
     "BasicSection",
-    "ORACLE_MANIFEST_SCHEMA",
+    "InputError",
     "MERLINO_XYZIN_ISOTOPOLOGUES_SCHEMA",
     "MERLINO_XYZIN_BASIC_SCHEMA",
+    "ORACLE_MANIFEST_SCHEMA",
     "ORACLE_XYZ_BASIC_SCHEMA",
     "ORACLE_XYZ_ISOTOPOLOGUES_SCHEMA",
+    "OracleError",
+    "ParseError",
+    "RankCondition",
     "RunManifest",
+    "ScientificValidationError",
     "SUPPORTED_BASIC_SCHEMAS",
     "SUPPORTED_XYZIN_ISOTOPOLOGUES_SCHEMAS",
     "WORKSPACE_DIRS",
     "WorkspaceLayout",
+    "XyzinGeometry",
     "XYZIN_ISOTOPOLOGUES_SCHEMA",
     "XYZIN_ISOTOPOLOGUES_SECTION",
     "XyzinIsotopologueRecord",
     "XyzinIsotopologueValidationIssue",
     "basic_section_lines",
     "build_run_manifest",
+    "damped_normal_step",
     "ensure_workspace",
+    "file_checksums",
     "format_substitutions",
     "format_xyzin_isotopologue_issues",
     "has_section",
     "has_xyzin_isotopologues",
+    "limit_step",
     "merge_xyzin_isotopologue_records",
     "key_value_section_lines",
     "normalize_key",
+    "objective",
     "parse_basic_section",
     "parse_key_value_section",
     "parse_substitutions",
     "parse_xyzin_isotopologue_records",
+    "rank_condition",
     "read_basic_section",
     "read_sectioned_lines",
+    "read_xyzin_geometry",
     "read_xyzin_isotopologue_records",
     "remove_section_from_lines",
     "replace_section",
     "replace_section_in_lines",
     "replace_xyz_block",
     "replace_xyz_block_in_lines",
+    "replace_xyzin_geometry",
+    "repo_root",
     "section_content",
     "section_header",
     "sha256_file",
@@ -95,6 +121,7 @@ __all__ = [
     "validate_xyzin_isotopologue_records",
     "write_sectioned_lines",
     "write_basic_section",
+    "write_manifest",
     "xyz_tail_start",
     "write_xyzin_isotopologue_records",
     "xyzin_isotopologue_section_lines",

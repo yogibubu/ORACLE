@@ -10,10 +10,10 @@ import numpy as np
 from merlino_fit.survibfit.geometry import angle
 from merlino_fit.survibfit.pipeline import b_matrix_analytic
 from merlino_fit.survibfit.primitives import Primitive
-from merlino_fit.topology.covalent_radii import covalent_radius
-from merlino_fit.topology.pipeline import build_topology_objects
-from merlino_fit.topology.ringset import RingSet
-from topology.elements import atomic_number
+from oracle_chem.topology.covalent_radii import covalent_radius
+from oracle_chem.topology.elements import atomic_number
+from oracle_chem.topology.pipeline import build_topology_objects
+from oracle_chem.topology.ringset import RingSet
 
 from .model import (
     GICDefinition,

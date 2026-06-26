@@ -9,9 +9,9 @@ from typing import Any
 import numpy as np
 
 from merlino_fit.survibfit.synthon_similarity import compare_against_library
-from merlino_fit.survibfit.modify_geom import read_xyz, write_xyz
 from merlino_fit.survibfit.primitives import Primitive, build_primitives, eval_primitives, grad_primitive
-from merlino_fit.topology.pipeline import build_topology_objects
+from oracle_chem.geometry_io import read_xyz_atoms_coords, write_xyz
+from oracle_chem.topology.pipeline import build_topology_objects
 
 from .fit import _atomic_number
 
@@ -289,7 +289,7 @@ def build_reference_assisted_geometry(
 
     root = Path(library_root) if library_root is not None else DEFAULT_SE_GEOMETRY_LIBRARY
     query = Path(query_xyz)
-    atoms, coords, _comment = read_xyz(query)
+    atoms, coords, _comment = read_xyz_atoms_coords(query)
     atoms_tuple = tuple(str(atom) for atom in atoms)
     apply = tuple(_normalize_primitive_kind(kind) for kind in apply_kinds if _normalize_primitive_kind(kind))
     if not apply:
@@ -600,7 +600,7 @@ class _PrimitiveDescriptor:
 
 
 def _primitive_descriptors(path: Path, *, slug: str) -> tuple[_PrimitiveDescriptor, ...]:
-    atoms, coords, _comment = read_xyz(Path(path))
+    atoms, coords, _comment = read_xyz_atoms_coords(Path(path))
     z_numbers = np.array([_atomic_number(atom) for atom in atoms], dtype=int)
     _continuous, graph, _ringset, synthons, _aromaticity = build_topology_objects(np.asarray(coords, dtype=float), z_numbers)
     primitives = build_primitives(graph, np.asarray(coords, dtype=float))

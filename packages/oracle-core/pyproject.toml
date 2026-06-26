@@ -13,3 +13,6 @@ oracle = "oracle_core.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+oracle_core = ["parameters/*.toml", "parameters/fortran/*.inc"]

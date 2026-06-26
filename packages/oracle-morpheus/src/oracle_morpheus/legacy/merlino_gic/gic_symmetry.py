@@ -7,14 +7,14 @@ import json
 
 import numpy as np
 
-from merlino_fit.survibfit.modify_geom import read_xyz
+from oracle_chem.geometry_io import read_xyz_atoms_coords
+from oracle_chem.topology.elements import atomic_number, atomic_symbol
+from oracle_chem.topology.pipeline import build_topology_objects
 from merlino_fit.survibfit.pipeline import b_matrix_analytic
 from merlino_fit.survibfit.primitives import Primitive
 from merlino_fit.survibfit.symmetry_classifier import group_label as _group_label
 from merlino_fit.survibfit.symmetry_detector import orient_coords, symmetry_elements_from_geometry
 from merlino_fit.survibfit.symmetry_global import irrep_characters_for_operations, primitive_permutation
-from merlino_fit.topology.pipeline import build_topology_objects
-from topology.elements import atomic_number, atomic_symbol
 
 
 SYMM_TOL = 1.0e-2
@@ -46,7 +46,7 @@ def write_gic_symmetry_files(
     xyzin = run_dir / "xyzin"
     if not xyzin.exists():
         return
-    atoms, coords, _comment = read_xyz(xyzin)
+    atoms, coords, _comment = read_xyz_atoms_coords(xyzin)
     if sycart_requested(run_dir):
         _write_sycart_files(run_dir, atoms, coords)
     if symmetrize_gics is None:

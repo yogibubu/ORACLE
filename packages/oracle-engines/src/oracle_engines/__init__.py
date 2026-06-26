@@ -9,6 +9,7 @@ from .gicforge import (
 )
 from .legacy_gicforge import (
     LegacyGICForgeRun,
+    legacy_gicforge_executable,
     read_legacy_gicforge_run,
     run_legacy_gicforge,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "LEGACY_GICFORGE_FILES",
     "LegacyGICForgeRun",
     "gicforge_fortran_layout",
+    "legacy_gicforge_executable",
     "legacy_gicforge_source_paths",
     "read_legacy_gicforge_run",
     "run_legacy_gicforge",

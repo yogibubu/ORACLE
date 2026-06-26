@@ -3,13 +3,12 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 
-from merlino_core.parameters.bdpcs3 import load_bdpcs3_parameters
+from oracle_core.parameters.bdpcs3 import load_bdpcs3_parameters
 
 from .pipeline import primitives_from_topology, build_topology, b_matrix
 from .primitives import Primitive, eval_primitives
@@ -44,48 +43,32 @@ class HydrogenBond:
 
 
 def _load_topology_elements():
-    root = Path(__file__).resolve().parents[1]
-    topo_parent = str(root)
-    if topo_parent not in sys.path:
-        sys.path.insert(0, topo_parent)
-    from topology.elements import atomic_number
+    from oracle_chem.topology.elements import atomic_number
+
     return atomic_number
 
 
 def _load_covalent_radius():
-    root = Path(__file__).resolve().parents[1]
-    topo_parent = str(root)
-    if topo_parent not in sys.path:
-        sys.path.insert(0, topo_parent)
-    from topology.covalent_radii import covalent_radius
+    from oracle_chem.topology.covalent_radii import covalent_radius
+
     return covalent_radius
 
 
 def _load_topology_bond_order():
-    root = Path(__file__).resolve().parents[1]
-    topo_parent = str(root)
-    if topo_parent not in sys.path:
-        sys.path.insert(0, topo_parent)
-    from topology.continuous_graph import bond_order
+    from oracle_chem.topology.continuous_graph import bond_order
+
     return bond_order
 
 
 def _load_isotopes_table():
-    root = Path(__file__).resolve().parents[2]
-    geom_parent = str(root.parent / "merlino3.0")
-    # geometry lives outside this repo
-    if geom_parent not in sys.path:
-        sys.path.insert(0, geom_parent)
-    from geometry.isotopes_table import ISOTOPES
+    from oracle_chem.isotopes_table import ISOTOPES
+
     return ISOTOPES
 
 
 def _load_average_atomic_mass_table():
-    root = Path(__file__).resolve().parents[2]
-    geom_parent = str(root.parent / "merlino3.0")
-    if geom_parent not in sys.path:
-        sys.path.insert(0, geom_parent)
-    from geometry.average_atomic_masses import atomic_mass
+    from oracle_chem.average_atomic_masses import atomic_mass
+
     return atomic_mass
 
 
@@ -189,11 +172,8 @@ def _bdpcs3_updated_rcov_ct(z1: int, z2: int) -> float:
 
 
 def _load_pyykko_radii():
-    root = Path(__file__).resolve().parents[1]
-    topo_parent = str(root)
-    if topo_parent not in sys.path:
-        sys.path.insert(0, topo_parent)
-    from topology.pykko_radii import covalent_radius as pyykko_radius
+    from oracle_chem.topology.pykko_radii import covalent_radius as pyykko_radius
+
     return pyykko_radius
 
 

@@ -12,7 +12,7 @@ from merlino_gic.gic_symmetry import (
     _cartesian_operation,
     _canonical_operation_order,
 )
-from topology.elements import atomic_number, atomic_symbol
+from oracle_chem.topology.elements import atomic_number, atomic_symbol
 
 
 TOTALLY_SYMMETRIC_IRREPS = {"A1", "A", "Ag", "A'"}

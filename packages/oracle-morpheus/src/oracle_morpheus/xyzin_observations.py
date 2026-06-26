@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from merlino_core.isotopologues import (
+from oracle_core.isotopologues import (
     XYZIN_ISOTOPOLOGUES_SCHEMA,
     XyzinIsotopologueRecord,
     format_xyzin_isotopologue_issues,
@@ -14,7 +14,7 @@ from merlino_core.isotopologues import (
     xyzin_isotopologue_validation_errors,
     xyzin_isotopologue_section_lines,
 )
-from merlino_core.xyzin_geometry import read_xyzin_geometry
+from oracle_core.xyzin_geometry import read_xyzin_geometry
 
 from .contracts import ElectronicCorrection, IsotopologueObservation, RotationalConstants, VibrationalCorrection
 

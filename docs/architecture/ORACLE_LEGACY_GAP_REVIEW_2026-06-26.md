@@ -108,3 +108,34 @@ Paper/benchmark generation
   families plus matrix-classified `Td`, `Oh` and `Ih`. Remaining parity work is
   strict Fortran77 projector diagnostics equivalent to Python and regression
   fixtures for ring/butterfly/special coordinates under symmetry.
+
+## Legacy Namespace Cleanup 2026-06-26
+
+Closed in the first MORPHEUS cleanup pass:
+
+- `merlino_core` service imports in MORPHEUS were replaced by `oracle_core`
+  (`manifest`, `numerics`, `xyzin_geometry`, `isotopologues`, `paths`,
+  scientific errors and BDPCS3 parameters).
+- Generic geometry utilities used by SEfit/Kraitchman were moved to
+  `oracle_chem` (`average_atomic_masses`, `isotopes_table`,
+  `physical_constants`, `structure`, `inertia`, `rotational`).
+- XYZ tuple I/O and XYZ writing now come from `oracle_chem.geometry_io` instead
+  of `survibfit.modify_geom`.
+- Topology/radius/element imports in MORPHEUS and the GIC kernel now use
+  `oracle_chem.topology`.
+- GICForge executable discovery now uses `oracle_engines` instead of
+  `merlino_fortran`.
+- Runtime aliases for `merlino_core`, `merlino_fortran`, `geometry` and
+  `topology` were removed.
+
+Remaining intentional boundary:
+
+- `merlino_fit.survibfit` and `merlino_gic` are still the active SEfit/GIC
+  kernel interfaces. They should be ported as real ORACLE kernel modules or
+  replaced by adapters to `oracle_gicforge`; they should not be renamed
+  cosmetically.
+- Only `merlino_fit` and `merlino_gic` remain as runtime aliases, because they
+  are still the active SEfit/GIC kernel boundary.
+
+Validation for this cleanup pass: `PYTHONPATH=. pytest -q` returned
+`125 passed`.

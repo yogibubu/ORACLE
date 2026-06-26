@@ -391,7 +391,7 @@ def _high_coord_angle_block(prims, center, neigh):
 
 
 def _ring_ordered_indices(prims, ring, kind):
-    from topology.ring_primitives import ring_valence_angles, ring_dihedrals, ring_bonds
+    from oracle_chem.topology.ring_primitives import ring_bonds, ring_dihedrals, ring_valence_angles
 
     idxs = []
     # build map for fast lookup
