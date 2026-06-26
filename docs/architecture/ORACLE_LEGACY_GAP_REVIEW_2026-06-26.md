@@ -58,6 +58,9 @@ Data/docs:
   and `#QCENT` contracts.
 - Migrates ORACLE `geometry/rotational_pipeline.py`, `vibrational.py`,
   `vib_anh.py`, `rovib_pipeline.py`, `coriolis.py` and `qcent.py`.
+- Current ORACLE port includes Merlino-compatible `vibin` generation from the
+  shared Gaussian FCHK adapter, sparse Coriolis terms, QCENT Watson constants,
+  direct vibrational DOS and rovibrational DOS/Q(T) commands.
 - Treats CeDiTT/alpha-resonances output as an external compatibility payload,
   not as ORACLE-owned theory unless explicitly migrated later.
 
@@ -67,6 +70,9 @@ Data/docs:
 - Migrates `geometry/thermo_trasl.py`, `thermo_rot.py`, `thermo_vib.py`,
   `thermo_pipeline.py` and `thermo_writer.py`.
 - Reads `#BASIC`, `#ROTATIONAL` and optional `#VIBRATIONAL` from `xyzin`.
+- Current ORACLE port keeps Merlino's translational, rotational
+  quantum/classical crossover and harmonic vibrational formulas while using
+  `oracle-core`, `oracle-chem` and `oracle-rovib` section contracts.
 
 Standalone `xyzin` mode
 

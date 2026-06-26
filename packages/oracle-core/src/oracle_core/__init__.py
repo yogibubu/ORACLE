@@ -34,6 +34,7 @@ from .isotopologues import (
 )
 from .sectioned_xyz import (
     has_section,
+    is_section_header_line,
     read_sectioned_lines,
     remove_section_from_lines,
     replace_section,
@@ -93,6 +94,7 @@ __all__ = [
     "format_xyzin_isotopologue_issues",
     "has_section",
     "has_xyzin_isotopologues",
+    "is_section_header_line",
     "limit_step",
     "merge_xyzin_isotopologue_records",
     "key_value_section_lines",

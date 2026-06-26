@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
+
+
+_SECTION_HEADER_RE = re.compile(r"^\s*#[A-Za-z][A-Za-z0-9_]*\s*$")
 
 
 def read_sectioned_lines(path: Path) -> list[str]:
@@ -29,6 +33,10 @@ def section_header(section_name: str) -> str:
     return f"#{normalize_section_name(section_name)}"
 
 
+def is_section_header_line(line: str) -> bool:
+    return bool(_SECTION_HEADER_RE.match(line))
+
+
 def section_content(lines: list[str], section_name: str) -> list[str]:
     header = section_header(section_name)
     start = None
@@ -40,7 +48,7 @@ def section_content(lines: list[str], section_name: str) -> list[str]:
         return []
     end = len(lines)
     for idx in range(start, len(lines)):
-        if lines[idx].startswith("#"):
+        if is_section_header_line(lines[idx]):
             end = idx
             break
     return list(lines[start:end])
@@ -60,7 +68,7 @@ def remove_section_from_lines(lines: list[str], section_name: str) -> list[str]:
             skip = True
             continue
         if skip:
-            if line.startswith("#"):
+            if is_section_header_line(line):
                 skip = False
                 out.append(line)
             continue
@@ -79,7 +87,7 @@ def replace_section_in_lines(
             continue
         end = len(lines)
         for end_idx in range(idx + 1, len(lines)):
-            if lines[end_idx].startswith("#"):
+            if is_section_header_line(lines[end_idx]):
                 end = end_idx
                 break
         return [*lines[: idx + 1], *content_lines, *lines[end:]]

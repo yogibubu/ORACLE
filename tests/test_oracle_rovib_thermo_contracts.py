@@ -15,7 +15,16 @@ from oracle_rovib import (
     write_rotational_section,
     write_vibrational_section,
 )
-from oracle_thermo import ORACLE_XYZ_THERMO_SCHEMA
+from oracle_thermo import (
+    ORACLE_XYZ_THERMO_SCHEMA,
+    ThermoContribution,
+    ThermoSection,
+    parse_thermo_section,
+    read_thermo_section,
+    run_thermo_on_xyzin,
+    thermo_section_lines,
+    write_thermo_section,
+)
 
 
 def test_rovib_and_thermo_schema_constants_are_oracle_xyz_sections():
@@ -146,3 +155,122 @@ def test_rovib_summary_reads_standalone_xyzin(tmp_path):
     assert summary.vibrational is not None
     assert "rotational: A=1000MHz B=900MHz C=800MHz" in lines
     assert "vibrational: 2 frequencies" in lines
+
+
+def test_thermo_section_round_trips_merlino_labels(tmp_path):
+    path = tmp_path / "molecule.xyzin"
+    path.write_text("1\nh\nH 0 0 0\n", encoding="utf-8")
+
+    write_thermo_section(
+        path,
+        ThermoSection(
+            translational=ThermoContribution(Q_dimless=2.0, U_kJmol=1.0),
+            rotational=ThermoContribution(Q_dimless=3.0, S_JmolK=4.0),
+            vibrational=ThermoContribution(
+                Q_dimless=1.0,
+                available=False,
+                reason="no frequencies above cutoff",
+            ),
+            total=ThermoContribution(Q_dimless=6.0, U_kJmol=1.0, S_JmolK=4.0),
+        ),
+    )
+    parsed = read_thermo_section(path)
+    lines = thermo_section_lines(parsed)
+
+    assert parsed.translational is not None
+    assert parsed.translational.Q_dimless == 2.0
+    assert parsed.rotational is not None
+    assert parsed.rotational.S_JmolK == 4.0
+    assert parsed.vibrational is not None
+    assert parsed.vibrational.available is False
+    assert parsed.total is not None
+    assert parsed.total.Q_dimless == 6.0
+    assert "Q_dimless_trasl = 2" in lines
+
+
+def test_thermo_section_accepts_legacy_merlino_comment_lines():
+    parsed = parse_thermo_section(
+        [
+            "# keys: Q_dimless U_kJmol H_kJmol S_JmolK Cv_JmolK Cp_JmolK",
+            "Q_dimless_trasl = 2.0",
+            "U_kJmol_tot = 5.0",
+        ]
+    )
+
+    assert parsed.translational is not None
+    assert parsed.translational.Q_dimless == 2.0
+    assert parsed.total is not None
+    assert parsed.total.U_kJmol == 5.0
+
+
+def test_section_content_keeps_thermo_comment_until_real_next_section(tmp_path):
+    path = tmp_path / "molecule.xyzin"
+    path.write_text(
+        "\n".join(
+            [
+                "1",
+                "h",
+                "H 0 0 0",
+                "",
+                "#THERMO",
+                "# keys: legacy Merlino comment",
+                "Q_dimless_trasl = 2.0",
+                "",
+                "#GIC",
+                "SCHEMA oracle.xyz.gic.v1",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    thermo = read_thermo_section(path)
+    content = section_content(path.read_text(encoding="utf-8").splitlines(), "THERMO")
+
+    assert "# keys: legacy Merlino comment" in content
+    assert thermo.translational is not None
+    assert thermo.translational.Q_dimless == 2.0
+
+
+def test_thermo_pipeline_writes_thermo_section_and_report(tmp_path):
+    path = tmp_path / "water.xyzin"
+    path.write_text(
+        "\n".join(
+            [
+                "3",
+                "water",
+                "O 0.000000 0.000000 0.000000",
+                "H 0.758602 0.000000 0.504284",
+                "H -0.758602 0.000000 0.504284",
+                "",
+                "#BASIC",
+                "SCHEMA oracle.xyz.basic.v1",
+                "T_K = 298.15",
+                "P_ATM = 1.0",
+                "",
+                "#ROTATIONAL",
+                "A_MHz = 835000.0",
+                "B_MHz = 435000.0",
+                "C_MHz = 287000.0",
+                "Symm. Number = 2",
+                "rotor_type = asymmetric_prolate",
+                "",
+                "#VIBRATIONAL",
+                "freq_cm1 = 1595.0 3657.0 3756.0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = run_thermo_on_xyzin(path, report=True)
+    parsed = read_thermo_section(path)
+    report = tmp_path / "thermo.report"
+
+    assert result.total is not None
+    assert result.total.Q_dimless is not None
+    assert result.total.Q_dimless > 0.0
+    assert parsed.total is not None
+    assert parsed.total.H_kJmol is not None
+    assert report.exists()
+    assert "THERMO PIPELINE REPORT" in report.read_text(encoding="utf-8")

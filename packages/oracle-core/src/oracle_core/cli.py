@@ -84,6 +84,47 @@ def build_parser(*, repo_root: Path | None = None) -> argparse.ArgumentParser:
     rovib_sub = rovib.add_subparsers(dest="rovib_command")
     rovib_summary = rovib_sub.add_parser("summarize", help="Summarize rovib sections")
     rovib_summary.add_argument("xyzin", type=Path)
+    rovib_vibin = rovib_sub.add_parser("vibin", help="Build Merlino-compatible vibin from FCHK")
+    rovib_vibin.add_argument("xyzin", type=Path)
+    rovib_vibin.add_argument("--fchk", type=Path, required=True)
+    rovib_vibin.add_argument("--workdir", type=Path)
+    rovib_vibin.add_argument("--no-project-tr", action="store_true")
+    rovib_vibin.add_argument("--no-update-vibrational", action="store_true")
+    rovib_coriolis = rovib_sub.add_parser("coriolis", help="Compute sparse Coriolis terms")
+    rovib_coriolis.add_argument("xyzin", type=Path)
+    rovib_coriolis.add_argument("--vibin", type=Path)
+    rovib_coriolis.add_argument("--threshold-cm1", type=float, default=1.0)
+    rovib_coriolis.add_argument("--all-pairs", action="store_true")
+    rovib_coriolis.add_argument("--append-vibin", action="store_true")
+    rovib_coriolis.add_argument("--out", type=Path)
+    rovib_qcent = rovib_sub.add_parser("qcent", help="Compute quartic centrifugal distortion")
+    rovib_qcent.add_argument("xyzin", type=Path)
+    rovib_qcent.add_argument("--vibin", type=Path)
+    rovib_qcent.add_argument("--append-vibin", action="store_true")
+    rovib_qcent.add_argument("--out", type=Path)
+    rovib_dos = rovib_sub.add_parser("dos", help="Build direct vibrational DOS from #VIBRATIONAL")
+    rovib_dos.add_argument("xyzin", type=Path)
+    rovib_dos.add_argument("--vmax", type=int, default=6)
+    rovib_dos.add_argument("--emax", type=float, default=8000.0)
+    rovib_dos.add_argument("--bin-cm1", type=float, default=50.0)
+    rovib_dos.add_argument("--ncap", type=float, default=10.0)
+    rovib_dos.add_argument("--out", type=Path)
+    rovib_dos_rovib = rovib_sub.add_parser("dos-rovib", help="Convolve vibrational and rotational DOS")
+    rovib_dos_rovib.add_argument("xyzin", type=Path)
+    rovib_dos_rovib.add_argument("--vib-dos", type=Path)
+    rovib_dos_rovib.add_argument("--out", type=Path)
+    rovib_dos_rovib.add_argument("--rot-out", type=Path)
+    rovib_dos_rovib.add_argument("--q-out", type=Path)
+    rovib_dos_rovib.add_argument("--emax-rot", type=float)
+    rovib_dos_rovib.add_argument("--jmax", type=int)
+
+    thermo = sub.add_parser("thermo", help="Run thermochemistry from an ORACLE xyzin")
+    thermo.add_argument("xyzin", type=Path)
+    thermo.add_argument("--out", type=Path, help="Write the readable thermo report here")
+    thermo.add_argument("--no-report", action="store_true", help="Do not write thermo.report")
+    thermo.add_argument("--no-write-section", action="store_true", help="Do not update #THERMO")
+    thermo.add_argument("--cutoff-cm1", type=float, default=10.0)
+    thermo.add_argument("--keep-low-positive", action="store_true")
 
     gf = sub.add_parser("gf", help="Run GF/PED analysis from a Cartesian Hessian")
     gf.add_argument("--fchk", type=Path, required=True)
@@ -340,6 +381,114 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
         from oracle_rovib import rovib_summary_lines, summarize_xyzin
 
         print("\n".join(rovib_summary_lines(summarize_xyzin(args.xyzin))))
+        return 0
+    if args.command == "rovib" and args.rovib_command == "vibin":
+        from oracle_rovib import vibin_from_xyzin_fchk
+
+        result = vibin_from_xyzin_fchk(
+            args.xyzin,
+            args.fchk,
+            workdir=args.workdir,
+            project_TR=not args.no_project_tr,
+            update_vibrational_section=not args.no_update_vibrational,
+        )
+        print(
+            "Built rovib vibin: "
+            f"{result.vibin} (nvib={result.data.nvib}, "
+            f"imag_like={result.n_imag_like})"
+        )
+        return 0
+    if args.command == "rovib" and args.rovib_command == "coriolis":
+        from oracle_rovib import (
+            append_coriolis_to_vibin,
+            compute_coriolis_from_xyzin,
+            coriolis_report_lines,
+        )
+
+        result = compute_coriolis_from_xyzin(
+            args.xyzin,
+            vibin=args.vibin,
+            Geff_thr_cm1=args.threshold_cm1,
+            only_upper=not args.all_pairs,
+        )
+        text = "\n".join(coriolis_report_lines(result))
+        if args.out is not None:
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            args.out.write_text(text + "\n", encoding="utf-8")
+            print(f"Wrote Coriolis report: {args.out}")
+        else:
+            print(text)
+        if args.append_vibin:
+            vibin_path = args.vibin or (args.xyzin.parent / "vibin")
+            append_coriolis_to_vibin(vibin_path, result)
+            print(f"Appended Coriolis block: {vibin_path}")
+        return 0
+    if args.command == "rovib" and args.rovib_command == "qcent":
+        from oracle_rovib import append_qcent_to_vibin, compute_qcent_from_xyzin, qcent_report_lines
+
+        result = compute_qcent_from_xyzin(args.xyzin, vibin=args.vibin)
+        text = "\n".join(qcent_report_lines(result))
+        if args.out is not None:
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            args.out.write_text(text + "\n", encoding="utf-8")
+            print(f"Wrote QCENT report: {args.out}")
+        else:
+            print(text)
+        if args.append_vibin:
+            vibin_path = args.vibin or (args.xyzin.parent / "vibin")
+            append_qcent_to_vibin(vibin_path, result)
+            print(f"Appended QCENT block: {vibin_path}")
+        return 0
+    if args.command == "rovib" and args.rovib_command == "dos":
+        from oracle_rovib import direct_vibrational_dos_from_xyzin
+
+        out = args.out or (args.xyzin.parent / "dos_vib.dat")
+        result = direct_vibrational_dos_from_xyzin(
+            args.xyzin,
+            vmax=args.vmax,
+            emax_cm1=args.emax,
+            bin_cm1=args.bin_cm1,
+            ncap=args.ncap,
+            out=out,
+        )
+        print(f"Wrote vibrational DOS: {result.path} (bins={len(result.bins_logg)})")
+        return 0
+    if args.command == "rovib" and args.rovib_command == "dos-rovib":
+        from oracle_rovib import rovib_pipeline
+
+        result = rovib_pipeline(
+            args.xyzin,
+            vib_dos=args.vib_dos,
+            out=args.out,
+            rot_out=args.rot_out,
+            q_out=args.q_out,
+            emax_rot=args.emax_rot,
+            jmax=args.jmax,
+        )
+        print(f"Wrote rovibrational DOS: {result.dos_rovib}")
+        if result.q_path is not None:
+            print(f"Wrote rovib Q(T): {result.q_path} (Q={result.Q_rovib:.8g})")
+        return 0
+    if args.command == "thermo":
+        from oracle_thermo import run_thermo_on_xyzin
+
+        result = run_thermo_on_xyzin(
+            args.xyzin,
+            report=not args.no_report or args.out is not None,
+            report_path=args.out,
+            write_section=not args.no_write_section,
+            cutoff_cm1=args.cutoff_cm1,
+            keep_low_positive=args.keep_low_positive,
+        )
+        total = result.total
+        q_text = "" if total is None or total.Q_dimless is None else f", Q={total.Q_dimless:.8g}"
+        print(f"Ran ORACLE Thermo: {args.xyzin}{q_text}")
+        if args.out is not None:
+            print(f"Wrote thermo report: {args.out}")
+        elif not args.no_report:
+            print(f"Wrote thermo report: {args.xyzin.parent / 'thermo.report'}")
+        if not args.no_write_section:
+            print(f"Updated #THERMO: {args.xyzin}")
         return 0
     if args.command == "gf":
         from oracle_gf import (

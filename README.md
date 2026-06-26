@@ -77,6 +77,17 @@ python -m oracle gicforge bmatrix molecule.xyzin bmat.out
 python -m oracle gicforge gaussian-input molecule.xyzin job.gjf
 ```
 
+Thermo and rovibrational utilities run from the same enriched `xyzin` state:
+
+```bash
+python -m oracle thermo molecule.xyzin
+python -m oracle rovib vibin molecule.xyzin --fchk gaussian.fchk
+python -m oracle rovib coriolis molecule.xyzin --out coriolis.report
+python -m oracle rovib qcent molecule.xyzin --out qcent.report
+python -m oracle rovib dos molecule.xyzin
+python -m oracle rovib dos-rovib molecule.xyzin
+```
+
 ## Migration Rule
 
 Scientific behavior is migrated package by package. Existing `oracle_*`

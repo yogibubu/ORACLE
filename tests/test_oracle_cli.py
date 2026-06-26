@@ -197,6 +197,48 @@ def test_rovib_summarize_cli_prints_summary(tmp_path, capsys):
     assert "rotational: A=1000MHz B=900MHz C=800MHz" in capsys.readouterr().out
 
 
+def test_thermo_cli_calls_shared_pipeline(tmp_path, monkeypatch, capsys):
+    calls = {}
+    path = tmp_path / "molecule.xyzin"
+    report = tmp_path / "custom.report"
+
+    def fake_run(target, *, report=True, report_path=None, write_section=True, **kwargs):
+        calls["target"] = target
+        calls["report"] = report
+        calls["report_path"] = report_path
+        calls["write_section"] = write_section
+        calls.update(kwargs)
+        return SimpleNamespace(total=SimpleNamespace(Q_dimless=12.5))
+
+    monkeypatch.setattr("oracle_thermo.run_thermo_on_xyzin", fake_run)
+
+    rc = oracle_run.main(
+        [
+            "thermo",
+            str(path),
+            "--out",
+            str(report),
+            "--no-write-section",
+            "--cutoff-cm1",
+            "20",
+            "--keep-low-positive",
+        ]
+    )
+
+    assert rc == 0
+    assert calls == {
+        "target": path,
+        "report": True,
+        "report_path": report,
+        "write_section": False,
+        "cutoff_cm1": 20.0,
+        "keep_low_positive": True,
+    }
+    out = capsys.readouterr().out
+    assert "Ran ORACLE Thermo" in out
+    assert "Q=12.5" in out
+
+
 def test_gicforge_plan_cli_calls_writer(tmp_path, monkeypatch, capsys):
     calls = {}
     path = tmp_path / "molecule.xyz"
