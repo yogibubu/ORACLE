@@ -13,6 +13,7 @@ C   ORCFTRN : center-center Cartesian translation component B row
 C   ORCFROT : exponential-map fragment rotation component B row
 C   ORCGSPC : classify ORACLE special protected primitive families
 C   ORCGSEL : protected-first modified Gram-Schmidt rank selection
+C   ORCGLCB : frozen GIC linear-combination B row
 C
       Subroutine ORCGSPC(FAMILY,ISPEC)
       Character*(*) FAMILY
@@ -132,6 +133,34 @@ C
       Do 10 I=1,N
        ORCGDOT=ORCGDOT+A(I)*B(I)
    10 Continue
+      Return
+      End
+
+      Subroutine ORCGLCB(NCOL,NTERM,IPRIM,COEF,BMAT,BROW,IFAIL)
+      Implicit Real*8(A-H,O-Z)
+      Integer NCOL,NTERM,IPRIM(*),IFAIL
+      Dimension COEF(*),BMAT(NCOL,*),BROW(*)
+C
+C     Build the B row for a frozen ORACLE GIC represented as
+C     COEFFS=primitive_id:coefficient.  This is the Fortran-side mirror
+C     of Python build_gic_b_matrix for local symmetrized GICs.
+C
+      IFAIL=0
+      Call ORCFCLR(NCOL,BROW)
+      If(NCOL.le.0.or.NTERM.lt.0) then
+       IFAIL=1
+       Return
+      EndIf
+      Do 20 IT=1,NTERM
+       IP=IPRIM(IT)
+       If(IP.le.0) then
+        IFAIL=2
+        Return
+       EndIf
+       Do 10 J=1,NCOL
+        BROW(J)=BROW(J)+COEF(IT)*BMAT(J,IP)
+   10  Continue
+   20 Continue
       Return
       End
 

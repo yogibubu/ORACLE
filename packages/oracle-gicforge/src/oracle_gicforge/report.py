@@ -68,6 +68,21 @@ def gic_report_lines(definition: GICDefinition) -> list[str]:
     else:
         lines.append("NONE")
 
+    symmetry = definition.symmetry_diagnostics
+    lines.extend(["", "Symmetrization Diagnostics", "---------------------------"])
+    if symmetry:
+        lines.append(f"Method: {symmetry.method}")
+        lines.append(f"Policy: {symmetry.policy}")
+        lines.append(f"Status: {symmetry.status}")
+        lines.append(f"Groups: {len(symmetry.groups)}")
+        for group in symmetry.groups:
+            lines.append(
+                f"{group.block} {group.signature}: "
+                f"{','.join(group.source_gics)} -> {','.join(group.output_gics)}"
+            )
+    else:
+        lines.append("NONE")
+
     lines.extend(["", "Reduction Diagnostics", "---------------------"])
     lines.append("Selected: " + _list_or_none(diagnostics.selected if diagnostics else ()))
     lines.append("Skipped singular: " + _list_or_none(skipped_singular))

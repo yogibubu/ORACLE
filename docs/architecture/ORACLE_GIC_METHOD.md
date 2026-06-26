@@ -115,6 +115,21 @@ fragment-orientation coordinates with fragment-orientation coordinates, and so
 on. It must not mix unrelated coordinate families just because they share an
 irreducible representation.
 
+The first imported ORACLE implementation mirrors Merlino's type-local
+GICForge symmetrizer. When `--symmetrize` is requested, GICForge groups
+one-term frozen GICs by:
+
+- symmetry source block;
+- primitive family;
+- atom-type signature.
+
+For each eligible group, the first output coordinate is the normalized totally
+symmetric sum of the source primitives. The remaining output coordinates are
+normalized adjacent differences. The transformation is written directly in
+`[FROZEN_GICS]` as `COEFFS=primitive_id:coefficient` and the B matrix is built
+analytically as the same linear combination of primitive B rows. The final GIC
+count therefore remains equal to the vibrational rank.
+
 For special coordinates, the intended symmetry source blocks are the protected
 classes themselves:
 
@@ -128,10 +143,15 @@ The symmetrized block must preserve the family counts and the protected
 semantic role. If symmetry projection would destroy these counts or produce
 ambiguous labels, the correct behavior is a clean stop.
 
+The frozen `#GIC` section records `[SYMMETRY_DIAGNOSTICS]` with the method,
+policy, status, transformed source groups and output labels. Human reports read
+this stored diagnostic state; they do not recompute symmetry.
+
 The helper `oracle_gicforge.symmetry.gic_symmetry_source_blocks` exposes these
 homogeneous blocks to future GICSYM implementations and reports. It is a
 preparatory layer: non-C1 projection remains constrained by backend
-availability, but the grouping contract is now explicit.
+availability, but the grouping contract and local sum/difference
+symmetrization are now explicit.
 
 ## Python And Fortran Backends
 
@@ -164,6 +184,10 @@ the method. Native Gaussian primitives are emitted directly where possible.
 Fragment and virtual-center coordinates are emitted through Gaussian ReadGIC
 symbolic expressions using `Fragment(...)`, `XCntr/YCntr/ZCntr(...)`,
 coordinate references and regularized exponential-map expressions.
+
+When a frozen GIC is a linear combination, Gaussian export emits the same
+linear combination of the primitive symbolic expressions. It does not silently
+fall back to the first primitive in the combination.
 
 The Gaussian block is therefore reproducible from the frozen `#GIC` section and
 the saved geometry. It is not used as the internal source of truth for rank,

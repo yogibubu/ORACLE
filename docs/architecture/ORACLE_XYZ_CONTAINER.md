@@ -42,6 +42,20 @@ model.
 The same file is also the standalone input contract. A tool may be run directly
 from an already prepared `xyzin` file when the sections it needs are present.
 
+## GIC State
+
+`#GIC` stores the frozen coordinate contract, not only a list of Gaussian input
+lines. In built files it includes:
+
+- selected primitive coordinates;
+- final frozen GICs, including linear-combination coefficients;
+- reduction diagnostics;
+- symmetrization diagnostics;
+- Gaussian ReadGIC text generated from the frozen state.
+
+Downstream modules should consume the frozen GICs and diagnostics directly and
+use `[GAUSSIAN_GIC]` only when writing Gaussian inputs.
+
 ## Compatibility
 
 The ORACLE `xyzin` format is the historical source:

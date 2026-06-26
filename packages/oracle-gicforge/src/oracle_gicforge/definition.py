@@ -20,15 +20,18 @@ from .policy import (
     DIAGNOSTIC_FINITE_DIFFERENCE_STEP,
     GIC_BACKEND,
     LINEAR_ANGLE_DEGREES,
+    LOCAL_SYMMETRIZATION_METHOD,
     ORDINARY_REDUCTION_CLASS,
     PRIMITIVE_FAMILY_ORDER,
     RANK_METHOD,
     RANK_TOLERANCE,
     REDUCTION_POLICY,
     SPECIAL_REDUCTION_CLASS,
+    SYMMETRIZATION_POLICY,
     SYCART_BACKEND,
     primitive_prefix,
     primitive_reduction_class,
+    primitive_symmetry_block,
 )
 
 
@@ -83,6 +86,24 @@ class GICReductionDiagnostics:
 
 
 @dataclass(frozen=True)
+class GICSymmetrizedGroup:
+    block: str
+    family: str
+    signature: str
+    source_gics: tuple[str, ...]
+    output_gics: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class GICSymmetrizationDiagnostics:
+    method: str
+    policy: str
+    status: str
+    point_group: str
+    groups: tuple[GICSymmetrizedGroup, ...] = ()
+
+
+@dataclass(frozen=True)
 class GICDefinition:
     backend: str
     point_group: str
@@ -94,6 +115,7 @@ class GICDefinition:
     primitives: tuple[GICPrimitive, ...]
     gics: tuple[FrozenGIC, ...]
     reduction_diagnostics: GICReductionDiagnostics | None = None
+    symmetry_diagnostics: GICSymmetrizationDiagnostics | None = None
 
 
 @dataclass(frozen=True)
@@ -165,6 +187,13 @@ def build_gic_definition_from_xyzin(
         )
         for idx, primitive in enumerate(selected, start=1)
     )
+    gics, symmetry_diagnostics = _apply_local_symmetrization(
+        gics,
+        tuple(selected),
+        atom_symbols=tuple(geometry.atoms),
+        point_group=point_group,
+        requested=bool(symmetrize),
+    )
     return GICDefinition(
         backend=GIC_BACKEND,
         point_group=point_group,
@@ -178,6 +207,7 @@ def build_gic_definition_from_xyzin(
         primitives=tuple(selected),
         gics=gics,
         reduction_diagnostics=reduction_diagnostics,
+        symmetry_diagnostics=symmetry_diagnostics,
     )
 
 
@@ -235,6 +265,8 @@ def gic_definition_section_lines(definition: GICDefinition) -> list[str]:
         lines.append("NONE")
     lines.append("[REDUCTION_DIAGNOSTICS]")
     lines.extend(_reduction_diagnostics_lines(definition))
+    lines.append("[SYMMETRY_DIAGNOSTICS]")
+    lines.extend(_symmetry_diagnostics_lines(definition))
     lines.append("[GAUSSIAN_GIC]")
     gaussian_gics = _gaussian_gic_block_lines(definition)
     if gaussian_gics:
@@ -365,6 +397,7 @@ def read_gic_definition_from_xyzin(path: Path) -> GICDefinition:
         section,
         selected=tuple(p.identifier for p in primitives),
     )
+    symmetry_diagnostics = _parse_symmetry_diagnostics(section)
     return GICDefinition(
         backend=_section_value(section, "BACKEND") or GIC_BACKEND,
         point_group=_section_value(section, "POINT_GROUP") or _point_group(lines),
@@ -379,6 +412,7 @@ def read_gic_definition_from_xyzin(path: Path) -> GICDefinition:
         primitives=primitives,
         gics=gics,
         reduction_diagnostics=diagnostics,
+        symmetry_diagnostics=symmetry_diagnostics,
     )
 
 
@@ -668,6 +702,46 @@ def _reduction_diagnostics_lines(definition: GICDefinition) -> list[str]:
     ]
 
 
+def _symmetry_diagnostics_lines(definition: GICDefinition) -> list[str]:
+    diagnostics = definition.symmetry_diagnostics or _empty_symmetry_diagnostics(
+        definition.point_group,
+        requested=definition.symmetrize,
+    )
+    lines = [
+        f"METHOD {diagnostics.method}",
+        f"POLICY {diagnostics.policy}",
+        f"STATUS {diagnostics.status}",
+        f"POINT_GROUP {diagnostics.point_group}",
+        f"GROUP_COUNT {len(diagnostics.groups)}",
+        f"SYMMETRIZED_GIC_COUNT {_symmetrized_gic_count(diagnostics)}",
+    ]
+    for index, group in enumerate(diagnostics.groups, start=1):
+        lines.append(
+            f"GROUP {index} BLOCK={group.block} FAMILY={group.family} "
+            f"SIGNATURE={group.signature} "
+            f"SOURCES={_csv_or_none(group.source_gics)} "
+            f"OUTPUTS={_csv_or_none(group.output_gics)}"
+        )
+    return lines
+
+
+def _empty_symmetry_diagnostics(
+    point_group: str,
+    *,
+    requested: bool,
+) -> GICSymmetrizationDiagnostics:
+    return GICSymmetrizationDiagnostics(
+        method="NONE",
+        policy=SYMMETRIZATION_POLICY,
+        status="NOT_REQUESTED" if not requested else "NO_ELIGIBLE_GROUPS",
+        point_group=point_group,
+    )
+
+
+def _symmetrized_gic_count(diagnostics: GICSymmetrizationDiagnostics) -> int:
+    return sum(len(group.output_gics) for group in diagnostics.groups)
+
+
 def _make_reduction_diagnostics(
     selected: list[GICPrimitive],
     *,
@@ -693,6 +767,304 @@ def _record_skip(
         skipped_singular.append(primitive.identifier)
     elif status == "dependent":
         skipped_dependent.append(primitive.identifier)
+
+
+def _apply_local_symmetrization(
+    gics: tuple[FrozenGIC, ...],
+    primitives: tuple[GICPrimitive, ...],
+    *,
+    atom_symbols: tuple[str, ...],
+    point_group: str,
+    requested: bool,
+) -> tuple[tuple[FrozenGIC, ...], GICSymmetrizationDiagnostics]:
+    if not requested:
+        return gics, _empty_symmetry_diagnostics(point_group, requested=False)
+
+    source_groups = _local_symmetry_groups(gics, primitives, atom_symbols=atom_symbols)
+    if not source_groups:
+        return (
+            gics,
+            GICSymmetrizationDiagnostics(
+                method=LOCAL_SYMMETRIZATION_METHOD,
+                policy=SYMMETRIZATION_POLICY,
+                status="NO_ELIGIBLE_GROUPS",
+                point_group=point_group,
+            ),
+        )
+
+    groups_by_first = {
+        group[0].identifier: (key, group)
+        for key, group in source_groups.items()
+    }
+    grouped_ids = {
+        gic.identifier
+        for group in source_groups.values()
+        for gic in group
+    }
+    name_counters: dict[tuple[str, str], int] = {}
+    output: list[FrozenGIC] = []
+    diagnostics: list[GICSymmetrizedGroup] = []
+
+    for gic in gics:
+        if gic.identifier in groups_by_first:
+            key, group = groups_by_first[gic.identifier]
+            new_gics = _symmetrized_group_gics(
+                key,
+                group,
+                first_index=len(output) + 1,
+                name_counters=name_counters,
+                point_group=point_group,
+            )
+            output.extend(new_gics)
+            diagnostics.append(
+                GICSymmetrizedGroup(
+                    block=key[0],
+                    family=key[1],
+                    signature=key[2],
+                    source_gics=tuple(source.name for source in group),
+                    output_gics=tuple(new_gic.name for new_gic in new_gics),
+                )
+            )
+            continue
+        if gic.identifier in grouped_ids:
+            continue
+        output.append(_renumber_frozen_gic(gic, len(output) + 1))
+
+    return (
+        tuple(output),
+        GICSymmetrizationDiagnostics(
+            method=LOCAL_SYMMETRIZATION_METHOD,
+            policy=SYMMETRIZATION_POLICY,
+            status="APPLIED",
+            point_group=point_group,
+            groups=tuple(diagnostics),
+        ),
+    )
+
+
+def _local_symmetry_groups(
+    gics: tuple[FrozenGIC, ...],
+    primitives: tuple[GICPrimitive, ...],
+    *,
+    atom_symbols: tuple[str, ...],
+) -> dict[tuple[str, str, str], tuple[FrozenGIC, ...]]:
+    primitive_by_id = {primitive.identifier: primitive for primitive in primitives}
+    grouped: dict[tuple[str, str, str], list[FrozenGIC]] = {}
+    for gic in gics:
+        primitive = _single_source_primitive(gic, primitive_by_id)
+        if primitive is None:
+            continue
+        signature = _local_symmetry_signature(primitive, atom_symbols=atom_symbols)
+        if not signature:
+            continue
+        key = (primitive_symmetry_block(primitive.family), primitive.family, signature)
+        grouped.setdefault(key, []).append(gic)
+    return {
+        key: tuple(group)
+        for key, group in grouped.items()
+        if len(group) > 1
+    }
+
+
+def _single_source_primitive(
+    gic: FrozenGIC,
+    primitive_by_id: dict[str, GICPrimitive],
+) -> GICPrimitive | None:
+    coefficients = gic.coefficients or ((gic.primitive_id, 1.0),)
+    if len(coefficients) != 1:
+        return None
+    primitive_id, coefficient = coefficients[0]
+    if abs(float(coefficient) - 1.0) > 1.0e-12:
+        return None
+    return primitive_by_id.get(primitive_id)
+
+
+def _local_symmetry_signature(
+    primitive: GICPrimitive,
+    *,
+    atom_symbols: tuple[str, ...],
+) -> str | None:
+    if primitive.family == "STRETCH" and len(primitive.atoms) == 2:
+        return "R:" + "-".join(_sorted_atom_symbols(primitive.atoms, atom_symbols))
+    if primitive.family == "BEND" and len(primitive.atoms) == 3:
+        end_symbols = _sorted_atom_symbols(
+            (primitive.atoms[0], primitive.atoms[2]),
+            atom_symbols,
+        )
+        return f"A:{_atom_symbol(primitive.atoms[1], atom_symbols)}:{'-'.join(end_symbols)}"
+    if primitive.family == "LINEAR_BEND" and len(primitive.atoms) == 3:
+        end_symbols = _sorted_atom_symbols(
+            (primitive.atoms[0], primitive.atoms[2]),
+            atom_symbols,
+        )
+        return (
+            f"L:{primitive.mode}:{_atom_symbol(primitive.atoms[1], atom_symbols)}:"
+            f"{'-'.join(end_symbols)}"
+        )
+    if primitive.family == "TORSION" and len(primitive.atoms) == 4:
+        return "D:" + "-".join(_atom_symbol(atom, atom_symbols) for atom in primitive.atoms)
+    if primitive.family == "OUT_OF_PLANE" and len(primitive.atoms) == 4:
+        substituents = _sorted_atom_symbols(primitive.atoms[1:], atom_symbols)
+        return (
+            f"U:{_atom_symbol(primitive.atoms[0], atom_symbols)}:"
+            f"{'-'.join(substituents)}"
+        )
+    if primitive.family == "FRAG_DISTANCE":
+        left = _atom_multiset_signature(primitive.atoms, atom_symbols)
+        right = _atom_multiset_signature(primitive.ref_atoms, atom_symbols)
+        pair = tuple(sorted((left, right)))
+        return f"FC_DIST:{pair[0]}:{pair[1]}"
+    if primitive.family == "FRAG_CENTER_ATOM_DISTANCE":
+        return (
+            "FCA_DIST:"
+            f"{_atom_multiset_signature(primitive.atoms, atom_symbols)}:"
+            f"{_atom_multiset_signature(primitive.ref_atoms, atom_symbols)}"
+        )
+    if primitive.family == "FRAG_TRANSLATION":
+        return (
+            f"FTRANS:{primitive.mode}:"
+            f"{_atom_multiset_signature(primitive.atoms, atom_symbols)}:"
+            f"{_atom_multiset_signature(primitive.ref_atoms, atom_symbols)}"
+        )
+    if primitive.family == "FRAG_ORIENTATION":
+        return (
+            f"FROT:{primitive.mode}:"
+            f"{_atom_multiset_signature(primitive.atoms, atom_symbols)}:"
+            f"{_atom_multiset_signature(primitive.ref_atoms, atom_symbols)}:"
+            f"{_atom_multiset_signature(primitive.frame_atoms, atom_symbols)}:"
+            f"{_atom_multiset_signature(primitive.ref_frame_atoms, atom_symbols)}"
+        )
+    if primitive.family == "CENTER_ATOM_DISTANCE":
+        return (
+            "CENTER_ATOM_DIST:"
+            f"{_atom_multiset_signature(primitive.atoms, atom_symbols)}:"
+            f"{_atom_multiset_signature(primitive.ref_atoms, atom_symbols)}"
+        )
+    return None
+
+
+def _symmetrized_group_gics(
+    key: tuple[str, str, str],
+    group: tuple[FrozenGIC, ...],
+    *,
+    first_index: int,
+    name_counters: dict[tuple[str, str], int],
+    point_group: str,
+) -> tuple[FrozenGIC, ...]:
+    _block, family, _signature = key
+    size = len(group)
+    output: list[FrozenGIC] = []
+    symmetric_weight = 1.0 / np.sqrt(float(size))
+    output.append(
+        FrozenGIC(
+            identifier=f"GIC{first_index:03d}",
+            name=_next_symmetrized_name(family, "S", name_counters),
+            family=family,
+            irrep=_local_symmetry_irrep(group, point_group=point_group, kind="S"),
+            primitive_id=group[0].primitive_id,
+            gaussian_expression="LINEAR_COMBINATION",
+            coefficients=_combine_gic_coefficients(
+                group,
+                tuple(symmetric_weight for _idx in range(size)),
+            ),
+        )
+    )
+    for group_index in range(1, size):
+        weights = [0.0 for _idx in group]
+        weights[group_index - 1] = 1.0 / np.sqrt(2.0)
+        weights[group_index] = -1.0 / np.sqrt(2.0)
+        output.append(
+            FrozenGIC(
+                identifier=f"GIC{first_index + group_index:03d}",
+                name=_next_symmetrized_name(family, "D", name_counters),
+                family=family,
+                irrep=_local_symmetry_irrep(group, point_group=point_group, kind="D"),
+                primitive_id=group[group_index - 1].primitive_id,
+                gaussian_expression="LINEAR_COMBINATION",
+                coefficients=_combine_gic_coefficients(group, tuple(weights)),
+            )
+        )
+    return tuple(output)
+
+
+def _combine_gic_coefficients(
+    gics: tuple[FrozenGIC, ...],
+    weights: tuple[float, ...],
+) -> tuple[tuple[str, float], ...]:
+    totals: dict[str, float] = {}
+    order: list[str] = []
+    for gic, weight in zip(gics, weights):
+        if abs(weight) <= 1.0e-14:
+            continue
+        coefficients = gic.coefficients or ((gic.primitive_id, 1.0),)
+        for primitive_id, coefficient in coefficients:
+            if primitive_id not in totals:
+                order.append(primitive_id)
+                totals[primitive_id] = 0.0
+            totals[primitive_id] += float(weight) * float(coefficient)
+    return tuple(
+        (primitive_id, totals[primitive_id])
+        for primitive_id in order
+        if abs(totals[primitive_id]) > 1.0e-14
+    )
+
+
+def _renumber_frozen_gic(gic: FrozenGIC, index: int) -> FrozenGIC:
+    return FrozenGIC(
+        identifier=f"GIC{index:03d}",
+        name=gic.name,
+        family=gic.family,
+        irrep=gic.irrep,
+        primitive_id=gic.primitive_id,
+        gaussian_expression=gic.gaussian_expression,
+        coefficients=gic.coefficients,
+    )
+
+
+def _next_symmetrized_name(
+    family: str,
+    kind: str,
+    counters: dict[tuple[str, str], int],
+) -> str:
+    key = (family, kind)
+    counters[key] = counters.get(key, 0) + 1
+    return f"{primitive_prefix(family)}{kind}{counters[key]:03d}"
+
+
+def _local_symmetry_irrep(
+    group: tuple[FrozenGIC, ...],
+    *,
+    point_group: str,
+    kind: str,
+) -> str:
+    if point_group.upper() == "C1":
+        return "A"
+    irreps = {gic.irrep for gic in group}
+    if len(irreps) == 1 and "UNASSIGNED" not in irreps:
+        return next(iter(irreps))
+    return "LOCAL_SYM" if kind == "S" else "LOCAL_DIF"
+
+
+def _sorted_atom_symbols(
+    atoms: tuple[int, ...],
+    atom_symbols: tuple[str, ...],
+) -> tuple[str, ...]:
+    return tuple(sorted(_atom_symbol(atom, atom_symbols) for atom in atoms))
+
+
+def _atom_multiset_signature(
+    atoms: tuple[int, ...],
+    atom_symbols: tuple[str, ...],
+) -> str:
+    if not atoms:
+        return "NONE"
+    return ".".join(_sorted_atom_symbols(atoms, atom_symbols))
+
+
+def _atom_symbol(atom: int, atom_symbols: tuple[str, ...]) -> str:
+    if 1 <= atom <= len(atom_symbols):
+        return atom_symbols[atom - 1].upper()
+    return f"A{atom}"
 
 
 def _try_select_ranked_primitive(
@@ -1817,6 +2189,43 @@ def _parse_reduction_diagnostics(
     )
 
 
+def _parse_symmetry_diagnostics(
+    section_lines: list[str],
+) -> GICSymmetrizationDiagnostics | None:
+    lines = _subsection(section_lines, "SYMMETRY_DIAGNOSTICS")
+    if not lines:
+        return None
+    groups: list[GICSymmetrizedGroup] = []
+    for line in lines:
+        parts = line.split()
+        if not parts or parts[0].upper() != "GROUP":
+            continue
+        fields = _key_values(parts[2:] if len(parts) > 1 else parts[1:])
+        try:
+            groups.append(
+                GICSymmetrizedGroup(
+                    block=fields["BLOCK"],
+                    family=fields["FAMILY"],
+                    signature=fields["SIGNATURE"],
+                    source_gics=_parse_text_list(fields.get("SOURCES", "")),
+                    output_gics=_parse_text_list(fields.get("OUTPUTS", "")),
+                )
+            )
+        except KeyError as exc:
+            raise GICForgeContractError(
+                f"invalid symmetry diagnostic group line: {line}"
+            ) from exc
+    return GICSymmetrizationDiagnostics(
+        method=_section_value(lines, "METHOD") or "UNKNOWN",
+        policy=_section_value(lines, "POLICY") or SYMMETRIZATION_POLICY,
+        status=_section_value(lines, "STATUS") or "UNKNOWN",
+        point_group=_section_value(lines, "POINT_GROUP")
+        or _section_value(section_lines, "POINT_GROUP")
+        or "UNKNOWN",
+        groups=tuple(groups),
+    )
+
+
 def _key_values(parts: list[str]) -> dict[str, str]:
     fields: dict[str, str] = {}
     for part in parts:
@@ -1941,11 +2350,55 @@ def _gaussian_gic_block_lines(definition: GICDefinition) -> list[str]:
             lines.extend(_gaussian_quaternion_lines(frag_id, ref_id))
 
     for gic in definition.gics:
-        primitive = _primitive_by_id(definition.primitives, gic.primitive_id)
-        expression = _gaussian_expression_for_primitive(primitive)
+        expression = _gaussian_expression_for_gic(definition, gic)
         if expression:
             lines.append(f"{gic.identifier} = {expression}")
     return lines
+
+
+def _gaussian_expression_for_gic(
+    definition: GICDefinition,
+    gic: FrozenGIC,
+) -> str | None:
+    coefficients = gic.coefficients or ((gic.primitive_id, 1.0),)
+    primitive_by_id = {primitive.identifier: primitive for primitive in definition.primitives}
+    if len(coefficients) == 1 and abs(coefficients[0][1] - 1.0) <= 1.0e-12:
+        primitive = primitive_by_id.get(coefficients[0][0])
+        if primitive is None:
+            raise GICForgeContractError(
+                f"unknown primitive {coefficients[0][0]!r} in frozen GIC {gic.identifier}"
+            )
+        return _gaussian_expression_for_primitive(primitive)
+
+    terms: list[str] = []
+    for primitive_id, coefficient in coefficients:
+        primitive = primitive_by_id.get(primitive_id)
+        if primitive is None:
+            raise GICForgeContractError(
+                f"unknown primitive {primitive_id!r} in frozen GIC {gic.identifier}"
+            )
+        expression = _gaussian_expression_for_primitive(primitive)
+        if expression is None:
+            return None
+        terms.append(_gaussian_linear_term(coefficient, expression, first=not terms))
+    return "".join(terms) if terms else None
+
+
+def _gaussian_linear_term(coefficient: float, expression: str, *, first: bool) -> str:
+    sign = "-" if coefficient < 0.0 else "+"
+    magnitude = abs(float(coefficient))
+    coefficient_text = f"{magnitude:.12g}"
+    term = f"{coefficient_text}*({_strip_gaussian_outer_parentheses(expression)})"
+    if first:
+        return f"-{term}" if sign == "-" else term
+    return f"{sign}{term}"
+
+
+def _strip_gaussian_outer_parentheses(expression: str) -> str:
+    text = expression.strip()
+    if text.startswith("(") and text.endswith(")"):
+        return text[1:-1]
+    return text
 
 
 def _gaussian_expression_for_primitive(primitive: GICPrimitive) -> str | None:
@@ -2175,6 +2628,14 @@ def _sycart_components(vector: tuple[float, ...]) -> str:
 
 
 def _symmetry_mode(definition: GICDefinition) -> str:
+    diagnostics = definition.symmetry_diagnostics
+    if (
+        definition.symmetrize
+        and diagnostics is not None
+        and diagnostics.method == LOCAL_SYMMETRIZATION_METHOD
+        and diagnostics.groups
+    ):
+        return "LOCAL_BLOCK_C1" if definition.point_group.upper() == "C1" else "LOCAL_BLOCK"
     if definition.point_group.upper() == "C1":
         return "IDENTITY_C1" if definition.symmetrize else "UNSYMMETRIZED_C1"
     return "SYMMETRIZED" if definition.symmetrize else "UNSYMMETRIZED"

@@ -179,11 +179,39 @@ def test_gicforge_build_writes_frozen_gics_and_sycart(tmp_path):
     assert gic[0] == "SCHEMA oracle.xyz.gic.v1"
     assert "STATUS BUILT" in gic
     assert "BACKEND oracle-native-primitive.v1" in gic
-    assert "SYMMETRY_MODE IDENTITY_C1" in gic
+    assert "SYMMETRY_MODE LOCAL_BLOCK_C1" in gic
     assert "GIC_COUNT 3" in gic
     assert not any("PENDING" in line for line in gic)
-    assert "GIC001 = R(1,2)" in gic
+    assert "[SYMMETRY_DIAGNOSTICS]" in gic
+    assert "METHOD LOCAL_BLOCK_SALC" in gic
+    assert "STATUS APPLIED" in gic
+    assert (
+        "GROUP 1 BLOCK=STRETCH FAMILY=STRETCH SIGNATURE=R:H-O "
+        "SOURCES=Str0001,Str0002 OUTPUTS=StrS001,StrD001"
+    ) in gic
+    assert any(
+        line.startswith(
+            "GIC001 NAME=StrS001 FAMILY=STRETCH IRREP=A "
+            "COEFFS=P001:0.707106781187,P002:0.707106781187"
+        )
+        for line in gic
+    )
+    assert "GIC001 = 0.707106781187*(R(1,2))+0.707106781187*(R(1,3))" in gic
+    assert "GIC002 = 0.707106781187*(R(1,2))-0.707106781187*(R(1,3))" in gic
     assert "GIC003 = A(2,1,3)" in gic
+    assert definition.symmetry_diagnostics is not None
+    assert definition.symmetry_diagnostics.status == "APPLIED"
+    assert definition.gics[0].name == "StrS001"
+    assert definition.gics[0].coefficients[0][1] == pytest.approx(1.0 / np.sqrt(2.0))
+    matrix = build_gic_b_matrix_from_xyzin(xyzin)
+    assert matrix.coordinate_names[:2] == ("StrS001", "StrD001")
+    assert matrix.rows[0][5] == pytest.approx(1.0 / np.sqrt(2.0))
+    assert matrix.rows[0][7] == pytest.approx(1.0 / np.sqrt(2.0))
+    assert matrix.rows[1][5] == pytest.approx(1.0 / np.sqrt(2.0))
+    assert matrix.rows[1][7] == pytest.approx(-1.0 / np.sqrt(2.0))
+    report_lines = gic_report_from_xyzin(xyzin)
+    assert "Method: LOCAL_BLOCK_SALC" in report_lines
+    assert "STRETCH R:H-O: Str0001,Str0002 -> StrS001,StrD001" in report_lines
     assert sycart[0] == "SCHEMA oracle.xyz.sycart.v1"
     assert "STATUS BUILT" in sycart
     assert "COORD_COUNT 3" in sycart

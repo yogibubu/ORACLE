@@ -29,7 +29,17 @@ It also mirrors the Python non-redundant reduction contract:
   Python (`FRAG_DISTANCE`, `FRAG_CENTER_ATOM_DISTANCE`, `FRAG_TRANSLATION`,
   `FRAG_ORIENTATION`, `CENTER_ATOM_DISTANCE`);
 - `ORCGSEL` performs the same protected-first modified Gram-Schmidt rank
-  selection used by `oracle_gicforge.definition`.
+  selection used by `oracle_gicforge.definition`;
+- `ORCGLCB` builds a frozen GIC B row as the linear combination of primitive B
+  rows stored in `COEFFS=`.
+
+`legacy_merlino/gic_type_symmetry.f` is the strict Fortran77 reference for the
+local GIC symmetrizer imported into Python. Both paths use the same policy:
+group one-term coordinates only inside homogeneous type blocks, write the first
+coordinate as a normalized symmetric sum, and write the remaining coordinates as
+normalized adjacent differences. ORACLE serializes that transformation in
+`#GIC/[FROZEN_GICS]` as primitive coefficients so Python and Fortran downstream
+tools can build the same B rows.
 
 The `FROT` B row is analytic: derivatives are propagated through the centroid,
 local frame, relative rotation matrix, quaternion and exponential-map
