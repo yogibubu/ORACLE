@@ -155,6 +155,14 @@ This constraint is formalized in
   geometry utilities.
 - This should absorb the stable parts of `geometry`, `topology` and topology
   pieces now under `merlino_fit`.
+- Descriptor topology and atomic synthons are first-class chemistry primitives,
+  not side tools. `AtomicSynthons`, descriptor parameters, aromaticity and
+  fragment/synthon signatures belong here so MORPHEUS, GICForge, fragment
+  search, GUI diagnostics and future ML/data workflows reuse the same
+  descriptors.
+- `topology_reporting` is migrated as source material but should not become a
+  public API until the remaining `survibfit` reporting dependencies are moved
+  or replaced by ORACLE services.
 
 `oracle-gicforge`
 

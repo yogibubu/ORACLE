@@ -2,10 +2,16 @@ from __future__ import annotations
 
 from oracle_core import (
     ORACLE_MANIFEST_SCHEMA,
+    ORACLE_XYZ_ISOTOPOLOGUES_SCHEMA,
+    MERLINO_XYZIN_ISOTOPOLOGUES_SCHEMA,
+    XyzinIsotopologueRecord,
     build_run_manifest,
     ensure_workspace,
+    parse_xyzin_isotopologue_records,
     replace_section,
     section_content,
+    validate_xyzin_isotopologue_records,
+    xyzin_isotopologue_section_lines,
 )
 
 
@@ -65,3 +71,42 @@ def test_section_replacement_preserves_other_sections(tmp_path):
         "SCHEMA oracle.xyz.morpheus.v1",
         "STATUS draft",
     ]
+
+
+def test_isotopologue_records_write_oracle_schema_and_validate():
+    records = (
+        XyzinIsotopologueRecord(
+            label="parent",
+            rotational_MHz=(1000.0, 800.0, 600.0),
+        ),
+        XyzinIsotopologueRecord(
+            label="D2",
+            substitutions={2: 2},
+            rotational_MHz=(990.0, 790.0, 590.0),
+            deltavib_MHz=(0.1, 0.2, 0.3),
+        ),
+    )
+
+    lines = xyzin_isotopologue_section_lines(records)
+    assert lines[0] == f"SCHEMA {ORACLE_XYZ_ISOTOPOLOGUES_SCHEMA}"
+    parsed = parse_xyzin_isotopologue_records(lines)
+
+    assert parsed == records
+    assert validate_xyzin_isotopologue_records(parsed, atom_count=3, require_rotational=True) == ()
+
+
+def test_isotopologue_parser_accepts_merlino_schema():
+    lines = [
+        f"SCHEMA {MERLINO_XYZIN_ISOTOPOLOGUES_SCHEMA}",
+        "UNITS ROTATIONAL=MHz DELTAVIB=MHz DELTAEL=MHz SIGMA=MHz",
+        "INDEXING ATOMS=ONE_BASED",
+        "BEGIN parent",
+        "DEFINITION parent",
+        "ROTATIONAL_MHZ A=1000 B=800 C=600",
+        "END",
+    ]
+
+    parsed = parse_xyzin_isotopologue_records(lines)
+
+    assert parsed[0].label == "parent"
+    assert parsed[0].rotational_MHz == (1000.0, 800.0, 600.0)

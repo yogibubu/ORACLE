@@ -11,6 +11,8 @@ packages are separated behind stable service, CLI and manifest contracts.
 - `oracle-core`: workspace layout, configuration, manifests, checksums and
   common errors.
 - `oracle-chem`: atoms, masses, geometry, topology, rings and symmetry.
+  Descriptor topology and atomic synthons live here as shared chemistry
+  primitives.
 - `oracle-gicforge`: non-redundant GIC construction, frozen schemas, SYCART and
   B-matrix evaluation.
 - `oracle-morpheus`: semiexperimental geometry refinement, constraints,

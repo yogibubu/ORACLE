@@ -53,6 +53,10 @@ Keep as migration sources:
 - `merlino_vpt2_vci`
 - `merlino_gui`
 - stable parts of `geometry`, `topology` and `merlino_fit`
+- `merlino_fit/topology`, especially `AtomicSynthons`,
+  `descriptor_parameters`, continuous/discrete topology, rings, aromaticity and
+  topology writers. The top-level `topology/` package in Merlino is mostly a
+  compatibility wrapper around this canonical implementation.
 - `fortran`
 - `puckering_dvr`
 - `examples`
@@ -89,4 +93,3 @@ Recommended next patch in `merlino3.0`:
    artifacts, benchmark goldens or regenerated paper outputs.
 4. Move local runtime outputs out of source control only after preserving the
    current dirty state.
-
