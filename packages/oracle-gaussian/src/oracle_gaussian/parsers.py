@@ -204,8 +204,6 @@ def _leading_zmatrix_variable_lines(lines: tuple[str, ...]) -> tuple[str, ...]:
     for raw in lines:
         stripped = raw.strip()
         if not stripped:
-            if variables:
-                break
             continue
         if stripped.startswith(("#", "%")):
             break

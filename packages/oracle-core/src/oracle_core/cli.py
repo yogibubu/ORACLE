@@ -78,6 +78,25 @@ def build_parser(*, repo_root: Path | None = None) -> argparse.ArgumentParser:
         default="summary",
         help="Output format",
     )
+    corpus_audit = gicforge_sub.add_parser(
+        "corpus-audit",
+        help="Audit geometry imports for the GIC regression corpus",
+    )
+    corpus_audit.add_argument("--root", type=Path, help="Override the GIC corpus root directory")
+    corpus_audit.add_argument("--suffix", action="append", help="Filter by suffix; defaults to geometry inputs")
+    corpus_audit.add_argument("--limit", type=int, help="Limit audited or listed records")
+    corpus_audit.add_argument(
+        "--format",
+        choices=("summary", "failures", "json"),
+        default="summary",
+        help="Output format",
+    )
+    corpus_audit.add_argument(
+        "--status",
+        choices=("all", "pass", "fail"),
+        default="all",
+        help="Entry status filter for JSON output",
+    )
     gaussian_input = gicforge_sub.add_parser(
         "gaussian-input",
         help="Write Gaussian input from validated #GIC state",
@@ -161,6 +180,42 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
             print("\n".join(format_gic_corpus_paths(summary, limit=args.limit)))
             return 0
         print("\n".join(format_gic_corpus_summary(summary)))
+        return 0
+    if args.command == "gicforge" and args.gicforge_command == "corpus-audit":
+        from oracle_gicforge import (
+            audit_gic_corpus_geometry,
+            default_gic_corpus_root,
+            format_gic_corpus_geometry_audit_summary,
+            format_gic_corpus_geometry_failures,
+            gic_corpus_geometry_audit_records,
+        )
+
+        corpus_root = args.root or default_gic_corpus_root(root)
+        audit = audit_gic_corpus_geometry(
+            corpus_root,
+            suffixes=args.suffix,
+            limit=args.limit if args.format == "summary" else None,
+        )
+        if args.format == "json":
+            payload = {
+                "root": str(audit.root),
+                "total_files": audit.total_files,
+                "passed_files": audit.passed_files,
+                "failed_files": audit.failed_files,
+                "source_format_counts": audit.source_format_counts,
+                "error_counts": audit.error_counts,
+                "entries": gic_corpus_geometry_audit_records(
+                    audit,
+                    status=args.status,
+                    limit=args.limit,
+                ),
+            }
+            print(json.dumps(payload, indent=2, sort_keys=True))
+            return 0
+        if args.format == "failures":
+            print("\n".join(format_gic_corpus_geometry_failures(audit, limit=args.limit)))
+            return 0
+        print("\n".join(format_gic_corpus_geometry_audit_summary(audit)))
         return 0
     if args.command == "gicforge" and args.gicforge_command == "gaussian-input":
         from oracle_gicforge import write_gicforge_gaussian_input

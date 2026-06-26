@@ -24,6 +24,10 @@ class ZMatrixValue:
         key = str(self.raw).strip()
         if key in variables:
             return float(variables[key])
+        folded = key.upper()
+        folded_variables = {name.upper(): value for name, value in variables.items()}
+        if folded in folded_variables:
+            return float(folded_variables[folded])
         try:
             return _float_token(key)
         except ValueError as exc:

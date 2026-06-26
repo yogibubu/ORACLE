@@ -181,6 +181,21 @@ def test_read_geometry_dispatches_gaussian_inp_to_unified_adapter():
     assert geometry.source_format == "gaussian_zmatrix_input"
 
 
+def test_gaussian_zmatrix_variables_allow_blank_separated_blocks():
+    geometry = read_gaussian_input(CORPUS / "h2co_zmat.inp")
+
+    assert geometry.atoms == ("O", "C", "H", "H")
+    assert geometry.source_format == "gaussian_zmatrix_input"
+
+
+def test_gaussian_zmatrix_variables_are_case_insensitive():
+    geometry = read_gaussian_input(CORPUS / "alaIIN.inp")
+
+    assert geometry.natoms == 13
+    assert geometry.atoms.count("N") == 1
+    assert geometry.source_format == "gaussian_zmatrix_input"
+
+
 def test_gaussian_log_summary_uses_shared_geometry_for_last_orientation(tmp_path):
     path = tmp_path / "test.log"
     path.write_text(

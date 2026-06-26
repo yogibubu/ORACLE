@@ -186,5 +186,9 @@ oracle-gic-corpus-summary() {
     oracle-cli gicforge corpus "$@"
 }
 
+oracle-gic-corpus-audit() {
+    oracle-cli gicforge corpus-audit "$@"
+}
+
 unset _oracle_env_file
 unset _oracle_env_dir

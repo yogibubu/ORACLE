@@ -4,9 +4,12 @@ from collections import Counter
 from dataclasses import dataclass
 import os
 from pathlib import Path
+from typing import TypeVar
 
 
 GIC_CORPUS_ENV = "ORACLE_GIC_CORPUS"
+GEOMETRY_IMPORT_SUFFIXES = (".inp", ".gjf", ".gau", ".com", ".xyz", ".zmat", ".zmt")
+T = TypeVar("T")
 
 ROLE_BY_SUFFIX = {
     ".inp": "legacy_gic_input",
@@ -68,6 +71,75 @@ class GICCorpusSummary:
     @property
     def role_counts(self) -> dict[str, int]:
         return dict(Counter(entry.role for entry in self.entries))
+
+
+@dataclass(frozen=True)
+class GICCorpusGeometryAuditEntry:
+    path: Path
+    name: str
+    suffix: str
+    role: str
+    status: str
+    source_format: str = ""
+    natoms: int | None = None
+    charge: int | None = None
+    multiplicity: int | None = None
+    error_type: str = ""
+    error: str = ""
+
+    @property
+    def passed(self) -> bool:
+        return self.status == "PASS"
+
+    def record(self, *, root: Path | None = None) -> dict[str, object]:
+        resolved_root = root.resolve() if root is not None else None
+        resolved_path = self.path.resolve()
+        if resolved_root is not None:
+            try:
+                display_path = str(resolved_path.relative_to(resolved_root))
+            except ValueError:
+                display_path = str(resolved_path)
+        else:
+            display_path = str(self.path)
+        return {
+            "path": display_path,
+            "name": self.name,
+            "suffix": self.suffix,
+            "role": self.role,
+            "status": self.status,
+            "source_format": self.source_format,
+            "natoms": self.natoms,
+            "charge": self.charge,
+            "multiplicity": self.multiplicity,
+            "error_type": self.error_type,
+            "error": self.error,
+        }
+
+
+@dataclass(frozen=True)
+class GICCorpusGeometryAudit:
+    root: Path
+    entries: tuple[GICCorpusGeometryAuditEntry, ...]
+
+    @property
+    def total_files(self) -> int:
+        return len(self.entries)
+
+    @property
+    def passed_files(self) -> int:
+        return sum(1 for entry in self.entries if entry.passed)
+
+    @property
+    def failed_files(self) -> int:
+        return self.total_files - self.passed_files
+
+    @property
+    def source_format_counts(self) -> dict[str, int]:
+        return dict(Counter(entry.source_format for entry in self.entries if entry.source_format))
+
+    @property
+    def error_counts(self) -> dict[str, int]:
+        return dict(Counter(entry.error_type for entry in self.entries if entry.error_type))
 
 
 class GICCorpusError(ValueError):
@@ -149,7 +221,99 @@ def format_gic_corpus_paths(
     return [str(entry.path) for entry in _limited(summary.entries, limit)]
 
 
-def _limited(entries: tuple[GICCorpusEntry, ...], limit: int | None) -> tuple[GICCorpusEntry, ...]:
+def audit_gic_corpus_geometry(
+    root: Path,
+    *,
+    suffixes: tuple[str, ...] | list[str] | None = None,
+    limit: int | None = None,
+) -> GICCorpusGeometryAudit:
+    target = Path(root).expanduser().resolve()
+    requested_suffixes = suffixes if suffixes is not None else GEOMETRY_IMPORT_SUFFIXES
+    corpus_entries = _limited(discover_gic_corpus(target, suffixes=requested_suffixes), limit)
+    audit_entries = tuple(_audit_geometry_entry(entry) for entry in corpus_entries)
+    return GICCorpusGeometryAudit(root=target, entries=audit_entries)
+
+
+def gic_corpus_geometry_audit_records(
+    audit: GICCorpusGeometryAudit,
+    *,
+    status: str = "all",
+    limit: int | None = None,
+) -> list[dict[str, object]]:
+    entries = _filter_audit_entries(audit.entries, status=status)
+    return [entry.record(root=audit.root) for entry in _limited(entries, limit)]
+
+
+def format_gic_corpus_geometry_audit_summary(audit: GICCorpusGeometryAudit) -> list[str]:
+    lines = [
+        f"ROOT {audit.root}",
+        f"TOTAL_FILES {audit.total_files}",
+        f"PASS {audit.passed_files}",
+        f"FAIL {audit.failed_files}",
+    ]
+    for source_format, count in sorted(audit.source_format_counts.items()):
+        lines.append(f"SOURCE_FORMAT {source_format} {count}")
+    for error_type, count in sorted(audit.error_counts.items()):
+        lines.append(f"ERROR_TYPE {error_type} {count}")
+    return lines
+
+
+def format_gic_corpus_geometry_failures(
+    audit: GICCorpusGeometryAudit,
+    *,
+    limit: int | None = None,
+) -> list[str]:
+    failures = _limited(_filter_audit_entries(audit.entries, status="fail"), limit)
+    return [
+        f"FAIL {entry.path} {entry.error_type}: {entry.error}"
+        for entry in failures
+    ]
+
+
+def _audit_geometry_entry(entry: GICCorpusEntry) -> GICCorpusGeometryAuditEntry:
+    try:
+        from oracle_chem import read_geometry
+
+        geometry = read_geometry(entry.path)
+    except Exception as exc:
+        return GICCorpusGeometryAuditEntry(
+            path=entry.path,
+            name=entry.name,
+            suffix=entry.suffix,
+            role=entry.role,
+            status="FAIL",
+            error_type=type(exc).__name__,
+            error=str(exc),
+        )
+    return GICCorpusGeometryAuditEntry(
+        path=entry.path,
+        name=entry.name,
+        suffix=entry.suffix,
+        role=entry.role,
+        status="PASS",
+        source_format=geometry.source_format,
+        natoms=geometry.natoms,
+        charge=geometry.charge,
+        multiplicity=geometry.multiplicity,
+    )
+
+
+def _filter_audit_entries(
+    entries: tuple[GICCorpusGeometryAuditEntry, ...],
+    *,
+    status: str,
+) -> tuple[GICCorpusGeometryAuditEntry, ...]:
+    normalized = status.strip().lower()
+    if normalized == "all":
+        return entries
+    if normalized == "pass":
+        return tuple(entry for entry in entries if entry.passed)
+    if normalized == "fail":
+        return tuple(entry for entry in entries if not entry.passed)
+    raise GICCorpusError(f"unsupported audit status filter: {status}")
+
+
+def _limited(entries: tuple[T, ...], limit: int | None) -> tuple[T, ...]:
     if limit is None:
         return entries
     if limit < 0:

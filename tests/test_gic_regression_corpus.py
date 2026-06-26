@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from oracle_gicforge import discover_gic_corpus, summarize_gic_corpus
+from oracle_gicforge import (
+    audit_gic_corpus_geometry,
+    discover_gic_corpus,
+    summarize_gic_corpus,
+)
 
 
 CORPUS = Path(__file__).resolve().parent / "fixtures" / "test_molecules" / "molecules"
@@ -41,6 +45,19 @@ def test_gic_regression_corpus_inventory_classifies_files():
     assert {entry.role for entry in inp_entries} == {"legacy_gic_input"}
 
 
+def test_gic_regression_corpus_geometry_audit_tracks_parser_budget():
+    audit = audit_gic_corpus_geometry(CORPUS)
+    failures = {entry.name for entry in audit.entries if not entry.passed}
+
+    assert audit.total_files == 129
+    assert audit.passed_files == 115
+    assert audit.failed_files == 14
+    assert audit.source_format_counts["gaussian_cartesian_input"] == 99
+    assert audit.source_format_counts["gaussian_zmatrix_input"] == 16
+    assert audit.error_counts == {"GeometryParseError": 14}
+    assert {"pyrrole_smile1.inp", "testvib.inp"} <= failures
+
+
 def test_oracle_environment_helpers_define_oracle_style_commands():
     text = ENV_HELPERS.read_text(encoding="utf-8")
 
@@ -53,5 +70,6 @@ def test_oracle_environment_helpers_define_oracle_style_commands():
         "oracle-clean()",
         "oracle-gic-corpus-list()",
         "oracle-gic-corpus-summary()",
+        "oracle-gic-corpus-audit()",
     ):
         assert name in text

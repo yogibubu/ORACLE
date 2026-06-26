@@ -54,6 +54,7 @@ The demanding `test_molecules` corpus is versioned under
 
 ```bash
 python -m oracle gicforge corpus
+python -m oracle gicforge corpus-audit
 python -m oracle gicforge corpus --format paths --suffix .inp
 ```
 
