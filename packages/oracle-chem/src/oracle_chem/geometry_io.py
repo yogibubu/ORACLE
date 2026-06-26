@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
+from typing import Literal
 
 import numpy as np
 
@@ -136,26 +137,91 @@ def read_enriched_xyz(path: Path) -> MolecularGeometry:
     )
 
 
-def read_geometry(path: Path) -> MolecularGeometry:
+GeometrySourceKind = Literal["auto", "xyz", "enriched_xyz", "gaussian", "molpro", "mrcc"]
+
+
+def read_geometry_with_kind(
+    path: Path,
+    source_kind: GeometrySourceKind = "auto",
+) -> MolecularGeometry:
     target = Path(path)
-    suffix = target.suffix.lower()
-    if target.name.lower() == "xyzin":
-        return read_enriched_xyz(target)
-    if suffix == ".xyz" or suffix == "":
+    kind = source_kind
+    if kind == "auto":
+        suffix = target.suffix.lower()
+        if target.name.lower() == "xyzin":
+            return read_enriched_xyz(target)
+        if suffix == ".xyz" or suffix == "":
+            return read_xyz(target)
+        if suffix in {".zmat", ".zmt"}:
+            from .zmatrix import read_zmatrix
+
+            return read_zmatrix(target)
+        if suffix in {".gjf", ".gau", ".com", ".inp"}:
+            from oracle_babel import is_legacy_smiles_input, read_legacy_smiles_input
+            from oracle_gaussian import read_gaussian_input
+
+            if is_legacy_smiles_input(target):
+                return read_legacy_smiles_input(target)
+            return read_gaussian_input(target)
+        if suffix in {".log", ".out"}:
+            detected = detect_qm_output_format(target)
+            if detected is not None:
+                return read_geometry_with_kind(target, detected)
+            return _try_qm_output_readers(target)
+        raise GeometryParseError(f"unsupported geometry format: {target}")
+    if kind == "xyz":
         return read_xyz(target)
-    if suffix in {".zmat", ".zmt"}:
-        from .zmatrix import read_zmatrix
+    if kind == "enriched_xyz":
+        return read_enriched_xyz(target)
+    if kind == "gaussian":
+        suffix = target.suffix.lower()
+        if suffix in {".gjf", ".gau", ".com", ".inp"}:
+            from oracle_gaussian import read_gaussian_input
 
-        return read_zmatrix(target)
-    if suffix in {".gjf", ".gau", ".com", ".inp"}:
-        from oracle_babel import is_legacy_smiles_input, read_legacy_smiles_input
-        from oracle_gaussian import read_gaussian_input
-
-        if is_legacy_smiles_input(target):
-            return read_legacy_smiles_input(target)
-        return read_gaussian_input(target)
-    if suffix in {".log", ".out"}:
+            return read_gaussian_input(target)
         from oracle_gaussian import read_gaussian_log_geometry
 
         return read_gaussian_log_geometry(target)
-    raise GeometryParseError(f"unsupported geometry format: {target}")
+    if kind == "molpro":
+        from oracle_molpro import read_molpro_output_geometry
+
+        return read_molpro_output_geometry(target)
+    if kind == "mrcc":
+        from oracle_mrcc import read_mrcc_output_geometry
+
+        return read_mrcc_output_geometry(target)
+    raise GeometryParseError(f"unsupported geometry source kind: {source_kind}")
+
+
+def read_geometry(path: Path) -> MolecularGeometry:
+    return read_geometry_with_kind(Path(path), "auto")
+
+
+def detect_qm_output_format(path: Path) -> Literal["gaussian", "molpro", "mrcc"] | None:
+    text = Path(path).read_text(encoding="utf-8", errors="replace")
+    upper = text.upper()
+    if (
+        "GAUSSIAN" in upper
+        or "STANDARD ORIENTATION:" in upper
+        or "INPUT ORIENTATION:" in upper
+        or "SCF DONE:" in upper
+    ):
+        return "gaussian"
+    if "MRCC" in upper or "CHARGE OF THE SYSTEM" in upper or "SPIN MULTIPLICITY" in upper:
+        return "mrcc"
+    if "MOLPRO" in upper or "ATOMIC COORDINATES" in upper or "SPIN QUANTUM NUMBER" in upper:
+        return "molpro"
+    return None
+
+
+def _try_qm_output_readers(path: Path) -> MolecularGeometry:
+    errors: list[str] = []
+    for kind in ("gaussian", "molpro", "mrcc"):
+        try:
+            return read_geometry_with_kind(path, kind)  # type: ignore[arg-type]
+        except Exception as exc:
+            errors.append(f"{kind}: {exc}")
+    raise GeometryParseError(
+        f"unsupported QM output format for {path}; tried Gaussian, Molpro and MRCC "
+        f"({'; '.join(errors)})"
+    )

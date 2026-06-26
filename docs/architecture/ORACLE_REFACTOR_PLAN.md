@@ -88,6 +88,10 @@ ORACLE/
       src/oracle_gf/
     oracle-gaussian/
       src/oracle_gaussian/
+    oracle-molpro/
+      src/oracle_molpro/
+    oracle-mrcc/
+      src/oracle_mrcc/
     oracle-fragments/
       src/oracle_fragments/
     oracle-rovib/
@@ -219,6 +223,15 @@ reuse the saved sections.
 - Gaussian rovibrational log data is promoted to shared `#VIBRATIONAL`,
   `#ROTATIONAL` and `#DELTABVIB` sections before GF, Thermo, SEfit/MORPHEUS or
   anharmonic workflows consume it.
+
+`oracle-molpro` / `oracle-mrcc`
+
+- Program-specific output adapters for Molpro and MRCC geometry import.
+- Return shared `oracle_chem.MolecularGeometry` objects and feed ORACLE-Babel
+  preprocessing, which writes `#BASIC`, `#SOURCE`, `#SYMMETRY`, `#TOPOLOGY` and
+  `#SYNTHONS`.
+- Downstream GF, SEfit/MORPHEUS and anharmonic workflows must consume enriched
+  XYZ sections, not Molpro/MRCC text.
 
 `oracle-fragments`
 

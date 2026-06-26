@@ -21,6 +21,10 @@ packages are separated behind stable service, CLI and manifest contracts.
 - `oracle-gf`: frozen-GIC GF/PED analysis.
 - `oracle-gaussian`: Gaussian input/output adapters, job status/run helpers,
   FCHK/QFF promotion and Gaussian log rovibrational promotion.
+- `oracle-molpro`: Molpro output adapters returning shared ORACLE geometry and
+  enriched XYZ state.
+- `oracle-mrcc`: MRCC output adapters returning shared ORACLE geometry and
+  enriched XYZ state.
 - `oracle-babel`: import adapters for external sources and molecular databases
   such as LCB25.
 - `oracle-fragments`: topology-backed fragmentation, fragment-library search
@@ -78,7 +82,7 @@ python -m oracle gicforge bmatrix molecule.xyzin bmat.out
 python -m oracle gicforge gaussian-input molecule.xyzin job.gjf
 ```
 
-Gaussian adapters and job helpers are available directly:
+QM adapters and Gaussian job helpers are available directly:
 
 ```bash
 python -m oracle gaussian summary gauin.log
@@ -87,6 +91,8 @@ python -m oracle gaussian run . --executable gdv
 python -m oracle gaussian formchk gicforge.chk gicforge.fchk
 python -m oracle gaussian fchk-summary gicforge.fchk
 python -m oracle gaussian promote-rovib gauin.log molecule.xyzin
+python -m oracle molpro promote molpro.out molecule.xyzin
+python -m oracle mrcc promote mrcc.out molecule.xyzin
 ```
 
 Thermo and rovibrational utilities run from the same enriched `xyzin` state:
@@ -109,7 +115,7 @@ imports stay valid until ORACLE-native tests cover the new public APIs.
 
 ORACLE modules must not reinvent shared operations. Common tasks such as
 sectioned XYZ I/O, atom and isotope data, topology, symmetry, GIC construction,
-Gaussian parsing, backend execution and manifests belong to shared libraries.
+QM-program parsing, backend execution and manifests belong to shared libraries.
 
 Geometry and QM-program parsers are unified: they return shared ORACLE models
 and live in parser packages, not GUI or workflow modules.

@@ -109,9 +109,10 @@ Paper/benchmark generation
 - Python/Fortran77 dual backends are already allowed by ADR-0002.
 - GICForge, GF/PED, DVR and VPT2/VCI package placeholders already exist.
 - Fragment/Nano-LEGO direction is covered by `oracle-fragments`.
-- Unified geometry/Gaussian/Z-matrix parsing is started but not complete for
-  all QM programs (`Molpro`, `MRCC` and other non-Gaussian adapters still need
-  migration).
+- Unified geometry/Gaussian/Z-matrix parsing now includes Molpro and MRCC
+  geometry/charge/multiplicity adapters. Other non-Gaussian Hessian,
+  anharmonic and property adapters still need migration as source formats are
+  identified.
 - GIC symmetry is an ORACLE strength and must preserve Merlino3.0 behavior.
   The current ORACLE projector covers tested low-symmetry, `C/D/Dnh/Dnd`
   families plus matrix-classified `Td`, `Oh` and `Ih`. Remaining parity work is

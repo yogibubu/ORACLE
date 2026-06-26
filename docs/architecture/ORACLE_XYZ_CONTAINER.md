@@ -22,7 +22,7 @@ by other tools.
 
 ```text
 plain XYZ
-  -> oracle-chem adds #TOPOLOGY and #SYMMETRY
+  -> oracle-chem adds #BASIC, #TOPOLOGY and #SYMMETRY
   -> oracle-fragments adds #FRAGMENTS, #FRAGMENT_LIBRARY or #ASSEMBLY
   -> oracle-chem adds #VALIDATION
   -> oracle-gicforge adds #GIC and optionally #SYCART
@@ -35,6 +35,10 @@ plain XYZ
        oracle-vpt2-vci adds #VPT2_VCI from normalized anharmonic data
        oracle-dvr adds #DVR
 ```
+
+Molpro and MRCC outputs enter the same flow through `oracle-molpro` and
+`oracle-mrcc`: their adapters normalize geometry, charge and multiplicity into
+`MolecularGeometry`, then ORACLE-Babel writes the shared sections.
 
 The GUI should display and orchestrate this state, not own a parallel data
 model.

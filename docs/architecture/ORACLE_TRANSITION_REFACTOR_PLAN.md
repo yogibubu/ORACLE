@@ -41,6 +41,8 @@ The planned new scientific capabilities are limited and explicit:
   separated from VPT2/VCI.
 - `oracle_gaussian`: Gaussian input writing, log parsing, scan extraction,
   GIC-value extraction and job metadata.
+- `oracle_molpro`: Molpro output geometry, charge and multiplicity adapters.
+- `oracle_mrcc`: MRCC output geometry, charge and multiplicity adapters.
 - `oracle_engines`: executable/source discovery, build checks, subprocess
   wrappers and normalized error reporting for GICForge, DVR and source-library
   Fortran kernels.

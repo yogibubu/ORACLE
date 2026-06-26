@@ -35,8 +35,10 @@ they must not define their own incompatible geometry containers.
 - `oracle-gaussian`: Gaussian `.com`/`.gjf` Cartesian input, Gaussian log/out
   summaries, Gaussian Z-matrix input through the shared Z-matrix parser and
   FCHK/QFF adapters.
-- Future program packages: Molpro, MRCC and other QM formats. They must consume
-  the same shared data model.
+- `oracle-molpro`: Molpro output geometry, charge and multiplicity adapters.
+- `oracle-mrcc`: MRCC output geometry, charge and multiplicity adapters.
+- Future program packages must consume the same shared data model and must not
+  add workflow-local parsers.
 
 ## Not Allowed
 

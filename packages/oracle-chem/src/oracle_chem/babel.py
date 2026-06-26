@@ -2,14 +2,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
 
 import numpy as np
 
-from oracle_core import read_sectioned_lines, replace_section, replace_xyz_block, section_content
+from oracle_core import (
+    BasicSection,
+    read_sectioned_lines,
+    replace_section,
+    replace_xyz_block,
+    section_content,
+    write_basic_section,
+)
 
 from .geometry import MolecularGeometry
-from .geometry_io import read_geometry
+from .geometry_io import GeometrySourceKind, read_geometry_with_kind
 from .symmetry import analyze_molecular_symmetry, symmetry_section_lines
 from .topology.pipeline import build_topology_objects
 
@@ -34,7 +40,7 @@ def preprocess_to_enriched_xyz(
     source: Path,
     target: Path,
     *,
-    source_kind: Literal["auto", "xyz", "enriched_xyz"] = "auto",
+    source_kind: GeometrySourceKind = "auto",
     symmetry_thresholds: SymmetryThresholds = SymmetryThresholds(),
 ) -> BabelPreprocessResult:
     """Import a geometry source and materialize initial ORACLE sections.
@@ -42,12 +48,13 @@ def preprocess_to_enriched_xyz(
     This is the initial ORACLE-Babel scaffold. Program-specific and SMILES
     adapters should call into this once they have produced `MolecularGeometry`.
     """
-    geometry = read_geometry(Path(source))
+    geometry = read_geometry_with_kind(Path(source), source_kind)
     write_enriched_geometry(target, geometry)
     write_source_section(target, source=Path(source), source_kind=source_kind, geometry=geometry)
     write_gaussian_topology_section(target, source=Path(source))
     symmetry = determine_initial_symmetry(geometry, symmetry_thresholds)
     point_group = symmetry.point_group
+    write_basic_section_from_geometry(target, geometry=geometry, point_group=point_group)
     write_symmetry_section(target, symmetry=symmetry, thresholds=symmetry_thresholds)
     bond_count, ring_count = write_topology_and_synthons_sections(target, geometry)
     return BabelPreprocessResult(
@@ -79,6 +86,22 @@ def write_source_section(
             f"FORMAT {geometry.source_format}",
             f"PATH {source}",
         ],
+    )
+
+
+def write_basic_section_from_geometry(
+    path: Path,
+    *,
+    geometry: MolecularGeometry,
+    point_group: str,
+) -> None:
+    write_basic_section(
+        Path(path),
+        BasicSection(
+            charge=0 if geometry.charge is None else int(geometry.charge),
+            multiplicity=1 if geometry.multiplicity is None else int(geometry.multiplicity),
+            point_group=point_group,
+        ),
     )
 
 

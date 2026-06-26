@@ -54,7 +54,7 @@ def build_parser(*, repo_root: Path | None = None) -> argparse.ArgumentParser:
     preprocess.add_argument("output", type=Path)
     preprocess.add_argument(
         "--source-kind",
-        choices=("auto", "xyz", "enriched_xyz"),
+        choices=("auto", "xyz", "enriched_xyz", "gaussian", "molpro", "mrcc"),
         default="auto",
     )
     preprocess.add_argument("--symmetry-distance", type=float, default=1.0e-3)
@@ -97,6 +97,34 @@ def build_parser(*, repo_root: Path | None = None) -> argparse.ArgumentParser:
         default=[],
         help="Exclude a normal-mode index from alpha-derived DeltaBvib",
     )
+
+    molpro = sub.add_parser("molpro", help="Molpro output adapter utilities")
+    molpro_sub = molpro.add_subparsers(dest="molpro_command")
+    molpro_summary = molpro_sub.add_parser("summary", help="Summarize a Molpro output")
+    molpro_summary.add_argument("output", type=Path)
+    molpro_promote = molpro_sub.add_parser(
+        "promote",
+        help="Preprocess a Molpro output into an ORACLE xyzin",
+    )
+    molpro_promote.add_argument("output", type=Path)
+    molpro_promote.add_argument("xyzin", type=Path)
+    molpro_promote.add_argument("--symmetry-distance", type=float, default=1.0e-3)
+    molpro_promote.add_argument("--symmetry-inertia", type=float, default=1.0e-3)
+    molpro_promote.add_argument("--max-rotation-order", type=int, default=6)
+
+    mrcc = sub.add_parser("mrcc", help="MRCC output adapter utilities")
+    mrcc_sub = mrcc.add_subparsers(dest="mrcc_command")
+    mrcc_summary = mrcc_sub.add_parser("summary", help="Summarize an MRCC output")
+    mrcc_summary.add_argument("output", type=Path)
+    mrcc_promote = mrcc_sub.add_parser(
+        "promote",
+        help="Preprocess an MRCC output into an ORACLE xyzin",
+    )
+    mrcc_promote.add_argument("output", type=Path)
+    mrcc_promote.add_argument("xyzin", type=Path)
+    mrcc_promote.add_argument("--symmetry-distance", type=float, default=1.0e-3)
+    mrcc_promote.add_argument("--symmetry-inertia", type=float, default=1.0e-3)
+    mrcc_promote.add_argument("--max-rotation-order", type=int, default=6)
 
     lcb25 = sub.add_parser("lcb25", help="Manage the local ORACLE LCB25 geometry cache")
     lcb25_sub = lcb25.add_subparsers(dest="lcb25_command")
@@ -469,6 +497,60 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
         print(f"wrote_vibrational: {int(result.wrote_vibrational)}")
         print(f"wrote_rotational: {int(result.wrote_rotational)}")
         print(f"wrote_deltabvib: {int(result.wrote_deltabvib)}")
+        return 0
+    if args.command == "molpro" and args.molpro_command == "summary":
+        from oracle_molpro import summarize_molpro_output
+
+        summary = summarize_molpro_output(args.output)
+        print(f"path: {summary.path}")
+        print(f"atoms: {summary.geometry.natoms}")
+        print(f"charge: {summary.charge}")
+        print(f"multiplicity: {summary.multiplicity}")
+        print(f"atomic_coordinate_blocks: {summary.atomic_coordinate_blocks}")
+        return 0
+    if args.command == "molpro" and args.molpro_command == "promote":
+        from oracle_molpro import promote_molpro_output_to_xyzin
+
+        result = promote_molpro_output_to_xyzin(
+            args.output,
+            args.xyzin,
+            symmetry_distance=args.symmetry_distance,
+            symmetry_inertia=args.symmetry_inertia,
+            max_rotation_order=args.max_rotation_order,
+        )
+        print(
+            "Promoted Molpro output: "
+            f"{args.output} -> {result.path} ({result.geometry.natoms} atoms, "
+            f"PG={result.point_group}, bonds={result.topology_bond_count}, "
+            f"rings={result.ring_count})"
+        )
+        return 0
+    if args.command == "mrcc" and args.mrcc_command == "summary":
+        from oracle_mrcc import summarize_mrcc_output
+
+        summary = summarize_mrcc_output(args.output)
+        print(f"path: {summary.path}")
+        print(f"atoms: {summary.geometry.natoms}")
+        print(f"charge: {summary.charge}")
+        print(f"multiplicity: {summary.multiplicity}")
+        print(f"cartesian_coordinate_blocks: {summary.cartesian_coordinate_blocks}")
+        return 0
+    if args.command == "mrcc" and args.mrcc_command == "promote":
+        from oracle_mrcc import promote_mrcc_output_to_xyzin
+
+        result = promote_mrcc_output_to_xyzin(
+            args.output,
+            args.xyzin,
+            symmetry_distance=args.symmetry_distance,
+            symmetry_inertia=args.symmetry_inertia,
+            max_rotation_order=args.max_rotation_order,
+        )
+        print(
+            "Promoted MRCC output: "
+            f"{args.output} -> {result.path} ({result.geometry.natoms} atoms, "
+            f"PG={result.point_group}, bonds={result.topology_bond_count}, "
+            f"rings={result.ring_count})"
+        )
         return 0
     if args.command == "lcb25" and args.lcb25_command == "fetch":
         from oracle_babel import sync_lcb25_library
