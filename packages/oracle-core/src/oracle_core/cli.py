@@ -79,6 +79,10 @@ def build_parser(*, repo_root: Path | None = None) -> argparse.ArgumentParser:
     gic_plan.add_argument("xyzin", type=Path)
     gic_plan.add_argument("--symmetrize", action="store_true")
     gic_plan.add_argument("--sycart", action="store_true")
+    gic_build = gicforge_sub.add_parser("build", help="Build frozen #GIC/#SYCART sections")
+    gic_build.add_argument("xyzin", type=Path)
+    gic_build.add_argument("--symmetrize", action="store_true")
+    gic_build.add_argument("--sycart", action="store_true")
     corpus = gicforge_sub.add_parser(
         "corpus",
         help="List or summarize the demanding GIC regression corpus",
@@ -188,6 +192,19 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
             sycart=args.sycart,
         )
         print(f"Planned GICForge workflow: {args.xyzin}")
+        return 0
+    if args.command == "gicforge" and args.gicforge_command == "build":
+        from oracle_gicforge import write_gicforge_build_sections
+
+        definition = write_gicforge_build_sections(
+            args.xyzin,
+            symmetrize=args.symmetrize,
+            sycart=args.sycart,
+        )
+        print(
+            "Built GICForge definition: "
+            f"{args.xyzin} (GICs={len(definition.gics)}, rank={definition.rank})"
+        )
         return 0
     if args.command == "gicforge" and args.gicforge_command == "corpus":
         from oracle_gicforge import (

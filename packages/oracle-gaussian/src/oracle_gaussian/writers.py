@@ -60,6 +60,10 @@ def write_gicforge_gaussian_input(
             "",
         ]
     )
+    gic_lines = _gaussian_gic_lines(source)
+    if gic_lines:
+        lines.extend(gic_lines)
+        lines.append("")
     target = Path(output)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text("\n".join(lines), encoding="utf-8")
@@ -74,6 +78,14 @@ def _require_gic_section(path: Path) -> None:
     expected = f"SCHEMA {REQUIRED_GIC_SCHEMA}"
     if gic[0].strip() != expected:
         raise GaussianWriteError(f"#GIC must start with {expected!r}; found {gic[0]!r}")
+
+
+def _gaussian_gic_lines(path: Path) -> list[str]:
+    try:
+        from oracle_gicforge import gaussian_gic_lines_from_xyzin
+    except ImportError:
+        return []
+    return gaussian_gic_lines_from_xyzin(Path(path))
 
 
 def _normalize_route(route: str) -> str:

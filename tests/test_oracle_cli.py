@@ -173,6 +173,29 @@ def test_gicforge_plan_cli_calls_writer(tmp_path, monkeypatch, capsys):
     assert "Planned GICForge workflow" in capsys.readouterr().out
 
 
+def test_gicforge_build_cli_calls_writer(tmp_path, monkeypatch, capsys):
+    calls = {}
+    path = tmp_path / "molecule.xyzin"
+
+    class FakeDefinition:
+        gics = (object(), object())
+        rank = 2
+
+    def fake_write(target, *, symmetrize=False, sycart=False):
+        calls["target"] = target
+        calls["symmetrize"] = symmetrize
+        calls["sycart"] = sycart
+        return FakeDefinition()
+
+    monkeypatch.setattr("oracle_gicforge.write_gicforge_build_sections", fake_write)
+
+    rc = oracle_run.main(["gicforge", "build", str(path), "--symmetrize", "--sycart"])
+
+    assert rc == 0
+    assert calls == {"target": path, "symmetrize": True, "sycart": True}
+    assert "Built GICForge definition" in capsys.readouterr().out
+
+
 def test_gicforge_corpus_cli_prints_inventory(capsys):
     rc = oracle_run.main(["gicforge", "corpus", "--root", str(GIC_CORPUS)])
 
