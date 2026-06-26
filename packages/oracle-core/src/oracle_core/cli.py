@@ -42,6 +42,20 @@ def build_parser(*, repo_root: Path | None = None) -> argparse.ArgumentParser:
     validate.add_argument("xyzin", type=Path)
     validate.add_argument("--require-fragments", action="store_true")
 
+    babel = sub.add_parser("babel", help="Run ORACLE-Babel preprocessing")
+    babel_sub = babel.add_subparsers(dest="babel_command")
+    preprocess = babel_sub.add_parser("preprocess", help="Import a source into enriched XYZ")
+    preprocess.add_argument("source", type=Path)
+    preprocess.add_argument("output", type=Path)
+    preprocess.add_argument(
+        "--source-kind",
+        choices=("auto", "xyz", "enriched_xyz"),
+        default="auto",
+    )
+    preprocess.add_argument("--symmetry-distance", type=float, default=1.0e-3)
+    preprocess.add_argument("--symmetry-inertia", type=float, default=1.0e-3)
+    preprocess.add_argument("--max-rotation-order", type=int, default=6)
+
     lcb25 = sub.add_parser("lcb25", help="Manage the local ORACLE LCB25 geometry cache")
     lcb25_sub = lcb25.add_subparsers(dest="lcb25_command")
     fetch = lcb25_sub.add_parser("fetch", help="Download/extract LCB25 geometries once")
@@ -127,6 +141,26 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
 
         result = write_validation_section(args.xyzin, require_fragments=args.require_fragments)
         print(f"Validated ORACLE molecule: {args.xyzin} ({result.status})")
+        return 0
+    if args.command == "babel" and args.babel_command == "preprocess":
+        from oracle_chem import SymmetryThresholds, preprocess_to_enriched_xyz
+
+        result = preprocess_to_enriched_xyz(
+            args.source,
+            args.output,
+            source_kind=args.source_kind,
+            symmetry_thresholds=SymmetryThresholds(
+                distance_angstrom=args.symmetry_distance,
+                inertia_relative=args.symmetry_inertia,
+                max_rotation_order=args.max_rotation_order,
+            ),
+        )
+        print(
+            "Preprocessed ORACLE-Babel molecule: "
+            f"{result.path} ({result.geometry.natoms} atoms, "
+            f"PG={result.point_group}, bonds={result.topology_bond_count}, "
+            f"rings={result.ring_count})"
+        )
         return 0
     if args.command == "lcb25" and args.lcb25_command == "fetch":
         from oracle_babel import sync_lcb25_library

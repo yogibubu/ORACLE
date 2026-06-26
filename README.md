@@ -62,6 +62,7 @@ python -m oracle gicforge corpus --format paths --suffix .inp
 Fragment workflows are planned against existing topology/synthon sections:
 
 ```bash
+python -m oracle babel preprocess molecule.inp molecule.xyzin
 python -m oracle fragments plan molecule.xyzin
 ```
 

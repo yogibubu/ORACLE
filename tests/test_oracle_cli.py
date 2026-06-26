@@ -25,6 +25,7 @@ def test_python_module_entrypoint_prints_help():
     )
 
     assert "ORACLE workflow CLI" in result.stdout
+    assert "babel" in result.stdout
     assert "gicforge" in result.stdout
 
 
@@ -64,6 +65,53 @@ def test_lcb25_fetch_cli_calls_sync(tmp_path, monkeypatch, capsys):
     assert rc == 0
     assert calls == {"root": tmp_path / "cache", "datasets": ["se"], "force": True}
     assert "Synced LCB25 library" in capsys.readouterr().out
+
+
+def test_babel_preprocess_cli_calls_shared_pipeline(tmp_path, monkeypatch, capsys):
+    calls = {}
+    source = tmp_path / "source.inp"
+    output = tmp_path / "molecule.xyzin"
+
+    def fake_preprocess(target_source, target_output, *, source_kind="auto", symmetry_thresholds):
+        calls["source"] = target_source
+        calls["output"] = target_output
+        calls["source_kind"] = source_kind
+        calls["thresholds"] = symmetry_thresholds
+        return SimpleNamespace(
+            path=target_output,
+            geometry=SimpleNamespace(natoms=3),
+            point_group="C1",
+            topology_bond_count=2,
+            ring_count=0,
+        )
+
+    monkeypatch.setattr("oracle_chem.preprocess_to_enriched_xyz", fake_preprocess)
+
+    rc = oracle_run.main(
+        [
+            "babel",
+            "preprocess",
+            str(source),
+            str(output),
+            "--source-kind",
+            "auto",
+            "--symmetry-distance",
+            "0.002",
+            "--symmetry-inertia",
+            "0.003",
+            "--max-rotation-order",
+            "8",
+        ]
+    )
+
+    assert rc == 0
+    assert calls["source"] == source
+    assert calls["output"] == output
+    assert calls["source_kind"] == "auto"
+    assert calls["thresholds"].distance_angstrom == 0.002
+    assert calls["thresholds"].inertia_relative == 0.003
+    assert calls["thresholds"].max_rotation_order == 8
+    assert "Preprocessed ORACLE-Babel molecule" in capsys.readouterr().out
 
 
 def test_fragments_plan_cli_calls_writer(tmp_path, monkeypatch, capsys):
