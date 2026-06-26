@@ -69,6 +69,8 @@ tests and release boundaries are stable.
 ORACLE/
   pyproject.toml
   README.md
+  scripts/
+    oracle_env.sh
   docs/
     architecture/
     manuals/
@@ -115,6 +117,7 @@ ORACLE/
   benchmarks/
     semiexp_msr/
   tests/
+    fixtures/test_molecules/
     integration/
     regression/
   tools/
@@ -376,7 +379,8 @@ Exit criteria:
    `oracle-morpheus`.
 3. Keep the manuals as contract docs and add examples that match each manual.
 4. Add regression fixtures for GICForge, SYCART, single MORPHEUS and ensemble
-   MORPHEUS.
+   MORPHEUS. The imported Merlino `test_molecules` corpus is the first
+   demanding GICForge/parser fixture set.
 
 Exit criteria:
 

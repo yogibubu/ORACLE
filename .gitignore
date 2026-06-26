@@ -41,3 +41,7 @@ working/
 projects/
 archives/freezes/
 data/lcb25/
+
+# Scientific regression fixtures kept in git even when they include logs.
+!tests/fixtures/test_molecules/**/*.log
+!tests/fixtures/test_molecules/**/*.out

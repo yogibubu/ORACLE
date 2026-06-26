@@ -1,0 +1,17 @@
+# ECKART GNIC GAUSSIAN VOLT DIHED SYMM VCI1 DVR1
+#P B3LYP/6-31G* OPT FREQ=INTMODES
+
+ OH radical
+
+0 2
+ O   0.0    0.0   0.0
+ H   0.97   0.0   0.0
+
+ 40  10 \NBASIS,NEIGEN 
+ 0.0    \Alpha 
+ 0.0   3643.065   -2507.86   1623.22    0.0   0.0   \F
+ 0.0   3643.065       0.0       0.0     0.0   0.0   \G
+ 9  5  0    \NPTS,NEIGEN,ITYP
+ -1.0   1.0 \XMIN,XMAX
+ 2.0 1.125 0.50 0.125 0.0 0.125 0.50 1.125 2.0 \EPOT
+

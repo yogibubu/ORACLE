@@ -1,0 +1,174 @@
+# Eckart GNIC VOLT GADV DIHED                                                   
+ ECKA: Enforce Eckart Orientation
+ GNIC: Gen.Int. Natural Coords.
+ VOLT: Make VOLT Input
+ GADV: Make GDV Input
+ DIHE: 1 Dihedral for Each Bond
+
+ C6H5 semiexp.                                                                  
+             Input in Cartesian Coordinates for   11 Atoms
+
+    Atom  Sigma  Pi  Lone Pairs  Unpaired  Bonded to
+    1  C    2    1      0           1      3    4
+    2  C    3    1      0           0      5    6    7
+    3  C    3    1      0           0      1    5    8
+    4  C    3    1      0           0      1    6    9
+    5  C    3    1      0           0      2    3   10
+    6  C    3    1      0           0      2    4   11
+    7  H    1    0      0           0      2
+    8  H    1    0      0           0      3
+    9  H    1    0      0           0      4
+   10  H    1    0      0           0      5
+   11  H    1    0      0           0      6
+     Bond    Pauling Bond Order    Topol. Bond Order
+    1    3          1.529               1.500
+    1    4          1.529               1.500
+    2    5          1.420               1.500
+    2    6          1.420               1.500
+    2    7          0.963               1.000
+    3    5          1.432               1.500
+    3    8          0.964               1.000
+    4    6          1.432               1.500
+    4    9          0.964               1.000
+    5   10          0.960               1.000
+    6   11          0.960               1.000
+
+ This Molecule is a Nearly Oblate Asymmetric Top
+     Ir Representation
+   11 Atoms with Total Mass =    77.039
+
+          Cartesian Coords.in Eckart Orientation
+    Atom    Pauling EAN  Topolog.EAN      X          Y            Z
+    1  C      6.49611     6.49594     0.00000    -1.36497    -0.00000
+    2  C      6.09625     6.14693    -0.00000     1.34920     0.00000
+    3  C      6.12582     6.15045    -1.22187    -0.73938    -0.00000
+    4  C      6.12582     6.15045     1.22187    -0.73938    -0.00000
+    5  C      6.09884     6.14735    -1.20846     0.65289     0.00000
+    6  C      6.09884     6.14735     1.20846     0.65289     0.00000
+    7  H      1.10439     1.13927    -0.00000     2.43040     0.00000
+    8  H      1.10459     1.13927    -2.15388    -1.28724    -0.00000
+    9  H      1.10459     1.13927     2.15388    -1.28724    -0.00000
+   10  H      1.10239     1.13927    -2.14461     1.19582     0.00000
+   11  H      1.10239     1.13927     2.14461     1.19582     0.00000
+
+ Equilibrium Rotational Constants (MHz)   6338.79111   5646.56583   2986.34421
+ 
+  Interatomic Distances 
+                    1          2          3          4          5
+     1  C    0.000000
+     2  C    2.714168   0.000000
+     3  C    1.372710   2.419741   0.000000
+     4  C    1.372710   2.419741   2.443746   0.000000
+     5  C    2.352050   1.394710   1.392340   2.800883   0.000000
+     6  C    2.352050   1.394710   2.800883   1.392340   2.416918
+     7  H    3.795368   1.081200   3.397129   3.397129   2.149395
+     8  H    2.155280   3.404406   1.081100   3.419918   2.158221
+     9  H    2.155280   3.404406   3.419918   1.081100   3.881934
+    10  H    3.340213   2.150090   2.143938   3.883071   1.082200
+    11  H    3.340213   2.150090   3.883071   2.143938   3.396743
+                    6          7          8          9         10
+     6  C    0.000000
+     7  H    2.149395   0.000000
+     8  H    3.881934   4.296510   0.000000
+     9  H    2.158221   4.296510   4.307756   0.000000
+    10  H    3.396743   2.474578   2.483077   4.964132   0.000000
+    11  H    1.082200   2.474578   4.964132   2.483077   4.289224
+                   11
+    11  H    0.000000
+ 
+
+      Partition Functions at  298.15 K
+      --------------------------------
+      Translation          0.26578D+08
+      Rotation             0.41606D+04
+      Vibration (Bottom)   0.00000D+00
+      Vibration (from ZPE) 0.00000D+00
+      Electronic           0.20000D+01
+      --------------------------------
+      Total (from Bottom)  0.00000D+00
+      Total (from ZPE)     0.00000D+00
+
+ Definition of Generalized Natural Internal Coordinates
+  6 Atoms in Only 1 Cycle 
+  1 Rings Found Over  1 Expected
+
+ Center  Symm  Equal Substituents   Frozen Atoms      Free Atoms      Free Angles
+   2      C2v     6   5              6   5                 7               1
+   3      C2v     5   1              5   1                 8               1
+   4      C2v     6   1              6   1                 9               1
+   5      C2v     3   2              3   2                10               1
+   6      C2v     4   2              4   2                11               1
+   6-Membered Ring (   6   4   1   3   5   2 )                             3
+
+  3 Ring coordinates for Dihedral Angles
+
+   11 Atoms and   27 Internal Coordinates
+
+               Stretch.  Bend.  L. Bend. Tors.  Out-Pl. Total
+ Redundant        11      16       0      20       5      52
+ Non Redund.      11       8       0       3       5      27
+
+ All the Redundancies have been Eliminated
+
+  1   Stretch      Prim:  1    Atoms   1   3            Value=  1.3727     Coeff.=   1.000    Free 
+  2   Stretch      Prim:  2    Atoms   1   4            Value=  1.3727     Coeff.=   1.000    Free 
+  3   Stretch      Prim:  3    Atoms   2   5            Value=  1.3947     Coeff.=   1.000    Free 
+  4   Stretch      Prim:  4    Atoms   2   6            Value=  1.3947     Coeff.=   1.000    Free 
+  5   Stretch      Prim:  5    Atoms   2   7            Value=  1.0812     Coeff.=   1.000    Free 
+  6   Stretch      Prim:  6    Atoms   3   5            Value=  1.3923     Coeff.=   1.000    Free 
+  7   Stretch      Prim:  7    Atoms   3   8            Value=  1.0811     Coeff.=   1.000    Free 
+  8   Stretch      Prim:  8    Atoms   4   6            Value=  1.3923     Coeff.=   1.000    Free 
+  9   Stretch      Prim:  9    Atoms   4   9            Value=  1.0811     Coeff.=   1.000    Free 
+ 10   Stretch      Prim: 10    Atoms   5  10            Value=  1.0822     Coeff.=   1.000    Free 
+ 11   Stretch      Prim: 11    Atoms   6  11            Value=  1.0822     Coeff.=   1.000    Free 
+ 12   Rocking      Prim: 12    Atoms   7   2   6        Value= 119.950     Coeff.=   0.707    Free 
+                   Prim: 13    Atoms   7   2   5        Value= 119.950     Coeff.=  -0.707
+ 13   Rocking      Prim: 14    Atoms   8   3   5        Value= 121.000     Coeff.=   0.707    Free 
+                   Prim: 15    Atoms   8   3   1        Value= 122.440     Coeff.=  -0.707
+ 14   Rocking      Prim: 16    Atoms   9   4   6        Value= 121.000     Coeff.=   0.707    Free 
+                   Prim: 17    Atoms   9   4   1        Value= 122.440     Coeff.=  -0.707
+ 15   Rocking      Prim: 18    Atoms  10   5   3        Value= 119.560     Coeff.=   0.707    Free 
+                   Prim: 19    Atoms  10   5   2        Value= 119.938     Coeff.=  -0.707
+ 16   Rocking      Prim: 20    Atoms  11   6   4        Value= 119.560     Coeff.=   0.707    Free 
+                   Prim: 21    Atoms  11   6   2        Value= 119.938     Coeff.=  -0.707
+ 17   Ring ADef    Prim: 22    Atoms   4   1   3        Value= 125.776     Coeff.=   0.577    Free 
+                   Prim: 23    Atoms   1   3   5        Value= 116.560     Coeff.=  -0.289
+                   Prim: 24    Atoms   3   5   2        Value= 120.502     Coeff.=  -0.289
+                   Prim: 25    Atoms   5   2   6        Value= 120.099     Coeff.=   0.577
+                   Prim: 26    Atoms   2   6   4        Value= 120.502     Coeff.=  -0.289
+                   Prim: 27    Atoms   6   4   1        Value= 116.560     Coeff.=  -0.289
+ 18   Ring ADef    Prim: 22    Atoms   4   1   3        Value= 125.776     Coeff.=   0.000    Free 
+                   Prim: 23    Atoms   1   3   5        Value= 116.560     Coeff.=   0.500
+                   Prim: 24    Atoms   3   5   2        Value= 120.502     Coeff.=  -0.500
+                   Prim: 25    Atoms   5   2   6        Value= 120.099     Coeff.=  -0.000
+                   Prim: 26    Atoms   2   6   4        Value= 120.502     Coeff.=   0.500
+                   Prim: 27    Atoms   6   4   1        Value= 116.560     Coeff.=  -0.500
+ 19   Ring ADef    Prim: 22    Atoms   4   1   3        Value= 125.776     Coeff.=   0.408    Free 
+                   Prim: 23    Atoms   1   3   5        Value= 116.560     Coeff.=  -0.408
+                   Prim: 24    Atoms   3   5   2        Value= 120.502     Coeff.=   0.408
+                   Prim: 25    Atoms   5   2   6        Value= 120.099     Coeff.=  -0.408
+                   Prim: 26    Atoms   2   6   4        Value= 120.502     Coeff.=   0.408
+                   Prim: 27    Atoms   6   4   1        Value= 116.560     Coeff.=  -0.408
+ 20   Ring Puck    Prim: 28    Atoms   2   6   4   1    Value=   0.000     Coeff.=   0.577    Free 
+                   Prim: 29    Atoms   6   4   1   3    Value=   0.000     Coeff.=  -0.289
+                   Prim: 30    Atoms   4   1   3   5    Value=   0.000     Coeff.=  -0.289
+                   Prim: 31    Atoms   1   3   5   2    Value=   0.000     Coeff.=   0.577
+                   Prim: 32    Atoms   3   5   2   6    Value=   0.000     Coeff.=  -0.289
+                   Prim: 33    Atoms   5   2   6   4    Value=   0.000     Coeff.=  -0.289
+ 21   Ring Puck    Prim: 28    Atoms   2   6   4   1    Value=   0.000     Coeff.=   0.000    Free 
+                   Prim: 29    Atoms   6   4   1   3    Value=   0.000     Coeff.=   0.500
+                   Prim: 30    Atoms   4   1   3   5    Value=   0.000     Coeff.=  -0.500
+                   Prim: 31    Atoms   1   3   5   2    Value=   0.000     Coeff.=  -0.000
+                   Prim: 32    Atoms   3   5   2   6    Value=   0.000     Coeff.=   0.500
+                   Prim: 33    Atoms   5   2   6   4    Value=   0.000     Coeff.=  -0.500
+ 22   Ring Puck    Prim: 28    Atoms   2   6   4   1    Value=   0.000     Coeff.=   0.408    Free 
+                   Prim: 29    Atoms   6   4   1   3    Value=   0.000     Coeff.=  -0.408
+                   Prim: 30    Atoms   4   1   3   5    Value=   0.000     Coeff.=   0.408
+                   Prim: 31    Atoms   1   3   5   2    Value=   0.000     Coeff.=  -0.408
+                   Prim: 32    Atoms   3   5   2   6    Value=   0.000     Coeff.=   0.408
+                   Prim: 33    Atoms   5   2   6   4    Value=   0.000     Coeff.=  -0.408
+ 23 Out-of-Plane   Prim: 48    Atoms   2   5   6   7    Value=   0.000     Coeff.=   1.000    Free 
+ 24 Out-of-Plane   Prim: 49    Atoms   3   1   5   8    Value=   0.000     Coeff.=   1.000    Free 
+ 25 Out-of-Plane   Prim: 50    Atoms   4   1   6   9    Value=   0.000     Coeff.=   1.000    Free 
+ 26 Out-of-Plane   Prim: 51    Atoms   5   2   3  10    Value=   0.000     Coeff.=   1.000    Free 
+ 27 Out-of-Plane   Prim: 52    Atoms   6   2   4  11    Value=   0.000     Coeff.=   1.000    Free 

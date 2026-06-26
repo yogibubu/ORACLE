@@ -1,0 +1,16 @@
+#GNIC DIHED SYMM GAUSSIAN 
+#HF3C OPT
+
+H2CO 
+
+ 0 1
+ X
+ O 1 1.0
+ C 2 CO 1 90.0
+ H 3 CH 2 HCO  1 180.0 
+ H 3 CH 2 HCO  1   0.0
+
+ CO=1.22
+ CH=1.08
+ HCO=121.0
+

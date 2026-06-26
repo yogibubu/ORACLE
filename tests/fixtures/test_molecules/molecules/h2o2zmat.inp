@@ -1,0 +1,12 @@
+# ZMAT ECKART GNIC VOLT GAUSS DIHED SYST BMAT 
+#OPT
+
+H202 SYMM cannot be used in Scan
+
+ 0  1
+ 1     0.00000     0.09540    -1.29127
+ 8     0.00000    -0.37807    -0.43323
+ 8     0.00000     0.37807     0.43323
+ 1     0.00000    -0.09540     1.29127
+
+

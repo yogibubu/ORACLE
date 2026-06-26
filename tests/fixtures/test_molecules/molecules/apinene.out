@@ -1,0 +1,385 @@
+# GNIC GADV DIHEDRAL                                                            
+ GNIC: Gen.Int. Natural Coords.
+ GADV: Make GDV Input
+ DIHE: 1 Dihedral for Each Bond
+
+ a-pinene B3/SVP                                                                
+             Input in Cartesian Coordinates for   26 Atoms
+
+    Atom  Sigma  Pi  Lone Pairs  Unpaired  Bonded to
+    1  C    4    0      0           0      2    6    7   18
+    2  C    3    1      0           0      1    3   10
+    3  C    3    1      0           0      2    4   15
+    4  C    4    0      0           0      3    5   16   17
+    5  C    4    0      0           0      4    6    7   11
+    6  C    4    0      0           0      1    5    8    9
+    7  C    4    0      0           0      1    5   19   20
+    8  C    4    0      0           0      6   21   22   23
+    9  C    4    0      0           0      6   24   25   26
+   10  C    4    0      0           0      2   12   13   14
+   11  H    1    0      0           0      5
+   12  H    1    0      0           0     10
+   13  H    1    0      0           0     10
+   14  H    1    0      0           0     10
+   15  H    1    0      0           0      3
+   16  H    1    0      0           0      4
+   17  H    1    0      0           0      4
+   18  H    1    0      0           0      1
+   19  H    1    0      0           0      7
+   20  H    1    0      0           0      7
+   21  H    1    0      0           0      8
+   22  H    1    0      0           0      8
+   23  H    1    0      0           0      8
+   24  H    1    0      0           0      9
+   25  H    1    0      0           0      9
+   26  H    1    0      0           0      9
+     Bond    Pauling Bond Order    Topol. Bond Order
+    1    2          0.956               1.000
+    1    6          0.796               1.000
+    1    7          0.836               1.000
+    1   18          0.926               1.000
+    2    3          1.713               2.000
+    2   10          1.011               1.000
+    3    4          0.969               1.000
+    3   15          0.947               1.000
+    4    5          0.899               1.000
+    4   16          0.915               1.000
+    4   17          0.913               1.000
+    5    6          0.811               1.000
+    5    7          0.848               1.000
+    5   11          0.924               1.000
+    6    8          0.934               1.000
+    6    9          0.913               1.000
+    7   19          0.932               1.000
+    7   20          0.941               1.000
+    8   21          0.939               1.000
+    8   22          0.921               1.000
+    8   23          0.921               1.000
+    9   24          0.936               1.000
+    9   25          0.922               1.000
+    9   26          0.923               1.000
+   10   12          0.931               1.000
+   10   13          0.921               1.000
+   10   14          0.920               1.000
+   26 Atoms with Total Mass =   136.125
+
+          Cartesian Coords. in Input Orientation
+    Atom    Pauling EAN  Topolog.EAN      X          Y            Z
+    1  C      6.05014     6.08728    -0.12340    -0.64233    -0.75462
+    2  C      6.49260     6.49366    -1.43381    -0.28063    -0.08919
+    3  C      6.27607     6.30032    -1.49824     0.91882     0.50155
+    4  C      5.93416     5.93246    -0.27970     1.80930     0.52194
+    5  C      6.04270     6.08611     0.87135     1.15259    -0.24687
+    6  C      6.18220     6.22990     1.07415    -0.32848     0.20865
+    7  C      5.91195     5.94505     0.31874     0.59548    -1.58287
+    8  C      5.79147     5.79158     0.94912    -0.66698     1.68568
+    9  C      5.78726     5.79189     2.38857    -0.90963    -0.30871
+   10  C      5.80711     5.79155    -2.56179    -1.26328    -0.13517
+   11  H      1.30747     1.29880     1.75760     1.79269    -0.27564
+   12  H      1.31353     1.29880    -3.45198    -0.87475     0.36248
+   13  H      1.30431     1.29880    -2.82181    -1.51038    -1.16954
+   14  H      1.30347     1.29880    -2.27479    -2.20157     0.35116
+   15  H      1.32728     1.29880    -2.40835     1.25698     0.98878
+   16  H      1.29928     1.29880    -0.51323     2.78336     0.07541
+   17  H      1.29784     1.29880     0.01957     2.01351     1.55763
+   18  H      1.30909     1.29880    -0.14928    -1.62372    -1.23510
+   19  H      1.31417     1.29880    -0.47963     1.16168    -2.06512
+   20  H      1.32219     1.29880     1.10188     0.37545    -2.30563
+   21  H      1.32023     1.29880     0.01835    -0.30988     2.12362
+   22  H      1.30493     1.29880     0.99547    -1.75102     1.82989
+   23  H      1.30478     1.29880     1.78249    -0.22683     2.24242
+   24  H      1.31726     1.29880     2.55979    -0.71035    -1.36654
+   25  H      1.30590     1.29880     3.23056    -0.49005     0.25011
+   26  H      1.30633     1.29880     2.40341    -1.99425    -0.16623
+
+ Equilibrium Rotational Constants (MHz)   1133.07609   1234.75971   1949.00163
+ 
+  Interatomic Distances 
+                    1          2          3          4          5
+     1  C    0.000000
+     2  C    1.513534   0.000000
+     3  C    2.430088   1.338586   0.000000
+     4  C    2.768486   2.464399   1.509372   0.000000
+     5  C    2.114019   2.718959   2.495940   1.532072   0.000000
+     6  C    1.568598   2.526036   2.873801   2.549736   1.562750
+     7  C    1.553599   2.463751   2.784020   2.502344   1.549406
+     8  C    2.665697   2.996299   3.147463   2.999378   2.655491
+     9  C    2.565204   3.880001   4.371158   3.899001   2.560964
+    10  C    2.591336   1.496677   2.509602   3.883355   4.199443
+    11  H    3.113981   3.810313   3.459499   2.187920   1.093613
+    12  H    3.518718   2.151744   2.655812   4.158473   4.813791
+    13  H    2.864806   2.146153   3.231930   4.510397   4.645661
+    14  H    2.877920   2.142695   3.219077   4.482921   4.637476
+    15  H    3.444968   2.115660   1.086296   2.248133   3.506293
+    16  H    3.546309   3.203537   2.151366   1.096688   2.163406
+    17  H    3.524261   3.176075   2.148819   1.097234   2.173224
+    18  H    1.093006   2.183344   3.361568   3.858734   3.118687
+    19  H    2.258046   2.625833   2.772062   2.674370   2.265228
+    20  H    2.223246   3.431140   3.864722   3.458295   2.212595
+    21  H    2.900840   2.646920   2.537887   2.673036   2.913011
+    22  H    3.026665   3.427288   3.887300   4.001579   3.572010
+    23  H    3.575930   3.972895   3.886686   3.370239   2.988235
+    24  H    2.752922   4.214867   4.755163   4.240016   2.752287
+    25  H    3.504529   4.681383   4.940617   4.205097   2.917387
+    26  H    2.925513   4.203171   4.914748   4.705277   3.500902
+                    6          7          8          9         10
+     6  C    0.000000
+     7  C    2.152645   0.000000
+     8  C    1.520473   3.560142   0.000000
+     9  C    1.527446   2.858854   2.471529   0.000000
+    10  C    3.769894   3.721324   3.999694   4.966006   0.000000
+    11  H    2.280562   2.283086   3.248131   2.775197   5.292989
+    12  H    4.561572   4.490467   4.600406   5.879093   1.091355
+    13  H    4.298234   3.803756   4.804532   5.315077   1.094797
+    14  H    3.839813   4.276718   3.811758   4.883794   1.095110
+    15  H    3.905134   3.806305   3.931911   5.421077   2.763793
+    16  H    3.495865   2.868609   4.078765   4.712341   4.540515
+    17  H    2.901171   3.458766   2.839983   4.200010   4.501819
+    18  H    2.293220   2.294524   3.263863   2.794432   2.675804
+    19  H    3.131262   1.091116   4.410648   3.949919   3.733698
+    20  H    2.611102   1.088159   4.128016   2.700870   4.562757
+    21  H    2.186822   3.827271   1.088879   3.448749   3.559248
+    22  H    2.158292   4.196538   1.094565   2.687423   4.093095
+    23  H    2.155996   4.177515   1.094620   2.709577   5.059634
+    24  H    2.198677   2.602748   3.451404   1.089976   5.296465
+    25  H    2.162855   3.607896   2.701319   1.094202   5.856419
+    26  H    2.163851   3.613780   2.702987   1.094039   5.018808
+                   11         12         13         14         15
+    11  H    0.000000
+    12  H    5.887454   0.000000
+    13  H    5.716669   1.774316   0.000000
+    14  H    5.710259   1.773795   1.757692   0.000000
+    15  H    4.386432   2.454737   3.533778   3.519374   0.000000
+    16  H    2.502262   4.701117   5.031472   5.294212   2.599142
+    17  H    2.535812   4.671418   5.284764   4.948391   2.605901
+    18  H    4.028475   3.744464   2.675735   2.714384   4.283394
+    19  H    2.933530   4.344554   3.664395   4.513580   3.613213
+    20  H    2.561128   5.423966   4.499157   5.010129   4.894062
+    21  H    3.633481   3.932419   4.511391   3.461015   3.103512
+    22  H    4.191884   4.764552   4.860670   3.617214   4.619688
+    23  H    3.227955   5.599432   5.872695   4.892642   4.619136
+    24  H    2.845840   6.257628   5.444309   5.342971   5.839548
+    25  H    2.767112   6.694551   6.299821   5.766143   5.949372
+    26  H    3.843164   5.984846   5.342630   4.711283   5.920940
+                   16         17         18         19         20
+    16  H    0.000000
+    17  H    1.753145   0.000000
+    18  H    4.612190   4.588825   0.000000
+    19  H    2.685678   3.754880   2.925150   0.000000
+    20  H    3.751791   4.333515   2.590005   1.782457   0.000000
+    21  H    3.747783   2.391334   3.610446   4.467551   4.611068
+    22  H    5.090674   3.898482   3.274267   5.082399   4.651415
+    23  H    4.362054   2.931882   4.216185   5.059648   4.637966
+    24  H    4.871215   4.735285   2.861921   3.637385   2.046059
+    25  H    4.976113   4.276428   3.861923   4.674828   3.436887
+    26  H    5.602743   4.971567   2.792135   4.677344   3.447678
+                   21         22         23         24         25
+    21  H    0.000000
+    22  H    1.765766   0.000000
+    23  H    1.770080   1.764289   0.000000
+    24  H    4.335961   3.707728   3.723257   0.000000
+    25  H    3.723010   3.013530   2.476996   1.764102   0.000000
+    26  H    3.710665   2.454777   3.051379   1.764538   1.766394
+                   26
+    26  H    0.000000
+ 
+
+      Partition Functions at  298.15 K
+      --------------------------------
+      Translation          0.62425D+08
+      Rotation             0.13702D+05
+      Vibration (Bottom)   0.00000D+00
+      Vibration (from ZPE) 0.00000D+00
+      Electronic           0.10000D+01
+      --------------------------------
+      Total (from Bottom)  0.00000D+00
+      Total (from ZPE)     0.00000D+00
+
+ Definition of Generalized Natural Internal Coordinates
+  4 Atoms in Only 1 Cycle 
+  3 Atoms Linking 2 Cycles
+  BrCyc angle:    1    6    5 Between Cycles  1  2
+  2 Rings Found Over  2 Expected
+
+ Center  Symm  Equal Substituents   Frozen Atoms      Free Atoms      Free Angles
+   1      C3v     7   6   2          7   6   2            18               2
+   2      C2v     3   1              3   1                10               1
+   3      C2v     4   2              4   2                15               1
+   4      Cs      3   5              3   5            16  17               4
+   5      C3v     7   6   4          7   6   4            11               2
+   6      Cs      1   5              1   5             8   9               4
+   7      Cs      1   5              1   5            19  20               4
+   8      Cs     22  23                                6  21  22  23       5
+   9      Cs     25  26                                6  24  25  26       5
+  10      Cs      2  12                               13  14   2  12       5
+   4-Membered Ring (   7   1   6   5 )                                     1
+   6-Membered Ring (   6   1   2   3   4   5 )                             3
+
+ Soft Dihedral Angles
+  1 Central Bond:  2 10 Bond Order:   1.01114 Periodicity: 3
+  2 Central Bond:  6  8 Bond Order:   0.93403 Periodicity: 3
+  3 Central Bond:  6  9 Bond Order:   0.91257 Periodicity: 3
+
+  4 Ring coordinates for Dihedral Angles
+
+   26 Atoms and   72 Internal Coordinates
+
+               Stretch.  Bend.  L. Bend. Tors.  Out-Pl. Total
+ Redundant        27      54       0      85       2     168
+ Non Redund.      27      37       0       7       2      73
+
+ WARNING:  1 Redundancies Still Present
+
+  1   Stretch      Prim:  1    Atoms   1   2            Value=  1.5135     Coeff.=   1.000    Free 
+  2   Stretch      Prim:  2    Atoms   1   6            Value=  1.5686     Coeff.=   1.000    Free 
+  3   Stretch      Prim:  3    Atoms   1   7            Value=  1.5536     Coeff.=   1.000    Free 
+  4   Stretch      Prim:  4    Atoms   1  18            Value=  1.0930     Coeff.=   1.000    Free 
+  5   Stretch      Prim:  5    Atoms   2   3            Value=  1.3386     Coeff.=   1.000    Free 
+  6   Stretch      Prim:  6    Atoms   2  10            Value=  1.4967     Coeff.=   1.000    Free 
+  7   Stretch      Prim:  7    Atoms   3   4            Value=  1.5094     Coeff.=   1.000    Free 
+  8   Stretch      Prim:  8    Atoms   3  15            Value=  1.0863     Coeff.=   1.000    Free 
+  9   Stretch      Prim:  9    Atoms   4   5            Value=  1.5321     Coeff.=   1.000    Free 
+ 10   Stretch      Prim: 10    Atoms   4  16            Value=  1.0967     Coeff.=   1.000    Free 
+ 11   Stretch      Prim: 11    Atoms   4  17            Value=  1.0972     Coeff.=   1.000    Free 
+ 12   Stretch      Prim: 12    Atoms   5   6            Value=  1.5628     Coeff.=   1.000    Free 
+ 13   Stretch      Prim: 13    Atoms   5   7            Value=  1.5494     Coeff.=   1.000    Free 
+ 14   Stretch      Prim: 14    Atoms   5  11            Value=  1.0936     Coeff.=   1.000    Free 
+ 15   Stretch      Prim: 15    Atoms   6   8            Value=  1.5205     Coeff.=   1.000    Free 
+ 16   Stretch      Prim: 16    Atoms   6   9            Value=  1.5274     Coeff.=   1.000    Free 
+ 17   Stretch      Prim: 17    Atoms   7  19            Value=  1.0911     Coeff.=   1.000    Free 
+ 18   Stretch      Prim: 18    Atoms   7  20            Value=  1.0882     Coeff.=   1.000    Free 
+ 19   Stretch      Prim: 19    Atoms   8  21            Value=  1.0889     Coeff.=   1.000    Free 
+ 20   Stretch      Prim: 20    Atoms   8  22            Value=  1.0946     Coeff.=   1.000    Free 
+ 21   Stretch      Prim: 21    Atoms   8  23            Value=  1.0946     Coeff.=   1.000    Free 
+ 22   Stretch      Prim: 22    Atoms   9  24            Value=  1.0900     Coeff.=   1.000    Free 
+ 23   Stretch      Prim: 23    Atoms   9  25            Value=  1.0942     Coeff.=   1.000    Free 
+ 24   Stretch      Prim: 24    Atoms   9  26            Value=  1.0940     Coeff.=   1.000    Free 
+ 25   Stretch      Prim: 25    Atoms  10  12            Value=  1.0914     Coeff.=   1.000    Free 
+ 26   Stretch      Prim: 26    Atoms  10  13            Value=  1.0948     Coeff.=   1.000    Free 
+ 27   Stretch      Prim: 27    Atoms  10  14            Value=  1.0951     Coeff.=   1.000    Free 
+ 28   Rocking      Prim: 28    Atoms  18   1   7        Value= 119.193     Coeff.=   0.500    Free 
+                   Prim: 29    Atoms  18   1   6        Value= 117.884     Coeff.=  -0.250
+                   Prim: 30    Atoms  18   1   2        Value= 112.789     Coeff.=  -0.250
+ 29   Rocking      Prim: 29    Atoms  18   1   6        Value= 117.884     Coeff.=   0.707    Free 
+                   Prim: 30    Atoms  18   1   2        Value= 112.789     Coeff.=  -0.707
+ 30   Rocking      Prim: 31    Atoms  10   2   3        Value= 124.443     Coeff.=   0.707    Free 
+                   Prim: 32    Atoms  10   2   1        Value= 118.823     Coeff.=  -0.707
+ 31   Rocking      Prim: 33    Atoms  15   3   4        Value= 119.121     Coeff.=   0.707    Free 
+                   Prim: 34    Atoms  15   3   2        Value= 121.146     Coeff.=  -0.707
+ 32   Bend         Prim: 35    Atoms  16   4  17        Value= 106.087     Coeff.=   0.500    Free 
+                   Prim: 36    Atoms   3   4  16        Value= 110.279     Coeff.=  -0.250
+                   Prim: 37    Atoms   3   4  17        Value= 110.045     Coeff.=  -0.250
+ 33   Bend         Prim: 36    Atoms   3   4  16        Value= 110.279     Coeff.=   0.500    Free 
+                   Prim: 37    Atoms   3   4  17        Value= 110.045     Coeff.=  -0.500
+ 34   Bend         Prim: 35    Atoms  16   4  17        Value= 106.087     Coeff.=   0.500    Free 
+                   Prim: 38    Atoms   5   4  16        Value= 109.656     Coeff.=  -0.250
+                   Prim: 39    Atoms   5   4  17        Value= 110.397     Coeff.=  -0.250
+ 35   Bend         Prim: 38    Atoms   5   4  16        Value= 109.656     Coeff.=   0.500    Free 
+                   Prim: 39    Atoms   5   4  17        Value= 110.397     Coeff.=  -0.500
+ 36   Rocking      Prim: 40    Atoms  11   5   7        Value= 118.477     Coeff.=   0.500    Free 
+                   Prim: 41    Atoms  11   5   6        Value= 117.207     Coeff.=  -0.250
+                   Prim: 42    Atoms  11   5   4        Value= 111.787     Coeff.=  -0.250
+ 37   Rocking      Prim: 41    Atoms  11   5   6        Value= 117.207     Coeff.=   0.707    Free 
+                   Prim: 42    Atoms  11   5   4        Value= 111.787     Coeff.=  -0.707
+ 38   Bend         Prim: 43    Atoms   8   6   9        Value= 108.366     Coeff.=   0.500    Free 
+                   Prim: 44    Atoms   1   6   8        Value= 119.289     Coeff.=  -0.250
+                   Prim: 45    Atoms   1   6   9        Value= 111.892     Coeff.=  -0.250
+ 39   Bend         Prim: 44    Atoms   1   6   8        Value= 119.289     Coeff.=   0.500    Free 
+                   Prim: 45    Atoms   1   6   9        Value= 111.892     Coeff.=  -0.500
+ 40   Bend         Prim: 43    Atoms   8   6   9        Value= 108.366     Coeff.=   0.500    Free 
+                   Prim: 46    Atoms   5   6   8        Value= 118.913     Coeff.=  -0.250
+                   Prim: 47    Atoms   5   6   9        Value= 111.934     Coeff.=  -0.250
+ 41   Bend         Prim: 46    Atoms   5   6   8        Value= 118.913     Coeff.=   0.500    Free 
+                   Prim: 47    Atoms   5   6   9        Value= 111.934     Coeff.=  -0.500
+ 42   Bend         Prim: 48    Atoms  19   7  20        Value= 109.753     Coeff.=   0.500    Free 
+                   Prim: 49    Atoms   1   7  19        Value= 116.157     Coeff.=  -0.250
+                   Prim: 50    Atoms   1   7  20        Value= 113.442     Coeff.=  -0.250
+ 43   Bend         Prim: 49    Atoms   1   7  19        Value= 116.157     Coeff.=   0.500    Free 
+                   Prim: 50    Atoms   1   7  20        Value= 113.442     Coeff.=  -0.500
+ 44   Bend         Prim: 48    Atoms  19   7  20        Value= 109.753     Coeff.=   0.500    Free 
+                   Prim: 51    Atoms   5   7  19        Value= 117.096     Coeff.=  -0.250
+                   Prim: 52    Atoms   5   7  20        Value= 112.876     Coeff.=  -0.250
+ 45   Bend         Prim: 51    Atoms   5   7  19        Value= 117.096     Coeff.=   0.500    Free 
+                   Prim: 52    Atoms   5   7  20        Value= 112.876     Coeff.=  -0.500
+ 46   Bend         Prim: 53    Atoms   6   8  21        Value= 112.829     Coeff.=   0.500    Free 
+                   Prim: 54    Atoms  22   8   6        Value= 110.181     Coeff.=  -0.250
+                   Prim: 55    Atoms  22   8  21        Value= 107.939     Coeff.=  -0.250
+ 47   Bend         Prim: 54    Atoms  22   8   6        Value= 110.181     Coeff.=   0.500    Free 
+                   Prim: 55    Atoms  22   8  21        Value= 107.939     Coeff.=  -0.500
+ 48   Bend         Prim: 53    Atoms   6   8  21        Value= 112.829     Coeff.=   0.500    Free 
+                   Prim: 56    Atoms  23   8   6        Value= 109.997     Coeff.=  -0.250
+                   Prim: 57    Atoms  23   8  21        Value= 108.321     Coeff.=  -0.250
+ 49   Bend         Prim: 56    Atoms  23   8   6        Value= 109.997     Coeff.=   0.500    Free 
+                   Prim: 57    Atoms  23   8  21        Value= 108.321     Coeff.=  -0.500
+ 50   Bend         Prim: 58    Atoms  22   8  23        Value= 107.397     Coeff.=   1.000    Free 
+ 51   Bend         Prim: 59    Atoms   6   9  24        Value= 113.225     Coeff.=   0.500    Free 
+                   Prim: 60    Atoms  25   9   6        Value= 110.079     Coeff.=  -0.250
+                   Prim: 61    Atoms  25   9  24        Value= 107.738     Coeff.=  -0.250
+ 52   Bend         Prim: 60    Atoms  25   9   6        Value= 110.079     Coeff.=   0.500    Free 
+                   Prim: 61    Atoms  25   9  24        Value= 107.738     Coeff.=  -0.500
+ 53   Bend         Prim: 59    Atoms   6   9  24        Value= 113.225     Coeff.=   0.500    Free 
+                   Prim: 62    Atoms  26   9   6        Value= 110.167     Coeff.=  -0.250
+                   Prim: 63    Atoms  26   9  24        Value= 107.789     Coeff.=  -0.250
+ 54   Bend         Prim: 62    Atoms  26   9   6        Value= 110.167     Coeff.=   0.500    Free 
+                   Prim: 63    Atoms  26   9  24        Value= 107.789     Coeff.=  -0.500
+ 55   Bend         Prim: 64    Atoms  25   9  26        Value= 107.651     Coeff.=   1.000    Free 
+ 56   Bend         Prim: 65    Atoms  13  10  14        Value= 106.765     Coeff.=   0.500    Free 
+                   Prim: 66    Atoms   2  10  13        Value= 110.868     Coeff.=  -0.250
+                   Prim: 67    Atoms   2  10  14        Value= 110.572     Coeff.=  -0.250
+ 57   Bend         Prim: 66    Atoms   2  10  13        Value= 110.868     Coeff.=   0.500    Free 
+                   Prim: 67    Atoms   2  10  14        Value= 110.572     Coeff.=  -0.500
+ 58   Bend         Prim: 65    Atoms  13  10  14        Value= 106.765     Coeff.=   0.500    Free 
+                   Prim: 68    Atoms  12  10  13        Value= 108.508     Coeff.=  -0.250
+                   Prim: 69    Atoms  12  10  14        Value= 108.439     Coeff.=  -0.250
+ 59   Bend         Prim: 68    Atoms  12  10  13        Value= 108.508     Coeff.=   0.500    Free 
+                   Prim: 69    Atoms  12  10  14        Value= 108.439     Coeff.=  -0.500
+ 60   Bend         Prim: 70    Atoms   2  10  12        Value= 111.530     Coeff.=   1.000    Free 
+ 61   Ring ADef    Prim: 71    Atoms   6   5   7        Value=  87.527     Coeff.=   0.500    Free 
+                   Prim: 72    Atoms   5   7   1        Value=  85.888     Coeff.=  -0.500
+                   Prim: 73    Atoms   7   1   6        Value=  87.174     Coeff.=   0.500
+                   Prim: 74    Atoms   1   6   5        Value=  84.926     Coeff.=  -0.500
+ 62   Ring ADef    Prim: 75    Atoms   1   2   3        Value= 116.733     Coeff.=   0.577    Free 
+                   Prim: 76    Atoms   2   3   4        Value= 119.719     Coeff.=  -0.289
+                   Prim: 77    Atoms   3   4   5        Value= 110.296     Coeff.=  -0.289
+                   Prim: 78    Atoms   4   5   6        Value= 110.945     Coeff.=   0.577
+                   Prim: 79    Atoms   5   6   1        Value=  84.926     Coeff.=  -0.289
+                   Prim: 80    Atoms   6   1   2        Value= 110.072     Coeff.=  -0.289
+ 63   Ring ADef    Prim: 75    Atoms   1   2   3        Value= 116.733     Coeff.=   0.000    Free 
+                   Prim: 76    Atoms   2   3   4        Value= 119.719     Coeff.=   0.500
+                   Prim: 77    Atoms   3   4   5        Value= 110.296     Coeff.=  -0.500
+                   Prim: 78    Atoms   4   5   6        Value= 110.945     Coeff.=  -0.000
+                   Prim: 79    Atoms   5   6   1        Value=  84.926     Coeff.=   0.500
+                   Prim: 80    Atoms   6   1   2        Value= 110.072     Coeff.=  -0.500
+ 64   Ring ADef    Prim: 75    Atoms   1   2   3        Value= 116.733     Coeff.=   0.408    Free 
+                   Prim: 76    Atoms   2   3   4        Value= 119.719     Coeff.=  -0.408
+                   Prim: 77    Atoms   3   4   5        Value= 110.296     Coeff.=   0.408
+                   Prim: 78    Atoms   4   5   6        Value= 110.945     Coeff.=  -0.408
+                   Prim: 79    Atoms   5   6   1        Value=  84.926     Coeff.=   0.408
+                   Prim: 80    Atoms   6   1   2        Value= 110.072     Coeff.=  -0.408
+ 65   Torsion      Prim: 82    Atoms   3   2  10  12    Value=   0.782     Coeff.=   1.000    Free 
+ 66   Torsion      Prim: 83    Atoms   1   6   8  21    Value= -48.770     Coeff.=   1.000    Free 
+ 67   Torsion      Prim: 84    Atoms   1   6   9  24    Value=  46.542     Coeff.=   1.000    Free 
+ 68   Ring Puck    Prim: 85    Atoms   5   7   1   6    Value= -28.283     Coeff.=   0.500    Free 
+                   Prim: 86    Atoms   7   1   6   5    Value=  28.061     Coeff.=  -0.500
+                   Prim: 87    Atoms   1   6   5   7    Value= -28.135     Coeff.=   0.500
+                   Prim: 88    Atoms   6   5   7   1    Value=  28.390     Coeff.=  -0.500
+ 69   Ring Puck    Prim: 89    Atoms   5   6   1   2    Value= -78.886     Coeff.=   0.577    Free 
+                   Prim: 90    Atoms   6   1   2   3    Value=  47.389     Coeff.=  -0.289
+                   Prim: 91    Atoms   1   2   3   4    Value=  -2.238     Coeff.=  -0.289
+                   Prim: 92    Atoms   2   3   4   5    Value=   2.656     Coeff.=   0.577
+                   Prim: 93    Atoms   3   4   5   6    Value= -49.021     Coeff.=  -0.289
+                   Prim: 94    Atoms   4   5   6   1    Value=  80.843     Coeff.=  -0.289
+ 70   Ring Puck    Prim: 89    Atoms   5   6   1   2    Value= -78.886     Coeff.=   0.000    Free 
+                   Prim: 90    Atoms   6   1   2   3    Value=  47.389     Coeff.=   0.500
+                   Prim: 91    Atoms   1   2   3   4    Value=  -2.238     Coeff.=  -0.500
+                   Prim: 92    Atoms   2   3   4   5    Value=   2.656     Coeff.=  -0.000
+                   Prim: 93    Atoms   3   4   5   6    Value= -49.021     Coeff.=   0.500
+                   Prim: 94    Atoms   4   5   6   1    Value=  80.843     Coeff.=  -0.500
+ 71   Ring Puck    Prim: 89    Atoms   5   6   1   2    Value= -78.886     Coeff.=   0.408    Free 
+                   Prim: 90    Atoms   6   1   2   3    Value=  47.389     Coeff.=  -0.408
+                   Prim: 91    Atoms   1   2   3   4    Value=  -2.238     Coeff.=   0.408
+                   Prim: 92    Atoms   2   3   4   5    Value=   2.656     Coeff.=  -0.408
+                   Prim: 93    Atoms   3   4   5   6    Value= -49.021     Coeff.=   0.408
+                   Prim: 94    Atoms   4   5   6   1    Value=  80.843     Coeff.=  -0.408
+ 72 Out-of-Plane   Prim:167    Atoms   2   1   3  10    Value=   0.252     Coeff.=   1.000    Free 
+ 73 Out-of-Plane   Prim:168    Atoms   3   2   4  15    Value=  -1.194     Coeff.=   1.000    Free 

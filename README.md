@@ -39,6 +39,19 @@ committed source files:
 python tools/oracle_run.py lcb25 fetch
 ```
 
+Merlino-style shell helpers are available for ORACLE without editing personal
+startup files automatically:
+
+```bash
+source /Users/vincenzobarone/ORACLE/scripts/oracle_env.sh
+oracle-set
+oracle-run --help
+oracle-test-all
+```
+
+The demanding Merlino `test_molecules` corpus is versioned under
+`tests/fixtures/test_molecules` for GICForge/parser regressions.
+
 Fragment workflows are planned against existing topology/synthon sections:
 
 ```bash
