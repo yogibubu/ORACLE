@@ -99,6 +99,24 @@ finished parsing:
 GF/PED can then run from `oracle gf --xyzin molecule.xyzin` without reparsing the
 FCHK. VPT2/VCI loaders can read `#QFF` directly from the same container.
 
+`oracle vpt2-vci --xyzin molecule.xyzin` consumes `#QFF` as the canonical
+standalone input. `--fchk` and `--qff-file` remain adapter/compatibility entry
+points; scientific VPT2/VCI code should not reparse Gaussian output directly.
+
+## DVR State
+
+`#DVR` stores the normalized DVR workflow request and output pointers:
+
+- source Gaussian scan/path log handled by the adapter workflow;
+- run directory, figure directory, prefix, boundary and selected solver;
+- rotconst/Cremer-Pople/check-only switches;
+- manifest path and expected grid, summary and level-table paths.
+
+The raw Gaussian log remains an external adapter input. `oracle dvr prepare`
+normalizes the request, writes an `oracle.run.v1` manifest and, when an `xyzin`
+is supplied, updates `#DVR` so the GUI and later workflow steps can discover
+the same run state without duplicating parser logic.
+
 ## GIC State
 
 `#GIC` stores the frozen coordinate contract, not only a list of Gaussian input

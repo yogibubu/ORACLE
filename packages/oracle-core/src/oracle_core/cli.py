@@ -227,6 +227,35 @@ def build_parser(*, repo_root: Path | None = None) -> argparse.ArgumentParser:
         help="Scale factor for 1-4 electrostatic and UFF-vdW terms",
     )
 
+    vpt2_vci = sub.add_parser("vpt2-vci", help="Run VPT2/VCI from normalized ORACLE QFF data")
+    vpt2_source = vpt2_vci.add_mutually_exclusive_group(required=True)
+    vpt2_source.add_argument("--xyzin", type=Path, help="ORACLE xyzin containing #QFF")
+    vpt2_source.add_argument("--fchk", type=Path, help="Gaussian FCHK adapter input")
+    vpt2_source.add_argument("--qff-file", type=Path, help="Indexed QFF text adapter input")
+    vpt2_vci.add_argument("--max-quanta", type=int, default=2)
+    vpt2_vci.add_argument("--roots", type=int, default=10)
+    vpt2_vci.add_argument("--vci-method", choices=("dense", "davidson"), default="dense")
+    vpt2_vci.add_argument("--out", type=Path, help="Write the readable VPT2/VCI report")
+    vpt2_vci.add_argument("--csv-dir", type=Path, help="Write VPT2/VCI CSV tables")
+
+    dvr = sub.add_parser("dvr", help="Prepare scan/path DVR workflows")
+    dvr_sub = dvr.add_subparsers(dest="dvr_command")
+    dvr_prepare = dvr_sub.add_parser("prepare", help="Prepare DVR manifest from a Gaussian scan log")
+    dvr_prepare.add_argument("log", type=Path)
+    dvr_prepare.add_argument("--outdir", type=Path, required=True)
+    dvr_prepare.add_argument("--figdir", type=Path)
+    dvr_prepare.add_argument("--prefix", default="puckering_dvr")
+    dvr_prepare.add_argument("--boundary", default="periodic")
+    dvr_prepare.add_argument(
+        "--solver",
+        choices=("fourier", "sinc-dvr", "fortran-sinc-dvr", "fortran-gaussian"),
+        default="fourier",
+    )
+    dvr_prepare.add_argument("--no-rotconst", action="store_true")
+    dvr_prepare.add_argument("--no-cremer-pople", action="store_true")
+    dvr_prepare.add_argument("--check-only", action="store_true")
+    dvr_prepare.add_argument("--xyzin", type=Path, help="Update this ORACLE xyzin with #DVR")
+
     semiexp = sub.add_parser(
         "semiexp",
         help="Fit semiexperimental equilibrium geometry with ORACLE-MORPHEUS",
@@ -770,6 +799,71 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
         if args.csv_dir is not None:
             written = write_csv_tables(report, args.csv_dir, prefix=prefix)
             print(f"Wrote GF/PED CSV tables: {len(written)} files in {args.csv_dir}")
+        return 0
+    if args.command == "vpt2-vci":
+        from oracle_vpt2_vci import VCIOptions, load_force_field, run_vpt2_vci_report, write_csv_tables
+
+        qff = load_force_field(fchk_path=args.fchk, qff_path=args.qff_file, xyzin_path=args.xyzin)
+        report = run_vpt2_vci_report(
+            qff,
+            max_quanta=args.max_quanta,
+            roots=args.roots,
+            options=VCIOptions(),
+            vci_method=args.vci_method,
+        )
+        if args.out is not None:
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            args.out.write_text(report.text + "\n", encoding="utf-8")
+            print(f"Wrote VPT2/VCI report: {args.out}")
+        else:
+            print(report.text)
+        if args.csv_dir is not None:
+            written = write_csv_tables(report, args.csv_dir)
+            print(f"Wrote VPT2/VCI CSV tables: {len(written)} files in {args.csv_dir}")
+        return 0
+    if args.command == "dvr" and args.dvr_command == "prepare":
+        import shlex
+
+        from oracle_dvr import (
+            DVRRequest,
+            build_fortran_bridge_args,
+            build_fortran_shell_command,
+            build_path_analysis_args,
+            dvr_section_from_request,
+            is_fortran_solver,
+            resolve_dvr_executable,
+            write_dvr_manifest,
+            write_dvr_section,
+        )
+
+        request = DVRRequest(
+            repo_root=root,
+            log_path=args.log,
+            outdir=args.outdir,
+            figdir=args.figdir or (args.outdir / "figures"),
+            prefix=args.prefix,
+            boundary=args.boundary,
+            solver=args.solver,
+            compute_rotconst=not args.no_rotconst,
+            label_cremer_pople=not args.no_cremer_pople,
+            check_only=args.check_only,
+        )
+        python_args = build_path_analysis_args(request)
+        command = f"{shlex.quote(request.python_executable)} {shlex.join(python_args)}"
+        manifest_args = python_args
+        if is_fortran_solver(request.solver):
+            bridge_args = build_fortran_bridge_args(request, resolve_dvr_executable(root))
+            command = build_fortran_shell_command(request, python_args, bridge_args)
+            manifest_args = [command]
+        manifest = write_dvr_manifest(request, manifest_args)
+        if args.xyzin is not None:
+            write_dvr_section(
+                args.xyzin,
+                dvr_section_from_request(request, manifest_path=manifest),
+            )
+            print(f"Updated #DVR: {args.xyzin}")
+        print(f"manifest: {manifest}")
+        print(f"command: {command}")
         return 0
     if args.command == "semiexp":
         from oracle_morpheus import (

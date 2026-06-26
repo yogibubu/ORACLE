@@ -47,10 +47,11 @@ Examples:
 - GF/PED reads frozen `#GIC` plus `#CARTESIAN_HESSIAN`.
 - Thermochemistry reads `#BASIC`, `#ROTATIONAL` and optionally
   `#VIBRATIONAL`.
-- VPT2/VCI reads `#QFF` or equivalent normalized QFF/anharmonic data and does
-  not rebuild GICs.
-- DVR reads normalized scan/path data from adapters and uses its engine
-  wrapper.
+- VPT2/VCI reads `#QFF` in standalone mode and does not rebuild GICs. Gaussian
+  FCHK and indexed QFF text remain adapter/compatibility entry points.
+- DVR writes and reads `#DVR` request/manifest/output state. Gaussian scan logs
+  remain adapter inputs for `oracle dvr prepare`, not private parsers inside
+  downstream DVR clients.
 
 ## Consequences
 
@@ -62,3 +63,4 @@ Examples:
 - Package CLIs should prefer `--xyzin` for direct standalone mode.
 - GF/PED standalone mode consumes `#CARTESIAN_HESSIAN` plus frozen `#GIC`.
 - VPT2/VCI standalone loaders consume `#QFF` when present.
+- DVR standalone orchestration stores discoverable run state in `#DVR`.

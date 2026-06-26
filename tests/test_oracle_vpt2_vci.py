@@ -252,6 +252,15 @@ def test_gui_service_reports_are_independent_from_qt(tmp_path):
     assert len(report.comparison.vci.basis) >= 3
 
 
+def test_report_service_exposes_davidson_vci_path():
+    qff = zero_anharmonic_force_field(np.array([100.0, 140.0]))
+
+    report = run_vpt2_vci_report(qff, max_quanta=2, roots=3, vci_method="davidson")
+
+    assert report.comparison.vci.davidson is not None
+    assert "VPT2/VCI comparison on canonical ORACLE QFF" in report.text
+
+
 def test_force_field_validation_rejects_bad_modes():
     qff = QuarticForceField(
         harmonic_frequencies_cm=np.array([1000.0]),

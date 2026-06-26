@@ -51,10 +51,17 @@ def run_vpt2_vci_report(
     max_quanta: int,
     roots: int,
     options: VCIOptions | None = None,
+    vci_method: str = "dense",
 ) -> VPT2VCIReport:
     """Run VPT2/VCI on a canonical force field and return a formatted report."""
     validate_force_field(force_field)
-    comparison = compare_vpt2_vci(force_field, max_quanta=max_quanta, n_roots=roots, options=options)
+    comparison = compare_vpt2_vci(
+        force_field,
+        max_quanta=max_quanta,
+        n_roots=roots,
+        options=options,
+        vci_method=vci_method,
+    )
     return VPT2VCIReport(force_field, comparison, format_vpt2_vci_report(force_field, comparison))
 
 

@@ -108,6 +108,8 @@ python -m oracle rovib qcent molecule.xyzin --out qcent.report
 python -m oracle rovib dos molecule.xyzin
 python -m oracle rovib dos-rovib molecule.xyzin
 python -m oracle gf --xyzin molecule.xyzin
+python -m oracle vpt2-vci --xyzin molecule.xyzin --out vpt2_vci.report
+python -m oracle dvr prepare scan.log --outdir runs/dvr --xyzin molecule.xyzin
 ```
 
 ## Migration Rule

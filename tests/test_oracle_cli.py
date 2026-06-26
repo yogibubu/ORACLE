@@ -414,6 +414,103 @@ def test_gf_cli_can_use_hessian_from_xyzin_without_fchk(tmp_path, monkeypatch, c
     assert "GF from xyzin" in out
 
 
+def test_vpt2_vci_cli_uses_qff_section_from_xyzin(tmp_path, monkeypatch, capsys):
+    calls = {}
+    xyzin = tmp_path / "molecule.xyzin"
+    report_path = tmp_path / "vpt2_vci.report"
+    csv_dir = tmp_path / "csv"
+
+    def fake_load_force_field(*, fchk_path=None, qff_path=None, xyzin_path=None):
+        calls["load"] = (fchk_path, qff_path, xyzin_path)
+        return SimpleNamespace(harmonic_frequencies_cm=(100.0,))
+
+    def fake_run(force_field, *, max_quanta, roots, options=None, vci_method="dense"):
+        calls["run"] = (force_field.harmonic_frequencies_cm, max_quanta, roots, vci_method)
+        return SimpleNamespace(text="vpt2 vci report")
+
+    def fake_csv(report, outdir, *, prefix="vpt2_vci"):
+        calls["csv"] = (report.text, outdir, prefix)
+        return {"comparison.csv": outdir / "vpt2_vci_comparison.csv"}
+
+    monkeypatch.setattr("oracle_vpt2_vci.load_force_field", fake_load_force_field)
+    monkeypatch.setattr("oracle_vpt2_vci.run_vpt2_vci_report", fake_run)
+    monkeypatch.setattr("oracle_vpt2_vci.write_csv_tables", fake_csv)
+
+    rc = oracle_run.main(
+        [
+            "vpt2-vci",
+            "--xyzin",
+            str(xyzin),
+            "--max-quanta",
+            "3",
+            "--roots",
+            "4",
+            "--vci-method",
+            "davidson",
+            "--out",
+            str(report_path),
+            "--csv-dir",
+            str(csv_dir),
+        ]
+    )
+
+    assert rc == 0
+    assert calls["load"] == (None, None, xyzin)
+    assert calls["run"] == ((100.0,), 3, 4, "davidson")
+    assert calls["csv"] == ("vpt2 vci report", csv_dir, "vpt2_vci")
+    assert report_path.read_text(encoding="utf-8") == "vpt2 vci report\n"
+    assert "Wrote VPT2/VCI report" in capsys.readouterr().out
+
+
+def test_dvr_prepare_cli_writes_manifest_and_xyzin_section(tmp_path, monkeypatch, capsys):
+    calls = {}
+    log = tmp_path / "scan.log"
+    xyzin = tmp_path / "molecule.xyzin"
+    outdir = tmp_path / "dvr"
+    xyzin.write_text("1\ncomment\nH 0.0 0.0 0.0\n", encoding="utf-8")
+
+    def fake_manifest(request, args):
+        calls["manifest_request"] = request
+        calls["manifest_args"] = tuple(args)
+        manifest = request.outdir / f"{request.normalized_prefix}_manifest.json"
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        manifest.write_text("{}\n", encoding="utf-8")
+        return manifest
+
+    monkeypatch.setattr("oracle_dvr.write_dvr_manifest", fake_manifest)
+
+    rc = oracle_run.main(
+        [
+            "dvr",
+            "prepare",
+            str(log),
+            "--outdir",
+            str(outdir),
+            "--prefix",
+            "demo",
+            "--boundary",
+            "nonperiodic",
+            "--no-rotconst",
+            "--check-only",
+            "--xyzin",
+            str(xyzin),
+        ]
+    )
+    out = capsys.readouterr().out
+    request = calls["manifest_request"]
+
+    assert rc == 0
+    assert request.log_path == log
+    assert request.outdir == outdir
+    assert request.normalized_prefix == "demo"
+    assert request.boundary == "nonperiodic"
+    assert not request.compute_rotconst
+    assert request.check_only
+    assert "--gaussian-log" in calls["manifest_args"]
+    assert "Updated #DVR" in out
+    assert "#DVR" in xyzin.read_text(encoding="utf-8")
+
+
 def test_fragments_plan_cli_calls_writer(tmp_path, monkeypatch, capsys):
     calls = {}
     path = tmp_path / "molecule.xyz"
