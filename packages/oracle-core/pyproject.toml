@@ -8,6 +8,8 @@ version = "0.1.0"
 description = "Core ORACLE infrastructure"
 requires-python = ">=3.11"
 
+[project.scripts]
+oracle = "oracle_core.cli:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
-

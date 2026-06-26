@@ -1,9 +1,29 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
+import subprocess
+import sys
 from types import SimpleNamespace
 
 from tools import oracle_run
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_python_module_entrypoint_prints_help():
+    result = subprocess.run(
+        [sys.executable, "-m", "oracle", "--help"],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "ORACLE workflow CLI" in result.stdout
+    assert "gicforge" in result.stdout
 
 
 def test_validate_cli_calls_writer(tmp_path, monkeypatch, capsys):

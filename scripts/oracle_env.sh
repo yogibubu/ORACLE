@@ -90,7 +90,7 @@ oracle-set() {
 
 oracle-cli() {
     oracle-set || return
-    python "$ORACLE_HOME/tools/oracle_run.py" "$@"
+    python -m oracle "$@"
 }
 
 oracle-run() {
@@ -102,7 +102,7 @@ PY
     then
         python -m oracle_gui.app "$@"
     else
-        python "$ORACLE_HOME/tools/oracle_run.py" "$@"
+        python -m oracle "$@"
     fi
 }
 
@@ -117,7 +117,7 @@ PY
     then
         nohup python -m oracle_gui.app > "$log" 2>&1 &
     else
-        nohup python "$ORACLE_HOME/tools/oracle_run.py" > "$log" 2>&1 &
+        nohup python -m oracle > "$log" 2>&1 &
     fi
     echo "ORACLE avviato in background. PID: $! Log: $log"
 }

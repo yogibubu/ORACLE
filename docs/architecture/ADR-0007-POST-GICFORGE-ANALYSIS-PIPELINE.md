@@ -39,7 +39,7 @@ Gaussian writers.
 Initial command:
 
 ```bash
-python tools/oracle_run.py gicforge gaussian-input molecule.xyzin job.gjf \
+python -m oracle gicforge gaussian-input molecule.xyzin job.gjf \
   --route "#p b3lyp/def2svp opt freq"
 ```
 

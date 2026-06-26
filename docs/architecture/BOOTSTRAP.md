@@ -29,7 +29,7 @@ See `docs/architecture/ORACLE_ENVIRONMENT.md`.
 
 ```bash
 cd /Users/vincenzobarone/ORACLE
-PYTHONPATH=packages/oracle-core/src python tools/oracle_run.py init /tmp/oracle-demo
+PYTHONPATH=packages/oracle-core/src python -m oracle init /tmp/oracle-demo
 ```
 
 ## Inspect The CLI
@@ -37,5 +37,5 @@ PYTHONPATH=packages/oracle-core/src python tools/oracle_run.py init /tmp/oracle-
 The temporary CLI is available directly from the repository:
 
 ```bash
-python tools/oracle_run.py --help
+python -m oracle --help
 ```

@@ -335,11 +335,11 @@ Exit criteria:
    ORACLE packages.
 3. Move only docs and metadata first; do not move scientific code in the first
    commit.
-4. Add `tools/oracle_run.py` as the initial ORACLE CLI.
+4. Add `python -m oracle` as the initial ORACLE CLI.
 
 Exit criteria:
 
-- `python tools/oracle_run.py --help` works.
+- `python -m oracle --help` works.
 - Existing compatibility imports still work.
 - No scientific behavior changed.
 

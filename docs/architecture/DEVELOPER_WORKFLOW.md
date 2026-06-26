@@ -3,7 +3,7 @@
 Every new workflow should be added in this order:
 
 1. Define a non-Qt service API with dataclasses for normalized inputs/outputs.
-2. Add CLI access under `tools/oracle_run.py` or the future `python -m oracle`.
+2. Add CLI access under `python -m oracle`.
 3. Write an `oracle.run.v1` manifest with input/output checksums.
 4. Add focused tests using small fixtures.
 5. Add GUI wiring only after the service and CLI are tested.

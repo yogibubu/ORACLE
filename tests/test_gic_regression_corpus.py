@@ -28,7 +28,7 @@ def test_gic_regression_corpus_keeps_qm_adapter_outputs():
     assert (CORPUS / "c6h5.gjf").is_file()
 
 
-def test_oracle_environment_helpers_define_merlino_style_commands():
+def test_oracle_environment_helpers_define_oracle_style_commands():
     text = ENV_HELPERS.read_text(encoding="utf-8")
 
     for name in (

@@ -1,6 +1,6 @@
 # ORACLE Environment Helpers
 
-ORACLE keeps ORACLE-style shell helpers in the repository instead of editing a
+ORACLE keeps sourceable shell helpers in the repository instead of editing a
 personal shell startup file implicitly. Source the helper once per shell:
 
 ```bash
@@ -14,8 +14,8 @@ The helper defines:
   `ORACLE_HOME`, add package `src` directories to `PYTHONPATH`, add local tools
   to `PATH`, and `cd` to the repo.
 - `oracle-run`: launch `oracle_gui.app` when it exists, otherwise dispatch to
-  `tools/oracle_run.py`.
-- `oracle-cli`: run `tools/oracle_run.py` directly.
+  `python -m oracle`.
+- `oracle-cli`: run `python -m oracle` directly.
 - `oracle-run-bg`: launch the same target in background with a log file.
 - `oracle-run-check`: verify the current Python can import the core scientific
   runtime stack.
@@ -25,7 +25,7 @@ The helper defines:
   remove ordinary runtime logs while preserving `tests/fixtures`.
 - `oracle-gic-corpus-list`: list imported demanding GIC input files.
 
-Default variables mirror the ORACLE helpers but use ORACLE names:
+Default variables use ORACLE names:
 
 ```bash
 ORACLE_HOME=/Users/vincenzobarone/ORACLE

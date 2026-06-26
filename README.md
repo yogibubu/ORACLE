@@ -2,8 +2,8 @@
 
 **Operational Recognition of Atomistic Connectivity and Local Environments**
 
-ORACLE is the suite-level refactor of the current ORACLE/MORPHEUS codebase.
-The first releases keep ORACLE compatibility aliases while the scientific
+ORACLE is the suite-level refactor of the legacy MORPHEUS/structural-analysis
+codebase. The first releases keep compatibility aliases while the scientific
 packages are separated behind stable service, CLI and manifest contracts.
 
 ## Initial Scope
@@ -36,11 +36,11 @@ LCB25 geometries are managed as a reproducible local cache rather than
 committed source files:
 
 ```bash
-python tools/oracle_run.py lcb25 fetch
+python -m oracle lcb25 fetch
 ```
 
-ORACLE-style shell helpers are available for ORACLE without editing personal
-startup files automatically:
+ORACLE shell helpers are available without editing personal startup files
+automatically:
 
 ```bash
 source /Users/vincenzobarone/ORACLE/scripts/oracle_env.sh
@@ -49,21 +49,21 @@ oracle-run --help
 oracle-test-all
 ```
 
-The demanding ORACLE `test_molecules` corpus is versioned under
+The demanding `test_molecules` corpus is versioned under
 `tests/fixtures/test_molecules` for GICForge/parser regressions.
 
 Fragment workflows are planned against existing topology/synthon sections:
 
 ```bash
-python tools/oracle_run.py fragments plan molecule.xyzin
+python -m oracle fragments plan molecule.xyzin
 ```
 
 Validation is the gate before GICForge:
 
 ```bash
-python tools/oracle_run.py validate molecule.xyzin
-python tools/oracle_run.py gicforge plan molecule.xyzin --symmetrize --sycart
-python tools/oracle_run.py gicforge gaussian-input molecule.xyzin job.gjf
+python -m oracle validate molecule.xyzin
+python -m oracle gicforge plan molecule.xyzin --symmetrize --sycart
+python -m oracle gicforge gaussian-input molecule.xyzin job.gjf
 ```
 
 ## Migration Rule
@@ -99,7 +99,7 @@ enriched XYZ can be passed directly to SEFit/MORPHEUS, GF/PED, Thermo, DVR or
 anharmonic workflows without rerunning the whole ORACLE preprocessing pipeline.
 
 ```bash
-python tools/oracle_run.py rovib summarize molecule.xyzin
+python -m oracle rovib summarize molecule.xyzin
 ```
 
 ## Workspace Contract

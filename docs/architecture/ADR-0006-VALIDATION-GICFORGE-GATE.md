@@ -39,8 +39,8 @@ symmetrization intent.
 ## Initial Commands
 
 ```bash
-python tools/oracle_run.py validate molecule.xyzin
-python tools/oracle_run.py gicforge plan molecule.xyzin --symmetrize --sycart
+python -m oracle validate molecule.xyzin
+python -m oracle gicforge plan molecule.xyzin --symmetrize --sycart
 ```
 
 ## Consequences

@@ -43,7 +43,7 @@ is robust across ORACLE cases and LCB25.
 The initial command is:
 
 ```bash
-python tools/oracle_run.py fragments plan molecule.xyzin
+python -m oracle fragments plan molecule.xyzin
 ```
 
 ## Consequences

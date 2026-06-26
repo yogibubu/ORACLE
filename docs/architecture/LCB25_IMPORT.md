@@ -20,7 +20,7 @@ LCB25 ZIP
 The managed local cache is created with:
 
 ```bash
-python tools/oracle_run.py lcb25 fetch
+python -m oracle lcb25 fetch
 ```
 
 By default it writes `data/lcb25/manifest.json`, `data/lcb25/archives/*.zip`
