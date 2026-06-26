@@ -7,6 +7,7 @@ from .lcb25 import (
     extract_lcb25_archive,
     lcb25_dataset_url,
     lcb25_download_plan,
+    sync_lcb25_library,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "extract_lcb25_archive",
     "lcb25_dataset_url",
     "lcb25_download_plan",
+    "sync_lcb25_library",
 ]

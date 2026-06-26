@@ -17,6 +17,17 @@ LCB25 ZIP
   -> fragment extraction or full-molecule reference search
 ```
 
+The managed local cache is created with:
+
+```bash
+python tools/oracle_run.py lcb25 fetch
+```
+
+By default it writes `data/lcb25/manifest.json`, `data/lcb25/archives/*.zip`
+and `data/lcb25/xyz/<dataset>/*.xyz`. The cache directory is intentionally
+ignored by git: code and manifests are reproducible, while redistribution of the
+downloaded database remains an explicit project decision.
+
 LCB25 molecules can be used in two directions:
 
 - as whole-molecule references for MORPHEUS/reference-assisted workflows;

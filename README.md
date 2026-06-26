@@ -27,6 +27,13 @@ packages are separated behind stable service, CLI and manifest contracts.
 - `oracle-vpt2-vci`: QFF, VPT2/VCI and Davidson workflows.
 - `oracle-gui`: GUI controllers and views only.
 
+LCB25 geometries are managed as a reproducible local cache rather than
+committed source files:
+
+```bash
+python tools/oracle_run.py lcb25 fetch
+```
+
 ## Migration Rule
 
 Scientific behavior is migrated package by package. Existing `merlino_*`
