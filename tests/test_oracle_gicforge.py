@@ -21,6 +21,8 @@ from oracle_gicforge import (
     gic_b_matrix_lines,
     gic_definition_section_lines,
     special_symmetry_source_blocks,
+    symmetrize_gic_definition,
+    total_symmetric_gic_names,
     write_gicforge_build_sections,
     write_gicforge_gaussian_input,
     write_gicforge_plan_sections,
@@ -180,6 +182,10 @@ def test_gicforge_build_writes_frozen_gics_and_sycart(tmp_path):
     assert "STATUS BUILT" in gic
     assert "BACKEND oracle-native-primitive.v1" in gic
     assert "SYMMETRY_MODE LOCAL_BLOCK_C1" in gic
+    assert "SYMMETRY_GROUP C1" in gic
+    assert "TOTAL_SYMMETRIC_IRREP A" in gic
+    assert "TOTAL_SYMMETRIC_GIC_COUNT 3" in gic
+    assert "TOTAL_SYMMETRIC_GICS AStrS001,AStrD001,ABend0001" in gic
     assert "GIC_COUNT 3" in gic
     assert not any("PENDING" in line for line in gic)
     assert "[SYMMETRY_DIAGNOSTICS]" in gic
@@ -187,31 +193,44 @@ def test_gicforge_build_writes_frozen_gics_and_sycart(tmp_path):
     assert "STATUS APPLIED" in gic
     assert (
         "GROUP 1 BLOCK=STRETCH FAMILY=STRETCH SIGNATURE=R:H-O "
-        "SOURCES=Str0001,Str0002 OUTPUTS=StrS001,StrD001"
+        "SOURCES=Str0001,Str0002 OUTPUTS=AStrS001,AStrD001"
     ) in gic
     assert any(
         line.startswith(
-            "GIC001 NAME=StrS001 FAMILY=STRETCH IRREP=A "
+            "GIC001 NAME=AStrS001 FAMILY=STRETCH IRREP=A "
             "COEFFS=P001:0.707106781187,P002:0.707106781187"
         )
         for line in gic
     )
-    assert "GIC001 = 0.707106781187*(R(1,2))+0.707106781187*(R(1,3))" in gic
-    assert "GIC002 = 0.707106781187*(R(1,2))-0.707106781187*(R(1,3))" in gic
-    assert "GIC003 = A(2,1,3)" in gic
+    assert "AStrS001 = 0.707106781187*(R(1,2))+0.707106781187*(R(1,3))" in gic
+    assert "AStrD001 = 0.707106781187*(R(1,2))-0.707106781187*(R(1,3))" in gic
+    assert "ABend0001 = A(2,1,3)" in gic
     assert definition.symmetry_diagnostics is not None
     assert definition.symmetry_diagnostics.status == "APPLIED"
-    assert definition.gics[0].name == "StrS001"
+    assert definition.symmetry_diagnostics.symmetry_group == "C1"
+    assert definition.symmetry_diagnostics.total_symmetric_irrep == "A"
+    assert definition.symmetry_diagnostics.total_symmetric_gics == (
+        "AStrS001",
+        "AStrD001",
+        "ABend0001",
+    )
+    assert total_symmetric_gic_names(definition) == (
+        "AStrS001",
+        "AStrD001",
+        "ABend0001",
+    )
+    assert definition.gics[0].name == "AStrS001"
     assert definition.gics[0].coefficients[0][1] == pytest.approx(1.0 / np.sqrt(2.0))
     matrix = build_gic_b_matrix_from_xyzin(xyzin)
-    assert matrix.coordinate_names[:2] == ("StrS001", "StrD001")
+    assert matrix.coordinate_names[:2] == ("AStrS001", "AStrD001")
     assert matrix.rows[0][5] == pytest.approx(1.0 / np.sqrt(2.0))
     assert matrix.rows[0][7] == pytest.approx(1.0 / np.sqrt(2.0))
     assert matrix.rows[1][5] == pytest.approx(1.0 / np.sqrt(2.0))
     assert matrix.rows[1][7] == pytest.approx(-1.0 / np.sqrt(2.0))
     report_lines = gic_report_from_xyzin(xyzin)
     assert "Method: LOCAL_BLOCK_SALC" in report_lines
-    assert "STRETCH R:H-O: Str0001,Str0002 -> StrS001,StrD001" in report_lines
+    assert "Total irrep: A" in report_lines
+    assert "STRETCH R:H-O: Str0001,Str0002 -> AStrS001,AStrD001" in report_lines
     assert sycart[0] == "SCHEMA oracle.xyz.sycart.v1"
     assert "STATUS BUILT" in sycart
     assert "COORD_COUNT 3" in sycart
@@ -401,6 +420,57 @@ def test_gicforge_build_uses_built_fragments_for_relative_coordinates(tmp_path):
     assert any(" = ExF002F001" in line for line in gaussian_lines)
 
 
+def test_gicforge_symmetrizes_special_fragment_coordinates(tmp_path):
+    source = tmp_path / "dimer.xyz"
+    source.write_text(
+        "\n".join(
+            [
+                "6",
+                "water dimer fragments",
+                "O 0.00 0.00 0.00",
+                "H 0.96 0.00 0.00",
+                "H -0.24 0.93 0.00",
+                "O 0.00 0.00 3.20",
+                "H 0.96 0.00 3.20",
+                "H -0.24 0.93 3.20",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    xyzin = tmp_path / "dimer.xyzin"
+
+    preprocess_to_enriched_xyz(source, xyzin)
+    write_validation_section(xyzin)
+    write_fragment_build_section(xyzin)
+    definition = write_gicforge_build_sections(xyzin, symmetrize=True)
+    matrix = build_gic_b_matrix_from_xyzin(xyzin)
+    gic = section_content(xyzin.read_text(encoding="utf-8").splitlines(), "GIC")
+
+    assert definition.symmetry_diagnostics is not None
+    special_groups = [
+        group
+        for group in definition.symmetry_diagnostics.groups
+        if group.block.startswith("SPECIAL_")
+    ]
+    assert special_groups
+    assert special_groups[0].block == "SPECIAL_FRAGMENT_CENTER_ATOM"
+    assert special_groups[0].output_gics == ("AFCAtS001", "AFCAtD001")
+    assert "TOTAL_SYMMETRIC_IRREP A" in gic
+    assert "AFCAtS001" in total_symmetric_gic_names(definition)
+    assert "AFCAtD001" in total_symmetric_gic_names(definition)
+    assert any(
+        line.startswith(
+            "GIC003 NAME=AFCAtS001 FAMILY=FRAG_CENTER_ATOM_DISTANCE IRREP=A "
+            "COEFFS=P007:0.707106781187,P008:0.707106781187"
+        )
+        for line in gic
+    )
+    assert any(line.startswith("AFCAtS001 = 0.707106781187*(") for line in gic)
+    assert matrix.coordinate_names[2:4] == ("AFCAtS001", "AFCAtD001")
+    assert len(matrix.rows) == definition.rank
+
+
 def test_gicforge_b_matrix_includes_fragment_coordinate_rows(tmp_path):
     source = tmp_path / "dimer.xyz"
     source.write_text(
@@ -571,3 +641,52 @@ def test_gicforge_rank_reduction_protects_special_coordinates():
     assert rank == 1
     assert selected == (special,)
     assert selected[0].reduction_class == "SPECIAL_PROTECTED"
+
+
+def test_gicforge_symmetry_labels_use_point_group_irreps():
+    primitives = tuple(
+        GICPrimitive(
+            identifier=f"P{idx:03d}",
+            name=f"Str{idx:04d}",
+            family="STRETCH",
+            function="R",
+            atoms=(1, idx + 1),
+        )
+        for idx in range(1, 5)
+    )
+    definition = GICDefinition(
+        backend="test",
+        point_group="C2v",
+        symmetrize=False,
+        target_rank=4,
+        rank=4,
+        candidate_count=4,
+        reference_coordinates_angstrom=((0.0, 0.0, 0.0),) * 5,
+        primitives=primitives,
+        gics=tuple(
+            FrozenGIC(
+                identifier=f"GIC{idx:03d}",
+                name=primitive.name,
+                family=primitive.family,
+                irrep="UNASSIGNED",
+                primitive_id=primitive.identifier,
+                gaussian_expression=primitive.gaussian_expression(),
+                coefficients=((primitive.identifier, 1.0),),
+            )
+            for idx, primitive in enumerate(primitives, start=1)
+        ),
+    )
+
+    symmetrized = symmetrize_gic_definition(
+        definition,
+        atom_symbols=("O", "H", "H", "H", "H"),
+    )
+
+    assert [gic.irrep for gic in symmetrized.gics] == ["A1", "A2", "B1", "B2"]
+    assert [gic.name for gic in symmetrized.gics] == [
+        "A1StrS001",
+        "A2StrD001",
+        "B1StrD001",
+        "B2StrD001",
+    ]
+    assert total_symmetric_gic_names(symmetrized) == ("A1StrS001",)

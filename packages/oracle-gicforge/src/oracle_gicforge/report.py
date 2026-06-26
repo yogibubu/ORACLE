@@ -5,7 +5,11 @@ from __future__ import annotations
 from collections import Counter
 from pathlib import Path
 
-from .definition import GICDefinition, read_gic_definition_from_xyzin
+from .definition import (
+    GICDefinition,
+    read_gic_definition_from_xyzin,
+    total_symmetric_gic_names,
+)
 from .policy import (
     REDUCTION_POLICY,
     SPECIAL_REDUCTION_CLASS,
@@ -33,6 +37,8 @@ def gic_report_lines(definition: GICDefinition) -> list[str]:
         "",
         f"Backend: {definition.backend}",
         f"Point group: {definition.point_group}",
+        f"Symmetry group: {definition.point_group}",
+        f"Totally symmetric GICs: {_list_or_none(total_symmetric_gic_names(definition))}",
         f"Symmetrize requested: {definition.symmetrize}",
         f"Target rank: {definition.target_rank}",
         f"Final rank: {definition.rank}",
@@ -74,6 +80,9 @@ def gic_report_lines(definition: GICDefinition) -> list[str]:
         lines.append(f"Method: {symmetry.method}")
         lines.append(f"Policy: {symmetry.policy}")
         lines.append(f"Status: {symmetry.status}")
+        lines.append(f"Symmetry group: {symmetry.symmetry_group}")
+        lines.append(f"Total irrep: {symmetry.total_symmetric_irrep}")
+        lines.append("Total GICs: " + _list_or_none(symmetry.total_symmetric_gics))
         lines.append(f"Groups: {len(symmetry.groups)}")
         for group in symmetry.groups:
             lines.append(

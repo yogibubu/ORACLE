@@ -33,6 +33,12 @@ from .policy import (
     primitive_reduction_class,
     primitive_symmetry_block,
 )
+from .symmetry_labels import (
+    irrep_name_prefix,
+    is_total_symmetric_irrep,
+    non_total_irrep_sequence,
+    total_symmetric_irrep,
+)
 
 
 @dataclass(frozen=True)
@@ -100,6 +106,9 @@ class GICSymmetrizationDiagnostics:
     policy: str
     status: str
     point_group: str
+    symmetry_group: str
+    total_symmetric_irrep: str
+    total_symmetric_gics: tuple[str, ...] = ()
     groups: tuple[GICSymmetrizedGroup, ...] = ()
 
 
@@ -143,16 +152,27 @@ def build_gic_definition_from_xyzin(
     rank_tolerance: float = RANK_TOLERANCE,
 ) -> GICDefinition:
     """Build a frozen ORACLE GIC definition from saved xyzin state."""
+    definition, atom_symbols = construct_gic_definition_from_xyzin(
+        path,
+        rank_tolerance=rank_tolerance,
+    )
+    if not symmetrize:
+        return definition
+    return symmetrize_gic_definition(definition, atom_symbols=atom_symbols)
+
+
+def construct_gic_definition_from_xyzin(
+    path: Path,
+    *,
+    rank_tolerance: float = RANK_TOLERANCE,
+) -> tuple[GICDefinition, tuple[str, ...]]:
+    """Construct and reduce GICs without applying symmetry adaptation."""
     target = Path(path)
     validate_gicforge_prerequisites(target)
     lines = read_sectioned_lines(target)
     geometry = read_enriched_xyz(target)
     coords = np.asarray(geometry.coordinates_angstrom, dtype=float)
     point_group = _point_group(lines)
-    if symmetrize and point_group.upper() != "C1":
-        raise GICForgeContractError(
-            "non-C1 GIC symmetrization is not available in the native backend yet"
-        )
 
     bonds = _topology_bonds(lines, natoms=geometry.natoms)
     candidates = _primitive_candidates(
@@ -187,17 +207,10 @@ def build_gic_definition_from_xyzin(
         )
         for idx, primitive in enumerate(selected, start=1)
     )
-    gics, symmetry_diagnostics = _apply_local_symmetrization(
-        gics,
-        tuple(selected),
-        atom_symbols=tuple(geometry.atoms),
-        point_group=point_group,
-        requested=bool(symmetrize),
-    )
-    return GICDefinition(
+    definition = GICDefinition(
         backend=GIC_BACKEND,
         point_group=point_group,
-        symmetrize=bool(symmetrize),
+        symmetrize=False,
         target_rank=target_rank,
         rank=rank,
         candidate_count=len(candidates),
@@ -207,6 +220,35 @@ def build_gic_definition_from_xyzin(
         primitives=tuple(selected),
         gics=gics,
         reduction_diagnostics=reduction_diagnostics,
+        symmetry_diagnostics=_empty_symmetry_diagnostics(point_group, requested=False),
+    )
+    return definition, tuple(geometry.atoms)
+
+
+def symmetrize_gic_definition(
+    definition: GICDefinition,
+    *,
+    atom_symbols: tuple[str, ...],
+) -> GICDefinition:
+    """Apply the frozen GIC symmetrization utility to a reduced definition."""
+    gics, symmetry_diagnostics = _apply_local_symmetrization(
+        definition.gics,
+        definition.primitives,
+        atom_symbols=tuple(atom_symbols),
+        point_group=definition.point_group,
+        requested=True,
+    )
+    return GICDefinition(
+        backend=definition.backend,
+        point_group=definition.point_group,
+        symmetrize=True,
+        target_rank=definition.target_rank,
+        rank=definition.rank,
+        candidate_count=definition.candidate_count,
+        reference_coordinates_angstrom=definition.reference_coordinates_angstrom,
+        primitives=definition.primitives,
+        gics=gics,
+        reduction_diagnostics=definition.reduction_diagnostics,
         symmetry_diagnostics=symmetry_diagnostics,
     )
 
@@ -238,6 +280,10 @@ def gic_definition_section_lines(definition: GICDefinition) -> list[str]:
         "INDEXING ATOMS=ONE_BASED",
         f"BACKEND {definition.backend}",
         f"POINT_GROUP {definition.point_group}",
+        f"SYMMETRY_GROUP {definition.point_group}",
+        f"TOTAL_SYMMETRIC_IRREP {total_symmetric_irrep(definition.point_group)}",
+        f"TOTAL_SYMMETRIC_GIC_COUNT {len(total_symmetric_gics(definition))}",
+        f"TOTAL_SYMMETRIC_GICS {_csv_or_none(total_symmetric_gic_names(definition))}",
         f"SYMMETRIZE {_bool_text(definition.symmetrize)}",
         f"SYMMETRY_MODE {_symmetry_mode(definition)}",
         f"TARGET_RANK {definition.target_rank}",
@@ -368,6 +414,19 @@ def build_gic_b_matrix_from_xyzin(path: Path) -> GICBMatrix:
         definition,
         coordinates_angstrom=geometry.coordinates_angstrom,
     )
+
+
+def total_symmetric_gics(definition: GICDefinition) -> tuple[FrozenGIC, ...]:
+    """Return frozen GICs active in symmetry-preserving optimization/fitting."""
+    return tuple(
+        gic
+        for gic in definition.gics
+        if is_total_symmetric_irrep(definition.point_group, gic.irrep)
+    )
+
+
+def total_symmetric_gic_names(definition: GICDefinition) -> tuple[str, ...]:
+    return tuple(gic.name for gic in total_symmetric_gics(definition))
 
 
 def read_gic_definition_from_xyzin(path: Path) -> GICDefinition:
@@ -712,6 +771,9 @@ def _symmetry_diagnostics_lines(definition: GICDefinition) -> list[str]:
         f"POLICY {diagnostics.policy}",
         f"STATUS {diagnostics.status}",
         f"POINT_GROUP {diagnostics.point_group}",
+        f"SYMMETRY_GROUP {diagnostics.symmetry_group}",
+        f"TOTAL_SYMMETRIC_IRREP {diagnostics.total_symmetric_irrep}",
+        f"TOTAL_SYMMETRIC_GICS {_csv_or_none(diagnostics.total_symmetric_gics)}",
         f"GROUP_COUNT {len(diagnostics.groups)}",
         f"SYMMETRIZED_GIC_COUNT {_symmetrized_gic_count(diagnostics)}",
     ]
@@ -735,6 +797,9 @@ def _empty_symmetry_diagnostics(
         policy=SYMMETRIZATION_POLICY,
         status="NOT_REQUESTED" if not requested else "NO_ELIGIBLE_GROUPS",
         point_group=point_group,
+        symmetry_group=point_group,
+        total_symmetric_irrep=total_symmetric_irrep(point_group),
+        total_symmetric_gics=(),
     )
 
 
@@ -782,13 +847,21 @@ def _apply_local_symmetrization(
 
     source_groups = _local_symmetry_groups(gics, primitives, atom_symbols=atom_symbols)
     if not source_groups:
+        prefixed_gics = _prefix_symmetrized_singletons(gics, point_group=point_group)
         return (
-            gics,
+            prefixed_gics,
             GICSymmetrizationDiagnostics(
                 method=LOCAL_SYMMETRIZATION_METHOD,
                 policy=SYMMETRIZATION_POLICY,
                 status="NO_ELIGIBLE_GROUPS",
                 point_group=point_group,
+                symmetry_group=point_group,
+                total_symmetric_irrep=total_symmetric_irrep(point_group),
+                total_symmetric_gics=tuple(
+                    gic.name
+                    for gic in prefixed_gics
+                    if is_total_symmetric_irrep(point_group, gic.irrep)
+                ),
             ),
         )
 
@@ -801,7 +874,7 @@ def _apply_local_symmetrization(
         for group in source_groups.values()
         for gic in group
     }
-    name_counters: dict[tuple[str, str], int] = {}
+    name_counters: dict[tuple[str, str, str], int] = {}
     output: list[FrozenGIC] = []
     diagnostics: list[GICSymmetrizedGroup] = []
 
@@ -828,15 +901,28 @@ def _apply_local_symmetrization(
             continue
         if gic.identifier in grouped_ids:
             continue
-        output.append(_renumber_frozen_gic(gic, len(output) + 1))
+        output.append(
+            _renumber_frozen_gic(
+                _prefix_symmetrized_gic(gic, point_group=point_group),
+                len(output) + 1,
+            )
+        )
 
+    output_tuple = tuple(output)
     return (
-        tuple(output),
+        output_tuple,
         GICSymmetrizationDiagnostics(
             method=LOCAL_SYMMETRIZATION_METHOD,
             policy=SYMMETRIZATION_POLICY,
             status="APPLIED",
             point_group=point_group,
+            symmetry_group=point_group,
+            total_symmetric_irrep=total_symmetric_irrep(point_group),
+            total_symmetric_gics=tuple(
+                gic.name
+                for gic in output_tuple
+                if is_total_symmetric_irrep(point_group, gic.irrep)
+            ),
             groups=tuple(diagnostics),
         ),
     )
@@ -948,19 +1034,20 @@ def _symmetrized_group_gics(
     group: tuple[FrozenGIC, ...],
     *,
     first_index: int,
-    name_counters: dict[tuple[str, str], int],
+    name_counters: dict[tuple[str, str, str], int],
     point_group: str,
 ) -> tuple[FrozenGIC, ...]:
     _block, family, _signature = key
     size = len(group)
     output: list[FrozenGIC] = []
     symmetric_weight = 1.0 / np.sqrt(float(size))
+    symmetric_irrep = _local_symmetry_irrep(point_group=point_group, kind="S", index=0)
     output.append(
         FrozenGIC(
             identifier=f"GIC{first_index:03d}",
-            name=_next_symmetrized_name(family, "S", name_counters),
+            name=_next_symmetrized_name(family, "S", name_counters, irrep=symmetric_irrep),
             family=family,
-            irrep=_local_symmetry_irrep(group, point_group=point_group, kind="S"),
+            irrep=symmetric_irrep,
             primitive_id=group[0].primitive_id,
             gaussian_expression="LINEAR_COMBINATION",
             coefficients=_combine_gic_coefficients(
@@ -973,12 +1060,22 @@ def _symmetrized_group_gics(
         weights = [0.0 for _idx in group]
         weights[group_index - 1] = 1.0 / np.sqrt(2.0)
         weights[group_index] = -1.0 / np.sqrt(2.0)
+        difference_irrep = _local_symmetry_irrep(
+            point_group=point_group,
+            kind="D",
+            index=group_index - 1,
+        )
         output.append(
             FrozenGIC(
                 identifier=f"GIC{first_index + group_index:03d}",
-                name=_next_symmetrized_name(family, "D", name_counters),
+                name=_next_symmetrized_name(
+                    family,
+                    "D",
+                    name_counters,
+                    irrep=difference_irrep,
+                ),
                 family=family,
-                irrep=_local_symmetry_irrep(group, point_group=point_group, kind="D"),
+                irrep=difference_irrep,
                 primitive_id=group[group_index - 1].primitive_id,
                 gaussian_expression="LINEAR_COMBINATION",
                 coefficients=_combine_gic_coefficients(group, tuple(weights)),
@@ -1021,28 +1118,57 @@ def _renumber_frozen_gic(gic: FrozenGIC, index: int) -> FrozenGIC:
     )
 
 
+def _prefix_symmetrized_singletons(
+    gics: tuple[FrozenGIC, ...],
+    *,
+    point_group: str,
+) -> tuple[FrozenGIC, ...]:
+    return tuple(_prefix_symmetrized_gic(gic, point_group=point_group) for gic in gics)
+
+
+def _prefix_symmetrized_gic(gic: FrozenGIC, *, point_group: str) -> FrozenGIC:
+    irrep = (
+        gic.irrep
+        if gic.irrep and gic.irrep != "UNASSIGNED"
+        else total_symmetric_irrep(point_group)
+    )
+    prefix = irrep_name_prefix(irrep)
+    name = gic.name if gic.name.startswith(prefix) else f"{prefix}{gic.name}"
+    return FrozenGIC(
+        identifier=gic.identifier,
+        name=name,
+        family=gic.family,
+        irrep=irrep,
+        primitive_id=gic.primitive_id,
+        gaussian_expression=gic.gaussian_expression,
+        coefficients=gic.coefficients,
+    )
+
+
 def _next_symmetrized_name(
     family: str,
     kind: str,
-    counters: dict[tuple[str, str], int],
+    counters: dict[tuple[str, str, str], int],
+    *,
+    irrep: str,
 ) -> str:
-    key = (family, kind)
+    key = (family, kind, irrep)
     counters[key] = counters.get(key, 0) + 1
-    return f"{primitive_prefix(family)}{kind}{counters[key]:03d}"
+    return f"{irrep_name_prefix(irrep)}{primitive_prefix(family)}{kind}{counters[key]:03d}"
 
 
 def _local_symmetry_irrep(
-    group: tuple[FrozenGIC, ...],
     *,
     point_group: str,
     kind: str,
+    index: int,
 ) -> str:
-    if point_group.upper() == "C1":
-        return "A"
-    irreps = {gic.irrep for gic in group}
-    if len(irreps) == 1 and "UNASSIGNED" not in irreps:
-        return next(iter(irreps))
-    return "LOCAL_SYM" if kind == "S" else "LOCAL_DIF"
+    if kind == "S":
+        return total_symmetric_irrep(point_group)
+    non_total = non_total_irrep_sequence(point_group)
+    if not non_total:
+        return total_symmetric_irrep(point_group)
+    return non_total[index % len(non_total)]
 
 
 def _sorted_atom_symbols(
@@ -2222,6 +2348,19 @@ def _parse_symmetry_diagnostics(
         point_group=_section_value(lines, "POINT_GROUP")
         or _section_value(section_lines, "POINT_GROUP")
         or "UNKNOWN",
+        symmetry_group=_section_value(lines, "SYMMETRY_GROUP")
+        or _section_value(section_lines, "SYMMETRY_GROUP")
+        or _section_value(lines, "POINT_GROUP")
+        or _section_value(section_lines, "POINT_GROUP")
+        or "UNKNOWN",
+        total_symmetric_irrep=_section_value(lines, "TOTAL_SYMMETRIC_IRREP")
+        or _section_value(section_lines, "TOTAL_SYMMETRIC_IRREP")
+        or total_symmetric_irrep(_section_value(section_lines, "POINT_GROUP")),
+        total_symmetric_gics=_parse_text_list(
+            _section_value(lines, "TOTAL_SYMMETRIC_GICS")
+            or _section_value(section_lines, "TOTAL_SYMMETRIC_GICS")
+            or ""
+        ),
         groups=tuple(groups),
     )
 
@@ -2352,8 +2491,12 @@ def _gaussian_gic_block_lines(definition: GICDefinition) -> list[str]:
     for gic in definition.gics:
         expression = _gaussian_expression_for_gic(definition, gic)
         if expression:
-            lines.append(f"{gic.identifier} = {expression}")
+            lines.append(f"{_gaussian_label_for_gic(definition, gic)} = {expression}")
     return lines
+
+
+def _gaussian_label_for_gic(definition: GICDefinition, gic: FrozenGIC) -> str:
+    return gic.name if definition.symmetrize else gic.identifier
 
 
 def _gaussian_expression_for_gic(

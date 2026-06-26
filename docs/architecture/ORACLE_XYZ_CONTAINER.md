@@ -49,12 +49,17 @@ lines. In built files it includes:
 
 - selected primitive coordinates;
 - final frozen GICs, including linear-combination coefficients;
+- point-group/symmetry-group metadata;
+- total-symmetric irrep and active total-symmetric GIC list;
 - reduction diagnostics;
 - symmetrization diagnostics;
 - Gaussian ReadGIC text generated from the frozen state.
 
 Downstream modules should consume the frozen GICs and diagnostics directly and
-use `[GAUSSIAN_GIC]` only when writing Gaussian inputs.
+use `[GAUSSIAN_GIC]` only when writing Gaussian inputs. Optimizers and
+least-squares refinements should use `TOTAL_SYMMETRIC_GICS` for
+symmetry-preserving active variables and reevaluate the B matrix from the frozen
+definition at each geometry step.
 
 ## Compatibility
 

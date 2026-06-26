@@ -130,6 +130,11 @@ normalized adjacent differences. The transformation is written directly in
 analytically as the same linear combination of primitive B rows. The final GIC
 count therefore remains equal to the vibrational rank.
 
+Symmetrized GIC names start with their assigned irreducible representation:
+for example `A1StrS001`, `B2BendD001`, `AgFCDiS001` or `AStrS001` in `C1`.
+The exact irrep label is stored separately in `IRREP=...`, while the coordinate
+name uses a filesystem- and Gaussian-safe prefix.
+
 For special coordinates, the intended symmetry source blocks are the protected
 classes themselves:
 
@@ -146,6 +151,21 @@ ambiguous labels, the correct behavior is a clean stop.
 The frozen `#GIC` section records `[SYMMETRY_DIAGNOSTICS]` with the method,
 policy, status, transformed source groups and output labels. Human reports read
 this stored diagnostic state; they do not recompute symmetry.
+
+For optimization and least-squares refinement, the built `#GIC` header also
+stores:
+
+```text
+SYMMETRY_GROUP ...
+TOTAL_SYMMETRIC_IRREP ...
+TOTAL_SYMMETRIC_GIC_COUNT ...
+TOTAL_SYMMETRIC_GICS ...
+```
+
+Downstream modules must use this total-symmetric subset for
+symmetry-preserving equilibrium refinement. In `C1`, all GICs transform as
+`A`; in higher symmetry, only the GICs whose `IRREP` matches
+`TOTAL_SYMMETRIC_IRREP` are active.
 
 The helper `oracle_gicforge.symmetry.gic_symmetry_source_blocks` exposes these
 homogeneous blocks to future GICSYM implementations and reports. It is a
@@ -167,6 +187,19 @@ The legacy tree is compiled with `engines/fortran/gicforge/compile_legacy` and
 is treated as a reference identity target. Python and Fortran paths are allowed
 to coexist only when they share the frozen `#GIC` contract, family names,
 protected-class policy, B-matrix definitions and regression fixtures.
+
+The native Python API deliberately separates the stages that run at different
+frequencies:
+
+- `construct_gic_definition_from_xyzin`: topology-driven candidate generation,
+  protected-first non-redundant reduction and frozen unsymmetrized GICs;
+- `symmetrize_gic_definition`: post-reduction symmetry adaptation and active
+  total-symmetric manifest;
+- `build_gic_b_matrix`: analytic evaluation of the frozen definition for the
+  current Cartesian geometry.
+
+Optimizers and least-squares solvers call the first two stages once at setup
+time, then call the B-matrix evaluator at every geometry iteration.
 
 ## Reports
 

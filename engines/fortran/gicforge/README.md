@@ -39,7 +39,15 @@ group one-term coordinates only inside homogeneous type blocks, write the first
 coordinate as a normalized symmetric sum, and write the remaining coordinates as
 normalized adjacent differences. ORACLE serializes that transformation in
 `#GIC/[FROZEN_GICS]` as primitive coefficients so Python and Fortran downstream
-tools can build the same B rows.
+tools can build the same B rows. Symmetry labels are part of the frozen
+contract: symmetrized coordinate names begin with their assigned irrep and the
+header records the total-symmetric active subset used by optimizers and
+least-squares fits.
+
+Construction, symmetrization and B evaluation are intentionally separate.
+Fortran optimizers should read the frozen primitive/GIC coefficient table once,
+then call `ORCGLCB` at each geometry iteration to combine the current primitive
+B rows into the current frozen GIC B matrix.
 
 The `FROT` B row is analytic: derivatives are propagated through the centroid,
 local frame, relative rotation matrix, quaternion and exponential-map
