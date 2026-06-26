@@ -10,6 +10,7 @@ from oracle_core import replace_section, replace_xyz_block
 
 from .geometry import MolecularGeometry
 from .geometry_io import read_geometry
+from .symmetry import analyze_molecular_symmetry, symmetry_section_lines
 from .topology.pipeline import build_topology_objects
 
 
@@ -44,8 +45,9 @@ def preprocess_to_enriched_xyz(
     geometry = read_geometry(Path(source))
     write_enriched_geometry(target, geometry)
     write_source_section(target, source=Path(source), source_kind=source_kind, geometry=geometry)
-    point_group = determine_initial_point_group(geometry, symmetry_thresholds)
-    write_symmetry_section(target, point_group=point_group, thresholds=symmetry_thresholds)
+    symmetry = determine_initial_symmetry(geometry, symmetry_thresholds)
+    point_group = symmetry.point_group
+    write_symmetry_section(target, symmetry=symmetry, thresholds=symmetry_thresholds)
     bond_count, ring_count = write_topology_and_synthons_sections(target, geometry)
     return BabelPreprocessResult(
         path=Path(target),
@@ -79,37 +81,42 @@ def write_source_section(
     )
 
 
+def determine_initial_symmetry(
+    geometry: MolecularGeometry,
+    thresholds: SymmetryThresholds,
+) -> object:
+    return analyze_molecular_symmetry(
+        geometry,
+        distance_tolerance=thresholds.distance_angstrom,
+        inertia_tolerance=thresholds.inertia_relative,
+        max_rotation_order=thresholds.max_rotation_order,
+    )
+
+
 def determine_initial_point_group(
     geometry: MolecularGeometry,
     thresholds: SymmetryThresholds,
 ) -> str:
-    # Conservative scaffold: full symmetry classifier migration comes next.
-    # The thresholds are already explicit and persisted so later implementation
-    # can improve the algorithm without changing the section contract.
-    _ = geometry, thresholds
-    return "C1"
+    return str(determine_initial_symmetry(geometry, thresholds).point_group)
 
 
 def write_symmetry_section(
     path: Path,
     *,
-    point_group: str,
+    symmetry,
     thresholds: SymmetryThresholds,
 ) -> None:
     replace_section(
         Path(path),
         "SYMMETRY",
-        [
-            "SCHEMA oracle.xyz.symmetry.v1",
-            f"POINT_GROUP {point_group}",
-            f"THRESHOLD_DISTANCE_ANGSTROM {thresholds.distance_angstrom:.12g}",
-            f"THRESHOLD_INERTIA_RELATIVE {thresholds.inertia_relative:.12g}",
-            f"MAX_ROTATION_ORDER {thresholds.max_rotation_order}",
-        ],
+        symmetry_section_lines(symmetry, thresholds=thresholds),
     )
 
 
-def write_topology_and_synthons_sections(path: Path, geometry: MolecularGeometry) -> tuple[int, int]:
+def write_topology_and_synthons_sections(
+    path: Path,
+    geometry: MolecularGeometry,
+) -> tuple[int, int]:
     atomic_numbers = [_atomic_number(atom) for atom in geometry.atoms]
     continuous, discrete, ringset, synthons, aromaticity = build_topology_objects(
         geometry.coordinates_angstrom,
@@ -134,7 +141,8 @@ def write_topology_and_synthons_sections(path: Path, geometry: MolecularGeometry
     topology_lines.append("[AROMATICITY]")
     aromatic_atoms = sorted(getattr(aromaticity, "aromatic_atoms", set()))
     topology_lines.append(
-        "ATOMS " + (" ".join(str(atom + 1) for atom in aromatic_atoms) if aromatic_atoms else "NONE")
+        "ATOMS "
+        + (" ".join(str(atom + 1) for atom in aromatic_atoms) if aromatic_atoms else "NONE")
     )
     replace_section(Path(path), "TOPOLOGY", topology_lines)
 

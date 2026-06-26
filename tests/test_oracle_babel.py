@@ -11,7 +11,12 @@ from oracle_babel import (
     rdkit_available,
     smiles_to_geometry,
 )
-from oracle_chem import MolecularGeometry, preprocess_to_enriched_xyz, read_enriched_xyz, read_geometry
+from oracle_chem import (
+    MolecularGeometry,
+    preprocess_to_enriched_xyz,
+    read_enriched_xyz,
+    read_geometry,
+)
 from oracle_core import read_sectioned_lines, section_content
 
 
@@ -47,7 +52,11 @@ def test_babel_preprocess_writes_avogadro_compatible_enriched_xyz(tmp_path):
         "H       0.00000000      1.00000000      0.00000000",
     ]
     assert section_content(lines, "SOURCE")[0] == "SCHEMA oracle.xyz.source.v1"
-    assert "POINT_GROUP C1" in section_content(lines, "SYMMETRY")
+    symmetry = section_content(lines, "SYMMETRY")
+    assert "POINT_GROUP C2v" in symmetry
+    assert "OPERATION_COUNT 4" in symmetry
+    assert "[OPERATIONS]" in symmetry
+    assert any("LABEL=sigma_yz" in line for line in symmetry)
     assert section_content(lines, "TOPOLOGY")[0] == "SCHEMA oracle.xyz.topology.v1"
     assert section_content(lines, "SYNTHONS")[0] == "SCHEMA oracle.xyz.synthons.v1"
     assert result.topology_bond_count == 2

@@ -21,6 +21,12 @@ from .babel import (
     SymmetryThresholds,
     preprocess_to_enriched_xyz,
 )
+from .symmetry import (
+    MolecularSymmetry,
+    SymmetryOperation,
+    analyze_molecular_symmetry,
+    symmetry_section_lines,
+)
 from .validation import (
     ORACLE_XYZ_VALIDATION_SCHEMA,
     ValidationMessage,
@@ -36,14 +42,17 @@ __all__ = [
     "AtomicSynthons",
     "GeometryParseError",
     "MolecularGeometry",
+    "MolecularSymmetry",
     "ORACLE_XYZ_VALIDATION_SCHEMA",
     "BabelPreprocessResult",
     "SymmetryThresholds",
+    "SymmetryOperation",
     "ValidationMessage",
     "ValidationResult",
     "ZMatrix",
     "ZMatrixAtom",
     "build_topology_objects",
+    "analyze_molecular_symmetry",
     "normalize_atom_symbol",
     "parse_xyz_lines",
     "preprocess_to_enriched_xyz",
@@ -55,5 +64,6 @@ __all__ = [
     "validate_enriched_molecule",
     "validation_section_lines",
     "write_validation_section",
+    "symmetry_section_lines",
     "zmatrix_to_geometry",
 ]

@@ -115,20 +115,43 @@ fragment-orientation coordinates with fragment-orientation coordinates, and so
 on. It must not mix unrelated coordinate families just because they share an
 irreducible representation.
 
-The first imported ORACLE implementation mirrors Merlino's type-local
-GICForge symmetrizer. When `--symmetrize` is requested, GICForge groups
-one-term frozen GICs by:
+The production path uses the point-group operations serialized upstream in the
+`#SYMMETRY` section. Each operation carries a label, a 3x3 matrix and a
+one-based atom permutation. When the selected post-reduction primitives form a
+closed homogeneous block under these operations, GICForge builds the primitive
+representation matrix for that block, applies the character projector for each
+irreducible representation, orthonormalizes the resulting SALCs and writes the
+final linear combinations to `[FROZEN_GICS]`. The method is recorded as
+`POINT_GROUP_PROJECTOR` with policy
+`HOMOGENEOUS_TYPE_BLOCK_POINT_GROUP_PROJECTOR`.
+
+Scalar primitives transform by atom permutation and, where appropriate, a sign:
+stretches, bends and center distances are invariant scalars; torsions change
+sign when the mapped torsion is reversed; out-of-plane coordinates use the
+parity of the mapped substituent ordering. Fragment translations transform as
+polar vector components under the operation matrix. Fragment orientations
+transform as axial vector components using `det(R) R`. These vector transforms
+still remain inside their own special coordinate families.
+
+If a selected post-reduction block is not closed under the stored operations,
+or if the operation character table is not available, GICForge falls back to
+the imported Merlino-style type-local SALC path and records
+`LOCAL_BLOCK_SALC` in `[SYMMETRY_DIAGNOSTICS]`. This fallback is explicit: a
+downstream optimizer that requires true point-group projectors can reject such
+a definition by checking the stored method.
+
+The local fallback groups one-term frozen GICs by:
 
 - symmetry source block;
 - primitive family;
 - atom-type signature.
 
-For each eligible group, the first output coordinate is the normalized totally
-symmetric sum of the source primitives. The remaining output coordinates are
-normalized adjacent differences. The transformation is written directly in
-`[FROZEN_GICS]` as `COEFFS=primitive_id:coefficient` and the B matrix is built
-analytically as the same linear combination of primitive B rows. The final GIC
-count therefore remains equal to the vibrational rank.
+For each eligible local group, the first output coordinate is the normalized
+sum of the source primitives. The remaining output coordinates are normalized
+adjacent differences. Both projector and fallback transformations are written
+directly in `[FROZEN_GICS]` as `COEFFS=primitive_id:coefficient`, and the B
+matrix is built analytically as the same linear combination of primitive B
+rows. The final GIC count therefore remains equal to the vibrational rank.
 
 Symmetrized GIC names start with their assigned irreducible representation:
 for example `A1StrS001`, `B2BendD001`, `AgFCDiS001` or `AStrS001` in `C1`.
@@ -168,10 +191,9 @@ symmetry-preserving equilibrium refinement. In `C1`, all GICs transform as
 `TOTAL_SYMMETRIC_IRREP` are active.
 
 The helper `oracle_gicforge.symmetry.gic_symmetry_source_blocks` exposes these
-homogeneous blocks to future GICSYM implementations and reports. It is a
-preparatory layer: non-C1 projection remains constrained by backend
-availability, but the grouping contract and local sum/difference
-symmetrization are now explicit.
+homogeneous blocks to GICSYM implementations and reports. The grouping
+contract, projector method and local fallback are explicit in the frozen
+schema.
 
 ## Python And Fortran Backends
 

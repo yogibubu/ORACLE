@@ -22,7 +22,9 @@ from .policy import (
     LINEAR_ANGLE_DEGREES,
     LOCAL_SYMMETRIZATION_METHOD,
     ORDINARY_REDUCTION_CLASS,
+    POINT_GROUP_PROJECTOR_METHOD,
     PRIMITIVE_FAMILY_ORDER,
+    PROJECTOR_SYMMETRIZATION_POLICY,
     RANK_METHOD,
     RANK_TOLERANCE,
     REDUCTION_POLICY,
@@ -34,6 +36,7 @@ from .policy import (
     primitive_symmetry_block,
 )
 from .symmetry_labels import (
+    irrep_characters_for_operations,
     irrep_name_prefix,
     is_total_symmetric_irrep,
     non_total_irrep_sequence,
@@ -113,6 +116,13 @@ class GICSymmetrizationDiagnostics:
 
 
 @dataclass(frozen=True)
+class GICPointGroupOperation:
+    label: str
+    rotation: tuple[tuple[float, float, float], ...]
+    permutation: tuple[int, ...]
+
+
+@dataclass(frozen=True)
 class GICDefinition:
     backend: str
     point_group: str
@@ -152,20 +162,24 @@ def build_gic_definition_from_xyzin(
     rank_tolerance: float = RANK_TOLERANCE,
 ) -> GICDefinition:
     """Build a frozen ORACLE GIC definition from saved xyzin state."""
-    definition, atom_symbols = construct_gic_definition_from_xyzin(
+    definition, atom_symbols, operations = construct_gic_definition_from_xyzin(
         path,
         rank_tolerance=rank_tolerance,
     )
     if not symmetrize:
         return definition
-    return symmetrize_gic_definition(definition, atom_symbols=atom_symbols)
+    return symmetrize_gic_definition(
+        definition,
+        atom_symbols=atom_symbols,
+        symmetry_operations=operations,
+    )
 
 
 def construct_gic_definition_from_xyzin(
     path: Path,
     *,
     rank_tolerance: float = RANK_TOLERANCE,
-) -> tuple[GICDefinition, tuple[str, ...]]:
+) -> tuple[GICDefinition, tuple[str, ...], tuple[GICPointGroupOperation, ...]]:
     """Construct and reduce GICs without applying symmetry adaptation."""
     target = Path(path)
     validate_gicforge_prerequisites(target)
@@ -173,6 +187,7 @@ def construct_gic_definition_from_xyzin(
     geometry = read_enriched_xyz(target)
     coords = np.asarray(geometry.coordinates_angstrom, dtype=float)
     point_group = _point_group(lines)
+    symmetry_operations = _symmetry_operations(lines)
 
     bonds = _topology_bonds(lines, natoms=geometry.natoms)
     candidates = _primitive_candidates(
@@ -222,13 +237,14 @@ def construct_gic_definition_from_xyzin(
         reduction_diagnostics=reduction_diagnostics,
         symmetry_diagnostics=_empty_symmetry_diagnostics(point_group, requested=False),
     )
-    return definition, tuple(geometry.atoms)
+    return definition, tuple(geometry.atoms), symmetry_operations
 
 
 def symmetrize_gic_definition(
     definition: GICDefinition,
     *,
     atom_symbols: tuple[str, ...],
+    symmetry_operations: tuple[GICPointGroupOperation, ...] = (),
 ) -> GICDefinition:
     """Apply the frozen GIC symmetrization utility to a reduced definition."""
     gics, symmetry_diagnostics = _apply_local_symmetrization(
@@ -237,6 +253,7 @@ def symmetrize_gic_definition(
         atom_symbols=tuple(atom_symbols),
         point_group=definition.point_group,
         requested=True,
+        symmetry_operations=tuple(symmetry_operations),
     )
     return GICDefinition(
         backend=definition.backend,
@@ -841,9 +858,19 @@ def _apply_local_symmetrization(
     atom_symbols: tuple[str, ...],
     point_group: str,
     requested: bool,
+    symmetry_operations: tuple[GICPointGroupOperation, ...] = (),
 ) -> tuple[tuple[FrozenGIC, ...], GICSymmetrizationDiagnostics]:
     if not requested:
         return gics, _empty_symmetry_diagnostics(point_group, requested=False)
+
+    projected = _apply_point_group_projector(
+        gics,
+        primitives,
+        point_group=point_group,
+        symmetry_operations=symmetry_operations,
+    )
+    if projected is not None:
+        return projected
 
     source_groups = _local_symmetry_groups(gics, primitives, atom_symbols=atom_symbols)
     if not source_groups:
@@ -926,6 +953,568 @@ def _apply_local_symmetrization(
             groups=tuple(diagnostics),
         ),
     )
+
+
+def _apply_point_group_projector(
+    gics: tuple[FrozenGIC, ...],
+    primitives: tuple[GICPrimitive, ...],
+    *,
+    point_group: str,
+    symmetry_operations: tuple[GICPointGroupOperation, ...],
+) -> tuple[tuple[FrozenGIC, ...], GICSymmetrizationDiagnostics] | None:
+    operations = _valid_projector_operations(symmetry_operations)
+    if len(operations) <= 1 or point_group.upper() in {"C1", "UNKNOWN"}:
+        return None
+
+    primitive_by_id = {primitive.identifier: primitive for primitive in primitives}
+    blocks: dict[tuple[str, str], list[FrozenGIC]] = {}
+    for gic in gics:
+        key = (primitive_symmetry_block(gic.family), gic.family)
+        blocks.setdefault(key, []).append(gic)
+
+    output: list[FrozenGIC] = []
+    diagnostics: list[GICSymmetrizedGroup] = []
+    name_counters: dict[tuple[str, str], int] = {}
+    for key, block_gics in blocks.items():
+        projected = _project_gic_block(
+            key,
+            tuple(block_gics),
+            primitive_by_id=primitive_by_id,
+            operations=operations,
+            point_group=point_group,
+            first_index=len(output) + 1,
+            name_counters=name_counters,
+        )
+        if projected is None:
+            return None
+        block_output, block_diagnostics = projected
+        output.extend(block_output)
+        diagnostics.append(block_diagnostics)
+
+    output_tuple = tuple(output)
+    return (
+        output_tuple,
+        GICSymmetrizationDiagnostics(
+            method=POINT_GROUP_PROJECTOR_METHOD,
+            policy=PROJECTOR_SYMMETRIZATION_POLICY,
+            status="APPLIED",
+            point_group=point_group,
+            symmetry_group=point_group,
+            total_symmetric_irrep=total_symmetric_irrep(point_group),
+            total_symmetric_gics=tuple(
+                gic.name
+                for gic in output_tuple
+                if is_total_symmetric_irrep(point_group, gic.irrep)
+            ),
+            groups=tuple(diagnostics),
+        ),
+    )
+
+
+def _valid_projector_operations(
+    operations: tuple[GICPointGroupOperation, ...],
+) -> tuple[GICPointGroupOperation, ...]:
+    if not operations:
+        return ()
+    natoms = len(operations[0].permutation)
+    expected = tuple(range(1, natoms + 1))
+    if natoms == 0:
+        return ()
+    validated: list[GICPointGroupOperation] = []
+    seen: set[tuple[tuple[int, ...], tuple[float, ...]]] = set()
+    for operation in operations:
+        if len(operation.permutation) != natoms:
+            return ()
+        if tuple(sorted(operation.permutation)) != expected:
+            return ()
+        unique_key = (
+            operation.permutation,
+            tuple(
+                round(float(value), 10)
+                for row in operation.rotation
+                for value in row
+            ),
+        )
+        if unique_key in seen:
+            continue
+        seen.add(unique_key)
+        validated.append(operation)
+    identity_index = next(
+        (
+            idx
+            for idx, operation in enumerate(validated)
+            if operation.label == "E" and operation.permutation == expected
+        ),
+        None,
+    )
+    if identity_index is None:
+        return ()
+    if identity_index:
+        identity = validated.pop(identity_index)
+        validated.insert(0, identity)
+    return tuple(validated)
+
+
+def _project_gic_block(
+    key: tuple[str, str],
+    gics: tuple[FrozenGIC, ...],
+    *,
+    primitive_by_id: dict[str, GICPrimitive],
+    operations: tuple[GICPointGroupOperation, ...],
+    point_group: str,
+    first_index: int,
+    name_counters: dict[tuple[str, str], int],
+) -> tuple[tuple[FrozenGIC, ...], GICSymmetrizedGroup] | None:
+    block, family = key
+    block_primitives = _block_primitives_for_gics(
+        gics,
+        primitive_by_id=primitive_by_id,
+        key=key,
+    )
+    if block_primitives is None:
+        return None
+
+    primitive_index = {
+        primitive.identifier: idx
+        for idx, primitive in enumerate(block_primitives)
+    }
+    source_vectors = tuple(
+        _gic_coefficient_vector(gic, primitive_index=primitive_index)
+        for gic in gics
+    )
+    if any(vector is None for vector in source_vectors):
+        return None
+
+    primitive_key_index = _primitive_projector_key_index(block_primitives)
+    if primitive_key_index is None:
+        return None
+    transforms = tuple(
+        _operation_primitive_transform(
+            block_primitives,
+            operation=operation,
+            primitive_key_index=primitive_key_index,
+        )
+        for operation in operations
+    )
+    if any(transform is None for transform in transforms):
+        return None
+
+    projected_vectors: list[tuple[str, np.ndarray]] = []
+    basis: list[np.ndarray] = []
+    operation_labels = tuple(operation.label for operation in operations)
+    for irrep, characters in irrep_characters_for_operations(operation_labels, point_group):
+        if len(characters) != len(operations):
+            return None
+        if all(abs(character) <= 1.0e-14 for character in characters):
+            continue
+        for source_vector in source_vectors:
+            assert source_vector is not None
+            projected = _project_vector_for_irrep(
+                source_vector,
+                characters=characters,
+                transforms=transforms,
+            )
+            normalized = _normalized_coefficient_vector_or_none(projected)
+            if normalized is None:
+                continue
+            independent = _orthonormal_coefficient_residual_or_none(basis, normalized)
+            if independent is None:
+                continue
+            basis.append(independent)
+            projected_vectors.append((irrep, independent))
+            if len(projected_vectors) == len(block_primitives):
+                break
+        if len(projected_vectors) == len(block_primitives):
+            break
+    if len(projected_vectors) != len(block_primitives):
+        return None
+
+    output: list[FrozenGIC] = []
+    for offset, (irrep, vector) in enumerate(projected_vectors):
+        coefficients = _coefficients_from_vector(block_primitives, vector)
+        if not coefficients:
+            return None
+        output.append(
+            FrozenGIC(
+                identifier=f"GIC{first_index + offset:03d}",
+                name=_next_projected_name(family, irrep, name_counters),
+                family=family,
+                irrep=irrep,
+                primitive_id=coefficients[0][0],
+                gaussian_expression="LINEAR_COMBINATION",
+                coefficients=coefficients,
+            )
+        )
+
+    return (
+        tuple(output),
+        GICSymmetrizedGroup(
+            block=block,
+            family=family,
+            signature="OPS=" + ",".join(operation_labels),
+            source_gics=tuple(gic.name for gic in gics),
+            output_gics=tuple(gic.name for gic in output),
+        ),
+    )
+
+
+def _block_primitives_for_gics(
+    gics: tuple[FrozenGIC, ...],
+    *,
+    primitive_by_id: dict[str, GICPrimitive],
+    key: tuple[str, str],
+) -> tuple[GICPrimitive, ...] | None:
+    block, family = key
+    ordered: list[GICPrimitive] = []
+    seen: set[str] = set()
+    for gic in gics:
+        coefficients = gic.coefficients or ((gic.primitive_id, 1.0),)
+        for primitive_id, _coefficient in coefficients:
+            primitive = primitive_by_id.get(primitive_id)
+            if primitive is None:
+                return None
+            primitive_key = (primitive_symmetry_block(primitive.family), primitive.family)
+            if primitive_key != (block, family):
+                return None
+            if primitive.identifier in seen:
+                continue
+            seen.add(primitive.identifier)
+            ordered.append(primitive)
+    return tuple(ordered)
+
+
+def _gic_coefficient_vector(
+    gic: FrozenGIC,
+    *,
+    primitive_index: dict[str, int],
+) -> np.ndarray | None:
+    vector = np.zeros(len(primitive_index), dtype=float)
+    coefficients = gic.coefficients or ((gic.primitive_id, 1.0),)
+    for primitive_id, coefficient in coefficients:
+        idx = primitive_index.get(primitive_id)
+        if idx is None:
+            return None
+        vector[idx] += float(coefficient)
+    return vector
+
+
+def _primitive_projector_key_index(
+    primitives: tuple[GICPrimitive, ...],
+) -> dict[tuple[object, ...], int] | None:
+    out: dict[tuple[object, ...], int] = {}
+    for idx, primitive in enumerate(primitives):
+        key = _primitive_projector_key(primitive)
+        if key is None or key in out:
+            return None
+        out[key] = idx
+    return out
+
+
+def _operation_primitive_transform(
+    primitives: tuple[GICPrimitive, ...],
+    *,
+    operation: GICPointGroupOperation,
+    primitive_key_index: dict[tuple[object, ...], int],
+) -> np.ndarray | None:
+    matrix = np.zeros((len(primitives), len(primitives)), dtype=float)
+    for source_index, primitive in enumerate(primitives):
+        terms = _mapped_primitive_projector_terms(primitive, operation)
+        if terms is None:
+            return None
+        for target_key, coefficient in terms:
+            if abs(float(coefficient)) <= 1.0e-12:
+                continue
+            target_index = primitive_key_index.get(target_key)
+            if target_index is None:
+                return None
+            matrix[target_index, source_index] += float(coefficient)
+    return matrix
+
+
+def _project_vector_for_irrep(
+    vector: np.ndarray,
+    *,
+    characters: tuple[float, ...],
+    transforms: tuple[np.ndarray | None, ...],
+) -> np.ndarray:
+    projected = np.zeros_like(vector, dtype=float)
+    for character, transform in zip(characters, transforms):
+        assert transform is not None
+        projected += float(character) * (transform @ vector)
+    return projected / float(len(transforms))
+
+
+def _normalized_coefficient_vector_or_none(vector: np.ndarray) -> np.ndarray | None:
+    norm = float(np.linalg.norm(vector))
+    if not np.isfinite(norm) or norm <= 1.0e-10:
+        return None
+    return vector / norm
+
+
+def _orthonormal_coefficient_residual_or_none(
+    basis: list[np.ndarray],
+    normalized: np.ndarray,
+) -> np.ndarray | None:
+    residual = np.array(normalized, dtype=float, copy=True)
+    for vector in basis:
+        residual -= float(np.dot(residual, vector)) * vector
+    norm = float(np.linalg.norm(residual))
+    if not np.isfinite(norm) or norm <= 1.0e-10:
+        return None
+    return residual / norm
+
+
+def _coefficients_from_vector(
+    primitives: tuple[GICPrimitive, ...],
+    vector: np.ndarray,
+) -> tuple[tuple[str, float], ...]:
+    return tuple(
+        (primitive.identifier, float(value))
+        for primitive, value in zip(primitives, vector)
+        if abs(float(value)) > 1.0e-12
+    )
+
+
+def _next_projected_name(
+    family: str,
+    irrep: str,
+    counters: dict[tuple[str, str], int],
+) -> str:
+    key = (family, irrep)
+    counters[key] = counters.get(key, 0) + 1
+    return f"{irrep_name_prefix(irrep)}{primitive_prefix(family)}{counters[key]:03d}"
+
+
+def _primitive_projector_key(primitive: GICPrimitive) -> tuple[object, ...] | None:
+    if primitive.family == "STRETCH" and len(primitive.atoms) == 2:
+        return ("STRETCH", tuple(sorted(primitive.atoms)))
+    if primitive.family == "BEND" and len(primitive.atoms) == 3:
+        return (
+            "BEND",
+            primitive.atoms[1],
+            tuple(sorted((primitive.atoms[0], primitive.atoms[2]))),
+        )
+    if primitive.family == "LINEAR_BEND" and len(primitive.atoms) == 3:
+        return (
+            "LINEAR_BEND",
+            primitive.atoms[1],
+            tuple(sorted((primitive.atoms[0], primitive.atoms[2]))),
+            primitive.mode,
+        )
+    if primitive.family == "TORSION" and len(primitive.atoms) == 4:
+        canonical, _sign = _canonical_torsion_key_and_sign(primitive.atoms)
+        return ("TORSION", canonical)
+    if primitive.family == "OUT_OF_PLANE" and len(primitive.atoms) == 4:
+        return (
+            "OUT_OF_PLANE",
+            primitive.atoms[0],
+            tuple(sorted(primitive.atoms[1:])),
+        )
+    if primitive.family == "FRAG_DISTANCE":
+        pair = tuple(
+            sorted((_atom_set_key(primitive.atoms), _atom_set_key(primitive.ref_atoms)))
+        )
+        return ("FRAG_DISTANCE", pair)
+    if primitive.family == "FRAG_CENTER_ATOM_DISTANCE":
+        return (
+            "FRAG_CENTER_ATOM_DISTANCE",
+            _atom_set_key(primitive.atoms),
+            _atom_set_key(primitive.ref_atoms),
+        )
+    if primitive.family == "CENTER_ATOM_DISTANCE":
+        return (
+            "CENTER_ATOM_DISTANCE",
+            _atom_set_key(primitive.atoms),
+            _atom_set_key(primitive.ref_atoms),
+        )
+    if primitive.family == "FRAG_TRANSLATION":
+        return (
+            "FRAG_TRANSLATION",
+            primitive.mode,
+            _atom_set_key(primitive.atoms),
+            _atom_set_key(primitive.ref_atoms),
+        )
+    if primitive.family == "FRAG_ORIENTATION":
+        return (
+            "FRAG_ORIENTATION",
+            primitive.mode,
+            _atom_set_key(primitive.atoms),
+            _atom_set_key(primitive.ref_atoms),
+            _atom_set_key(primitive.frame_atoms),
+            _atom_set_key(primitive.ref_frame_atoms),
+        )
+    return None
+
+
+def _mapped_primitive_projector_terms(
+    primitive: GICPrimitive,
+    operation: GICPointGroupOperation,
+) -> tuple[tuple[tuple[object, ...], float], ...] | None:
+    mapped_atoms = tuple(_mapped_atom(operation, atom) for atom in primitive.atoms)
+    mapped_refs = tuple(_mapped_atom(operation, atom) for atom in primitive.ref_atoms)
+    mapped_frame = tuple(_mapped_atom(operation, atom) for atom in primitive.frame_atoms)
+    mapped_ref_frame = tuple(
+        _mapped_atom(operation, atom) for atom in primitive.ref_frame_atoms
+    )
+    if any(atom < 1 for atom in mapped_atoms + mapped_refs + mapped_frame + mapped_ref_frame):
+        return None
+
+    if primitive.family == "STRETCH" and len(mapped_atoms) == 2:
+        return ((("STRETCH", tuple(sorted(mapped_atoms))), 1.0),)
+    if primitive.family == "BEND" and len(mapped_atoms) == 3:
+        return (
+            (
+                (
+                    "BEND",
+                    mapped_atoms[1],
+                    tuple(sorted((mapped_atoms[0], mapped_atoms[2]))),
+                ),
+                1.0,
+            ),
+        )
+    if primitive.family == "LINEAR_BEND":
+        if not _is_identity_operation(operation):
+            return None
+        key = _primitive_projector_key(primitive)
+        return ((key, 1.0),) if key is not None else None
+    if primitive.family == "TORSION" and len(mapped_atoms) == 4:
+        canonical, sign = _canonical_torsion_key_and_sign(mapped_atoms)
+        return ((("TORSION", canonical), sign),)
+    if primitive.family == "OUT_OF_PLANE" and len(mapped_atoms) == 4:
+        center = mapped_atoms[0]
+        substituents = mapped_atoms[1:]
+        sorted_substituents = tuple(sorted(substituents))
+        return (
+            (
+                (
+                    "OUT_OF_PLANE",
+                    center,
+                    sorted_substituents,
+                ),
+                _permutation_parity_sign(substituents, sorted_substituents),
+            ),
+        )
+    if primitive.family == "FRAG_DISTANCE":
+        pair = tuple(sorted((_atom_set_key(mapped_atoms), _atom_set_key(mapped_refs))))
+        return ((("FRAG_DISTANCE", pair), 1.0),)
+    if primitive.family == "FRAG_CENTER_ATOM_DISTANCE":
+        return (
+            (
+                (
+                    "FRAG_CENTER_ATOM_DISTANCE",
+                    _atom_set_key(mapped_atoms),
+                    _atom_set_key(mapped_refs),
+                ),
+                1.0,
+            ),
+        )
+    if primitive.family == "CENTER_ATOM_DISTANCE":
+        return (
+            (
+                (
+                    "CENTER_ATOM_DISTANCE",
+                    _atom_set_key(mapped_atoms),
+                    _atom_set_key(mapped_refs),
+                ),
+                1.0,
+            ),
+        )
+    if primitive.family == "FRAG_TRANSLATION":
+        return tuple(
+            (
+                (
+                    "FRAG_TRANSLATION",
+                    target_mode,
+                    _atom_set_key(mapped_atoms),
+                    _atom_set_key(mapped_refs),
+                ),
+                coefficient,
+            )
+            for target_mode, coefficient in _vector_component_terms(
+                operation,
+                source_mode=primitive.mode,
+                axial=False,
+            )
+        )
+    if primitive.family == "FRAG_ORIENTATION":
+        return tuple(
+            (
+                (
+                    "FRAG_ORIENTATION",
+                    target_mode,
+                    _atom_set_key(mapped_atoms),
+                    _atom_set_key(mapped_refs),
+                    _atom_set_key(mapped_frame),
+                    _atom_set_key(mapped_ref_frame),
+                ),
+                coefficient,
+            )
+            for target_mode, coefficient in _vector_component_terms(
+                operation,
+                source_mode=primitive.mode,
+                axial=True,
+            )
+        )
+    return None
+
+
+def _mapped_atom(operation: GICPointGroupOperation, atom: int) -> int:
+    if 1 <= atom <= len(operation.permutation):
+        return operation.permutation[atom - 1]
+    return -1
+
+
+def _is_identity_operation(operation: GICPointGroupOperation) -> bool:
+    return operation.permutation == tuple(range(1, len(operation.permutation) + 1))
+
+
+def _vector_component_terms(
+    operation: GICPointGroupOperation,
+    *,
+    source_mode: int,
+    axial: bool,
+) -> tuple[tuple[int, float], ...]:
+    if source_mode not in {0, 1, 2}:
+        return ()
+    rotation = np.asarray(operation.rotation, dtype=float)
+    if rotation.shape != (3, 3):
+        return ()
+    if axial:
+        rotation = float(np.linalg.det(rotation)) * rotation
+    return tuple(
+        (target_mode, float(rotation[source_mode, target_mode]))
+        for target_mode in range(3)
+        if abs(float(rotation[source_mode, target_mode])) > 1.0e-10
+    )
+
+
+def _atom_set_key(atoms: tuple[int, ...]) -> tuple[int, ...]:
+    return tuple(sorted(int(atom) for atom in atoms))
+
+
+def _canonical_torsion_key_and_sign(atoms: tuple[int, ...]) -> tuple[tuple[int, ...], float]:
+    forward = tuple(atoms)
+    backward = tuple(reversed(atoms))
+    if backward < forward:
+        return backward, -1.0
+    return forward, 1.0
+
+
+def _permutation_parity_sign(
+    order: tuple[int, ...],
+    target_order: tuple[int, ...],
+) -> float:
+    positions = {atom: idx for idx, atom in enumerate(target_order)}
+    try:
+        indexes = [positions[atom] for atom in order]
+    except KeyError:
+        return 1.0
+    inversions = 0
+    for left in range(len(indexes)):
+        for right in range(left + 1, len(indexes)):
+            if indexes[left] > indexes[right]:
+                inversions += 1
+    return -1.0 if inversions % 2 else 1.0
 
 
 def _local_symmetry_groups(
@@ -2217,6 +2806,46 @@ def _point_group(lines: list[str]) -> str:
     return "UNKNOWN"
 
 
+def _symmetry_operations(lines: list[str]) -> tuple[GICPointGroupOperation, ...]:
+    symmetry = section_content(lines, "SYMMETRY")
+    if not symmetry:
+        return ()
+    operation_lines = _subsection(symmetry, "OPERATIONS")
+    if not operation_lines:
+        return ()
+    operations: list[GICPointGroupOperation] = []
+    for line in operation_lines:
+        text = line.strip()
+        if not text or text.upper() == "NONE":
+            continue
+        parts = text.split()
+        fields = _key_values(parts[1:])
+        try:
+            matrix_values = _parse_float_list(fields["MATRIX"])
+            if len(matrix_values) != 9:
+                raise ValueError("operation matrix must have 9 values")
+            permutation = _parse_atom_list(fields["PERMUTATION"])
+            operations.append(
+                GICPointGroupOperation(
+                    label=fields["LABEL"],
+                    rotation=tuple(
+                        tuple(float(value) for value in matrix_values[start : start + 3])
+                        for start in (0, 3, 6)
+                    ),
+                    permutation=permutation,
+                )
+            )
+        except KeyError as exc:
+            raise GICForgeContractError(
+                f"invalid #SYMMETRY operation line: {line}"
+            ) from exc
+        except ValueError as exc:
+            raise GICForgeContractError(
+                f"invalid #SYMMETRY operation numeric field: {line}"
+            ) from exc
+    return tuple(operations)
+
+
 def _subsection(section_lines: list[str], name: str) -> list[str]:
     header = f"[{name.upper()}]"
     start = None
@@ -2382,6 +3011,15 @@ def _parse_atom_list(text: str) -> tuple[int, ...]:
         return tuple(int(item) for item in text.split(",") if item)
     except ValueError as exc:
         raise GICForgeContractError(f"invalid atom list: {text}") from exc
+
+
+def _parse_float_list(text: str) -> tuple[float, ...]:
+    if not text:
+        return ()
+    try:
+        return tuple(float(item) for item in text.split(",") if item)
+    except ValueError as exc:
+        raise GICForgeContractError(f"invalid float list: {text}") from exc
 
 
 def _parse_text_list(text: str) -> tuple[str, ...]:
@@ -2772,6 +3410,13 @@ def _sycart_components(vector: tuple[float, ...]) -> str:
 
 def _symmetry_mode(definition: GICDefinition) -> str:
     diagnostics = definition.symmetry_diagnostics
+    if (
+        definition.symmetrize
+        and diagnostics is not None
+        and diagnostics.method == POINT_GROUP_PROJECTOR_METHOD
+        and diagnostics.groups
+    ):
+        return "POINT_GROUP_PROJECTOR"
     if (
         definition.symmetrize
         and diagnostics is not None

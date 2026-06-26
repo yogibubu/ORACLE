@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import re
 
+import numpy as np
+
 
 _IRREP_ORDER_BY_POINT_GROUP = {
     "C1": ("A",),
@@ -98,3 +100,91 @@ def irrep_name_prefix(irrep: str | None) -> str:
     """Convert an irrep label to a compact coordinate-name prefix."""
     text = (irrep or "X").strip() or "X"
     return text.replace("'", "p").replace('"', "pp")
+
+
+def irrep_characters_for_operations(
+    operation_labels: tuple[str, ...] | list[str],
+    point_group: str | None,
+) -> tuple[tuple[str, tuple[float, ...]], ...]:
+    labels = tuple(_canonical_operation_label(label) for label in operation_labels)
+    if labels == ("E",):
+        return (("A", (1.0,)),)
+    group = normalized_point_group(point_group)
+    group_key = group.upper()
+    if group_key == "CS":
+        return (
+            ("A'", tuple(1.0 for _label in labels)),
+            (
+                "A''",
+                tuple(-1.0 if label.startswith("sigma") else 1.0 for label in labels),
+            ),
+        )
+    if group_key == "CI":
+        return (
+            ("Ag", tuple(1.0 for _label in labels)),
+            ("Au", tuple(-1.0 if label == "i" else 1.0 for label in labels)),
+        )
+    if group_key == "C2":
+        return (
+            ("A", tuple(1.0 for _label in labels)),
+            ("B", tuple(-1.0 if label.startswith("C2") else 1.0 for label in labels)),
+        )
+    if group_key == "C2V":
+        sigma_labels = [label for label in labels if label.startswith("sigma")]
+        preferred = ("sigma_xz", "sigma_yz", "sigma_xy")
+        first_sigma = next((label for label in preferred if label in sigma_labels), None)
+        second_sigma = next(
+            (label for label in sorted(sigma_labels) if label != first_sigma),
+            None,
+        )
+        if first_sigma and second_sigma:
+            table = {
+                "E": (1.0, 1.0, 1.0, 1.0),
+                "C2x": (1.0, 1.0, -1.0, -1.0),
+                "C2y": (1.0, 1.0, -1.0, -1.0),
+                "C2z": (1.0, 1.0, -1.0, -1.0),
+                "C2_perp": (1.0, 1.0, -1.0, -1.0),
+                first_sigma: (1.0, -1.0, 1.0, -1.0),
+                second_sigma: (1.0, -1.0, -1.0, 1.0),
+            }
+            rows = np.array(
+                [table.get(label, (1.0, 1.0, 1.0, 1.0)) for label in labels]
+            )
+            return tuple(
+                (name, tuple(float(value) for value in rows[:, idx]))
+                for idx, name in enumerate(("A1", "A2", "B1", "B2"))
+            )
+    if group_key == "D2":
+        values = {
+            "A": {"C2x": 1.0, "C2y": 1.0, "C2z": 1.0},
+            "B1": {"C2x": -1.0, "C2y": -1.0, "C2z": 1.0},
+            "B2": {"C2x": -1.0, "C2y": 1.0, "C2z": -1.0},
+            "B3": {"C2x": 1.0, "C2y": -1.0, "C2z": -1.0},
+        }
+        return tuple(
+            (name, tuple(chars.get(label, 1.0) for label in labels))
+            for name, chars in values.items()
+        )
+    return tuple(
+        (
+            irrep,
+            tuple(
+                1.0 if irrep == total_symmetric_irrep(group) else 0.0
+                for _ in labels
+            ),
+        )
+        for irrep in irrep_sequence(group)
+    )
+
+
+def _canonical_operation_label(label: str) -> str:
+    text = str(label)
+    if text in {"E", "i"} or text.startswith("sigma"):
+        return text
+    match = re.match(r"C(\d+)([xyz])\^(\d+)", text)
+    if match:
+        order, axis, _power = match.groups()
+        return f"C2{axis}" if int(order) == 2 else text
+    if text.startswith("C2_xy"):
+        return "C2_perp"
+    return text
