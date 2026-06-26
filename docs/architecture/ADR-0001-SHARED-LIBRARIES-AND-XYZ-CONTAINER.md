@@ -114,6 +114,7 @@ Initial section ownership:
 - `#BASIC`: `oracle-core` and GUI/project importers.
 - `#SMILES`: SMILES/import adapters.
 - `#GAUSSIAN`: `oracle-gaussian`.
+- Gaussian input files: `oracle-gaussian`, even when requested by GICForge.
 - `#GAUSSIAN_TOPOLOGY`: `oracle-gaussian` as adapter data, consumed by
   `oracle-chem`.
 - `#TOPOLOGY`: `oracle-chem`.

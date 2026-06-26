@@ -76,3 +76,48 @@ def test_gicforge_plan_cli_calls_writer(tmp_path, monkeypatch, capsys):
     assert rc == 0
     assert calls == {"target": path, "symmetrize": True, "sycart": True}
     assert "Planned GICForge workflow" in capsys.readouterr().out
+
+
+def test_gicforge_gaussian_input_cli_calls_writer(tmp_path, monkeypatch, capsys):
+    calls = {}
+    xyzin = tmp_path / "molecule.xyzin"
+    output = tmp_path / "molecule.gjf"
+
+    def fake_write(target, out, *, route, title=None, charge=None, multiplicity=None):
+        calls["target"] = target
+        calls["output"] = out
+        calls["route"] = route
+        calls["title"] = title
+        calls["charge"] = charge
+        calls["multiplicity"] = multiplicity
+        return out
+
+    monkeypatch.setattr("oracle_gicforge.write_gicforge_gaussian_input", fake_write)
+
+    rc = oracle_run.main(
+        [
+            "gicforge",
+            "gaussian-input",
+            str(xyzin),
+            str(output),
+            "--route",
+            "#p hf/3-21g opt",
+            "--title",
+            "job",
+            "--charge",
+            "1",
+            "--multiplicity",
+            "2",
+        ]
+    )
+
+    assert rc == 0
+    assert calls == {
+        "target": xyzin,
+        "output": output,
+        "route": "#p hf/3-21g opt",
+        "title": "job",
+        "charge": 1,
+        "multiplicity": 2,
+    }
+    assert "Wrote Gaussian input" in capsys.readouterr().out

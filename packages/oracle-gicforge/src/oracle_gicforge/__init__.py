@@ -7,6 +7,7 @@ from .contracts import (
     gic_plan_section_lines,
     sycart_plan_section_lines,
     validate_gicforge_prerequisites,
+    write_gicforge_gaussian_input,
     write_gicforge_plan_sections,
 )
 
@@ -17,5 +18,6 @@ __all__ = [
     "gic_plan_section_lines",
     "sycart_plan_section_lines",
     "validate_gicforge_prerequisites",
+    "write_gicforge_gaussian_input",
     "write_gicforge_plan_sections",
 ]

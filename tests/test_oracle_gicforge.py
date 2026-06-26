@@ -4,7 +4,12 @@ import pytest
 
 from oracle_core import section_content
 from oracle_chem import preprocess_to_enriched_xyz, write_validation_section
-from oracle_gicforge import GICForgeContractError, write_gicforge_plan_sections
+from oracle_gaussian import read_gaussian_cartesian_input
+from oracle_gicforge import (
+    GICForgeContractError,
+    write_gicforge_gaussian_input,
+    write_gicforge_plan_sections,
+)
 
 
 def test_gicforge_plan_requires_validation_pass(tmp_path):
@@ -87,3 +92,39 @@ def test_preprocess_validate_then_gicforge_plan_pipeline(tmp_path):
     assert validation.status == "PASS"
     assert "STATUS PASS" in section_content(lines, "VALIDATION")
     assert "SYMMETRIZE TRUE" in section_content(lines, "GIC")
+
+
+def test_gicforge_writes_gaussian_input_after_gic_plan(tmp_path):
+    source = tmp_path / "water.xyz"
+    source.write_text(
+        "\n".join(
+            [
+                "3",
+                "water",
+                "O 0.0 0.0 0.0",
+                "H 0.0 0.0 1.0",
+                "H 0.0 1.0 0.0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    xyzin = tmp_path / "water.xyzin"
+    gjf = tmp_path / "water.gjf"
+
+    preprocess_to_enriched_xyz(source, xyzin)
+    write_validation_section(xyzin)
+    write_gicforge_plan_sections(xyzin, symmetrize=True)
+    write_gicforge_gaussian_input(
+        xyzin,
+        gjf,
+        route="#p b3lyp/sto-3g opt",
+        title="water from ORACLE",
+    )
+
+    text = gjf.read_text(encoding="utf-8")
+    geometry = read_gaussian_cartesian_input(gjf)
+    assert "#p b3lyp/sto-3g opt" in text
+    assert "! ORACLE_SCHEMA oracle.gaussian.gic_input.v1" in text
+    assert geometry.atoms == ("O", "H", "H")
+    assert geometry.comment == "water from ORACLE"

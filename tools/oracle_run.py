@@ -45,6 +45,16 @@ def build_parser() -> argparse.ArgumentParser:
     gic_plan.add_argument("xyzin", type=Path)
     gic_plan.add_argument("--symmetrize", action="store_true")
     gic_plan.add_argument("--sycart", action="store_true")
+    gaussian_input = gicforge_sub.add_parser(
+        "gaussian-input",
+        help="Write Gaussian input from validated #GIC state",
+    )
+    gaussian_input.add_argument("xyzin", type=Path)
+    gaussian_input.add_argument("output", type=Path)
+    gaussian_input.add_argument("--route", default="#p hf/sto-3g")
+    gaussian_input.add_argument("--title")
+    gaussian_input.add_argument("--charge", type=int)
+    gaussian_input.add_argument("--multiplicity", type=int)
 
     sub.add_parser("merlino", help="Delegate to the current Merlino CLI during migration")
     return parser
@@ -86,6 +96,19 @@ def main(argv: list[str] | None = None) -> int:
             sycart=args.sycart,
         )
         print(f"Planned GICForge workflow: {args.xyzin}")
+        return 0
+    if args.command == "gicforge" and args.gicforge_command == "gaussian-input":
+        from oracle_gicforge import write_gicforge_gaussian_input
+
+        output = write_gicforge_gaussian_input(
+            args.xyzin,
+            args.output,
+            route=args.route,
+            title=args.title,
+            charge=args.charge,
+            multiplicity=args.multiplicity,
+        )
+        print(f"Wrote Gaussian input: {output}")
         return 0
     if args.command == "merlino":
         sys.argv = ["merlino", *remainder]

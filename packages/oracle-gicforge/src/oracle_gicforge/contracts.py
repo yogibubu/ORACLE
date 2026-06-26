@@ -68,6 +68,29 @@ def write_gicforge_plan_sections(
         replace_section(target, "SYCART", sycart_plan_section_lines())
 
 
+def write_gicforge_gaussian_input(
+    path: Path,
+    output: Path,
+    *,
+    route: str = "#p hf/sto-3g",
+    title: str | None = None,
+    charge: int | None = None,
+    multiplicity: int | None = None,
+) -> Path:
+    """Create Gaussian input for a validated GICForge molecule state."""
+    validate_gicforge_prerequisites(Path(path))
+    from oracle_gaussian import write_gicforge_gaussian_input as write_gaussian
+
+    return write_gaussian(
+        Path(path),
+        Path(output),
+        route=route,
+        title=title,
+        charge=charge,
+        multiplicity=multiplicity,
+    )
+
+
 def _validation_status(validation_lines: list[str]) -> str | None:
     for line in validation_lines:
         parts = line.split()

@@ -47,6 +47,7 @@ Validation is the gate before GICForge:
 ```bash
 python tools/oracle_run.py validate molecule.xyzin
 python tools/oracle_run.py gicforge plan molecule.xyzin --symmetrize --sycart
+python tools/oracle_run.py gicforge gaussian-input molecule.xyzin job.gjf
 ```
 
 ## Migration Rule

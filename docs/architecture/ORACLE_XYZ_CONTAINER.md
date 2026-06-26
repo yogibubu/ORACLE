@@ -26,11 +26,12 @@ plain XYZ
   -> oracle-fragments adds #FRAGMENTS, #FRAGMENT_LIBRARY or #ASSEMBLY
   -> oracle-chem adds #VALIDATION
   -> oracle-gicforge adds #GIC and optionally #SYCART
-  -> oracle-gaussian adds #GAUSSIAN, #VIBRATIONAL or correction sections
-  -> oracle-morpheus adds #ISOTOPOLOGUES and #MORPHEUS
-  -> oracle-gf adds #GF_PED
-  -> oracle-dvr adds #DVR
-  -> oracle-vpt2-vci adds #VPT2_VCI
+  -> branches:
+       oracle-gaussian writes Gaussian inputs or imports QM outputs
+       oracle-gf adds #GF_PED from Cartesian Hessian plus frozen #GIC
+       oracle-morpheus adds #ISOTOPOLOGUES and #MORPHEUS
+       oracle-vpt2-vci adds #VPT2_VCI from normalized anharmonic data
+       oracle-dvr adds #DVR
 ```
 
 The GUI should display and orchestrate this state, not own a parallel data

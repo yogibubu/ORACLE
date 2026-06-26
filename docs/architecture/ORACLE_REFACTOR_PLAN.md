@@ -184,6 +184,8 @@ reuse the saved sections.
   backend contract.
 - Starts only from an enriched XYZ with `#VALIDATION STATUS PASS`; it then
   writes frozen `#GIC` and optional `#SYCART` sections for downstream tools.
+- May create Gaussian input on request, but the file-format serialization is
+  delegated to `oracle-gaussian`.
 
 `oracle-morpheus`
 
@@ -207,6 +209,7 @@ reuse the saved sections.
   `oracle_chem.MolecularGeometry`; downstream tools must not parse Gaussian text
   directly.
 - Gaussian Z-matrix input delegates to the shared `oracle-chem` Z-matrix parser.
+- Gaussian input generation from GICForge consumes enriched XYZ plus `#GIC`.
 
 `oracle-fragments`
 
