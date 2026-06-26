@@ -93,6 +93,9 @@ def build_parser(*, repo_root: Path | None = None) -> argparse.ArgumentParser:
     bmatrix = gicforge_sub.add_parser("bmatrix", help="Evaluate the frozen GIC B matrix")
     bmatrix.add_argument("xyzin", type=Path)
     bmatrix.add_argument("output", type=Path, nargs="?")
+    report = gicforge_sub.add_parser("report", help="Write a readable frozen-GIC report")
+    report.add_argument("xyzin", type=Path)
+    report.add_argument("output", type=Path, nargs="?")
     corpus = gicforge_sub.add_parser(
         "corpus",
         help="List or summarize the demanding GIC regression corpus",
@@ -261,6 +264,15 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
             f"{args.output} (rows={len(matrix.rows)}, "
             f"columns={len(matrix.cartesian_columns)})"
         )
+        return 0
+    if args.command == "gicforge" and args.gicforge_command == "report":
+        from oracle_gicforge import gic_report_from_xyzin, write_gic_report
+
+        if args.output is None:
+            print("\n".join(gic_report_from_xyzin(args.xyzin)))
+            return 0
+        output = write_gic_report(args.xyzin, args.output)
+        print(f"Wrote GICForge report: {output}")
         return 0
     if args.command == "gicforge" and args.gicforge_command == "corpus":
         from oracle_gicforge import (

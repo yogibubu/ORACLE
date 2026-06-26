@@ -1,0 +1,34 @@
+   List of Merlino Keywords                                                     
+
+ G16       : Make G16 Input
+ GDV       : Make GDV Input
+ CUBIC     : Freq=Cubic(GDV) and Vibr=Gauconv MSR
+ NATURAL   : Natural Isotopic Abundance 
+ ECKART    : Enforce Eckart Orientation
+ IMPDIH    : Use Improper Dihedrals in place of Out-of-plane Bends
+ GNIC      : Make Generalized  Natural Internal Coords.
+ INVDIST   : Inv.Dist. for Stretching
+ SYMMSTR   : Legacy keyword ignored for primitive stretching coordinates
+ONEDIH    : 1 Dihedral per Bond (default)
+NOONEDIH  : Use all non-ring dihedrals
+LOCSVD    : Local SVD GNIC blocks (experimental)
+CLEAN     : Clean GNIC values
+ LOOSE     : Loose Symmetry for Gaussian
+ BDPCS3    : Make BDPCS3 Bond Lengths
+ GICSYM    : Symmetrize GIC blocks for downstream modules
+ SYCART    : Write symmetrized Cartesian coordinates without changing frame
+ SYMMALL   : Symmetrize same-type GNIC blocks (legacy alias)
+ FINDFR    : Find Fragments
+ JOINFR    : Join Fragments
+ HBOND     : Detect H-Bonds as non-covalent targets
+ BMAT      : Build B Matrix
+ SCAN      : Scan for Soft DOF
+ RIGID     : Freeze Hard Modes in Scan
+ PCS0      : PCS0 Model (UFF)
+ PCS1      : PCS1 Model (HF3C)
+ HPCS2     : HPCS2 Model (B3LYP-D4/6-31G*)
+ DPCS3     : DPCS3 Model (rev-dsd-PBEP86D4/3F12-)
+ OPT       : Geometry  Optimization
+ FREQ      : Second Energy Derivatives
+ CUBIC     : Third Energy Derivatives
+ ANHARM    : Fourth Energy Derivatives (up to ijkk

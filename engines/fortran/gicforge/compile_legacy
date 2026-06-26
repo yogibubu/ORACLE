@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+FC="${FC:-gfortran}"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SRC_DIR="$ROOT_DIR/legacy_merlino"
+BUILD_DIR="$ROOT_DIR/build"
+TARGET="$BUILD_DIR/gicforge_legacy"
+LOG="$BUILD_DIR/gicforge_legacy_build.log"
+
+mkdir -p "$BUILD_DIR"
+rm -f "$TARGET" "$LOG"
+
+"$FC" \
+  -std=legacy \
+  -w \
+  -I"$ROOT_DIR/include" \
+  "$SRC_DIR/dina25.f" \
+  "$SRC_DIR/entors.f" \
+  "$SRC_DIR/coord.f" \
+  "$SRC_DIR/mkprim.f" \
+  "$SRC_DIR/mkcyc.f" \
+  "$SRC_DIR/mksalc.f" \
+  "$SRC_DIR/locsvd.f" \
+  "$SRC_DIR/gicprune.f" \
+  "$SRC_DIR/gic_type_symmetry.f" \
+  "$SRC_DIR/pcsgeo.f" \
+  "$SRC_DIR/symang.f" \
+  "$SRC_DIR/tools1.f" \
+  "$SRC_DIR/tools2.f" \
+  "$SRC_DIR/symm.f" \
+  -o "$TARGET" \
+  >"$LOG" 2>&1
+
+echo "$TARGET"

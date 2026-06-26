@@ -15,26 +15,20 @@ from .contracts import (
     GICForgeContractError,
     validate_gicforge_prerequisites,
 )
-
-
-GIC_BACKEND = "oracle-native-primitive.v1"
-SYCART_BACKEND = "oracle-native-cartesian-nullspace.v1"
-B_MATRIX_BACKEND = "oracle-native-analytic-bmatrix.v1"
-RANK_METHOD = "analytic_b_matrix_mgs_greedy"
-RANK_TOLERANCE = 1.0e-7
-DIAGNOSTIC_FINITE_DIFFERENCE_STEP = 1.0e-5
-LINEAR_ANGLE_DEGREES = 175.0
-ORDINARY_REDUCTION_CLASS = "ORDINARY"
-SPECIAL_REDUCTION_CLASS = "SPECIAL_PROTECTED"
-REDUCTION_POLICY = "SPECIAL_PROTECTED_FIRST_THEN_ORDINARY_ANALYTIC_RANK"
-SPECIAL_PRIMITIVE_FAMILIES = frozenset(
-    {
-        "FRAG_DISTANCE",
-        "FRAG_CENTER_ATOM_DISTANCE",
-        "FRAG_TRANSLATION",
-        "FRAG_ORIENTATION",
-        "CENTER_ATOM_DISTANCE",
-    }
+from .policy import (
+    B_MATRIX_BACKEND,
+    DIAGNOSTIC_FINITE_DIFFERENCE_STEP,
+    GIC_BACKEND,
+    LINEAR_ANGLE_DEGREES,
+    ORDINARY_REDUCTION_CLASS,
+    PRIMITIVE_FAMILY_ORDER,
+    RANK_METHOD,
+    RANK_TOLERANCE,
+    REDUCTION_POLICY,
+    SPECIAL_REDUCTION_CLASS,
+    SYCART_BACKEND,
+    primitive_prefix,
+    primitive_reduction_class,
 )
 
 
@@ -65,9 +59,7 @@ class GICPrimitive:
 
     @property
     def reduction_class(self) -> str:
-        if self.family in SPECIAL_PRIMITIVE_FAMILIES:
-            return SPECIAL_REDUCTION_CLASS
-        return ORDINARY_REDUCTION_CLASS
+        return primitive_reduction_class(self.family)
 
 
 @dataclass(frozen=True)
@@ -82,6 +74,15 @@ class FrozenGIC:
 
 
 @dataclass(frozen=True)
+class GICReductionDiagnostics:
+    rank_method: str
+    reduction_policy: str
+    selected: tuple[str, ...] = ()
+    skipped_singular: tuple[str, ...] = ()
+    skipped_dependent: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class GICDefinition:
     backend: str
     point_group: str
@@ -92,6 +93,7 @@ class GICDefinition:
     reference_coordinates_angstrom: tuple[tuple[float, float, float], ...]
     primitives: tuple[GICPrimitive, ...]
     gics: tuple[FrozenGIC, ...]
+    reduction_diagnostics: GICReductionDiagnostics | None = None
 
 
 @dataclass(frozen=True)
@@ -139,7 +141,7 @@ def build_gic_definition_from_xyzin(
         interaction_centers=_interaction_center_definition(target),
     )
     target_rank = _vibrational_rank(coords)
-    selected, rank = _select_ranked_primitives(
+    selected, rank, reduction_diagnostics = _select_ranked_primitives_with_diagnostics(
         candidates,
         coords,
         target_rank=target_rank,
@@ -175,6 +177,7 @@ def build_gic_definition_from_xyzin(
         ),
         primitives=tuple(selected),
         gics=gics,
+        reduction_diagnostics=reduction_diagnostics,
     )
 
 
@@ -213,6 +216,8 @@ def gic_definition_section_lines(definition: GICDefinition) -> list[str]:
         f"PRIMITIVE_COUNT {len(definition.primitives)}",
         f"GIC_COUNT {len(definition.gics)}",
         f"PROTECTED_GIC_COUNT {_protected_gic_count(definition.primitives)}",
+        f"SKIPPED_SINGULAR_COUNT {_skipped_singular_count(definition)}",
+        f"SKIPPED_DEPENDENT_COUNT {_skipped_dependent_count(definition)}",
         f"RANK_METHOD {RANK_METHOD}",
         f"REDUCTION_POLICY {REDUCTION_POLICY}",
         "B_MATRIX_DERIVATIVE_MODE ANALYTIC",
@@ -228,6 +233,8 @@ def gic_definition_section_lines(definition: GICDefinition) -> list[str]:
         lines.extend(_frozen_gic_line(gic) for gic in definition.gics)
     else:
         lines.append("NONE")
+    lines.append("[REDUCTION_DIAGNOSTICS]")
+    lines.extend(_reduction_diagnostics_lines(definition))
     lines.append("[GAUSSIAN_GIC]")
     gaussian_gics = _gaussian_gic_block_lines(definition)
     if gaussian_gics:
@@ -354,6 +361,10 @@ def read_gic_definition_from_xyzin(path: Path) -> GICDefinition:
         for line in _subsection(section, "FROZEN_GICS")
         if line.strip() and line.strip().upper() != "NONE"
     )
+    diagnostics = _parse_reduction_diagnostics(
+        section,
+        selected=tuple(p.identifier for p in primitives),
+    )
     return GICDefinition(
         backend=_section_value(section, "BACKEND") or GIC_BACKEND,
         point_group=_section_value(section, "POINT_GROUP") or _point_group(lines),
@@ -367,6 +378,7 @@ def read_gic_definition_from_xyzin(path: Path) -> GICDefinition:
         ),
         primitives=primitives,
         gics=gics,
+        reduction_diagnostics=diagnostics,
     )
 
 
@@ -446,18 +458,7 @@ def _primitive_candidates(
     interaction_centers: object | None = None,
 ) -> tuple[GICPrimitive, ...]:
     adjacency = _adjacency(bonds, natoms=natoms)
-    counters: dict[str, int] = {
-        "STRETCH": 0,
-        "BEND": 0,
-        "LINEAR_BEND": 0,
-        "TORSION": 0,
-        "OUT_OF_PLANE": 0,
-        "FRAG_DISTANCE": 0,
-        "FRAG_CENTER_ATOM_DISTANCE": 0,
-        "FRAG_TRANSLATION": 0,
-        "FRAG_ORIENTATION": 0,
-        "CENTER_ATOM_DISTANCE": 0,
-    }
+    counters: dict[str, int] = {family: 0 for family in PRIMITIVE_FAMILY_ORDER}
     candidates: list[GICPrimitive] = []
 
     for i, j in bonds:
@@ -519,18 +520,7 @@ def _make_primitive(
     ref_frame_atoms: tuple[int, ...] = (),
 ) -> GICPrimitive:
     counters[family] += 1
-    prefix = {
-        "STRETCH": "Str",
-        "BEND": "Bend",
-        "LINEAR_BEND": "LinB",
-        "TORSION": "Tors",
-        "OUT_OF_PLANE": "OuPl",
-        "FRAG_DISTANCE": "FCDi",
-        "FRAG_CENTER_ATOM_DISTANCE": "FCAt",
-        "FRAG_TRANSLATION": "FTrn",
-        "FRAG_ORIENTATION": "FRot",
-        "CENTER_ATOM_DISTANCE": "CnAt",
-    }[family]
+    prefix = primitive_prefix(family)
     serial = sum(counters.values())
     return GICPrimitive(
         identifier=f"P{serial:03d}",
@@ -553,8 +543,33 @@ def _select_ranked_primitives(
     target_rank: int,
     rank_tolerance: float,
 ) -> tuple[tuple[GICPrimitive, ...], int]:
+    selected, rank, _ = _select_ranked_primitives_with_diagnostics(
+        candidates,
+        coords,
+        target_rank=target_rank,
+        rank_tolerance=rank_tolerance,
+    )
+    return selected, rank
+
+
+def _select_ranked_primitives_with_diagnostics(
+    candidates: tuple[GICPrimitive, ...],
+    coords: np.ndarray,
+    *,
+    target_rank: int,
+    rank_tolerance: float,
+) -> tuple[tuple[GICPrimitive, ...], int, GICReductionDiagnostics]:
+    skipped_singular: list[str] = []
+    skipped_dependent: list[str] = []
     if target_rank == 0:
-        return (), 0
+        return (
+            (),
+            0,
+            GICReductionDiagnostics(
+                rank_method=RANK_METHOD,
+                reduction_policy=REDUCTION_POLICY,
+            ),
+        )
     selected: list[GICPrimitive] = []
     basis: list[np.ndarray] = []
     rank = 0
@@ -567,15 +582,25 @@ def _select_ranked_primitives(
     ]
     for index, primitive in enumerate(special_candidates):
         if rank == target_rank:
-            _raise_if_remaining_special_independent(
-                special_candidates[index:],
+            singular, dependent = _raise_if_remaining_special_independent(
+                tuple(special_candidates[index:]),
                 coords,
                 basis,
                 rank,
                 rank_tolerance=rank_tolerance,
             )
-            return tuple(selected), rank
-        rank = _try_select_ranked_primitive(
+            skipped_singular.extend(singular)
+            skipped_dependent.extend(dependent)
+            return (
+                tuple(selected),
+                rank,
+                _make_reduction_diagnostics(
+                    selected,
+                    skipped_singular=skipped_singular,
+                    skipped_dependent=skipped_dependent,
+                ),
+            )
+        rank, status = _try_select_ranked_primitive(
             primitive,
             coords,
             selected,
@@ -583,11 +608,12 @@ def _select_ranked_primitives(
             rank,
             rank_tolerance=rank_tolerance,
         )
+        _record_skip(primitive, status, skipped_singular, skipped_dependent)
 
     for primitive in ordinary_candidates:
         if rank == target_rank:
             break
-        rank = _try_select_ranked_primitive(
+        rank, status = _try_select_ranked_primitive(
             primitive,
             coords,
             selected,
@@ -595,10 +621,16 @@ def _select_ranked_primitives(
             rank,
             rank_tolerance=rank_tolerance,
         )
-    if rank == target_rank:
-        return tuple(selected), rank
-
-    return tuple(selected), rank
+        _record_skip(primitive, status, skipped_singular, skipped_dependent)
+    return (
+        tuple(selected),
+        rank,
+        _make_reduction_diagnostics(
+            selected,
+            skipped_singular=skipped_singular,
+            skipped_dependent=skipped_dependent,
+        ),
+    )
 
 
 def _is_special_primitive(primitive: GICPrimitive) -> bool:
@@ -609,6 +641,60 @@ def _protected_gic_count(primitives: tuple[GICPrimitive, ...]) -> int:
     return sum(1 for primitive in primitives if _is_special_primitive(primitive))
 
 
+def _skipped_singular_count(definition: GICDefinition) -> int:
+    if definition.reduction_diagnostics is None:
+        return 0
+    return len(definition.reduction_diagnostics.skipped_singular)
+
+
+def _skipped_dependent_count(definition: GICDefinition) -> int:
+    if definition.reduction_diagnostics is None:
+        return 0
+    return len(definition.reduction_diagnostics.skipped_dependent)
+
+
+def _reduction_diagnostics_lines(definition: GICDefinition) -> list[str]:
+    diagnostics = definition.reduction_diagnostics or GICReductionDiagnostics(
+        rank_method=RANK_METHOD,
+        reduction_policy=REDUCTION_POLICY,
+        selected=tuple(primitive.identifier for primitive in definition.primitives),
+    )
+    return [
+        f"RANK_METHOD {diagnostics.rank_method}",
+        f"REDUCTION_POLICY {diagnostics.reduction_policy}",
+        f"SELECTED {_csv_or_none(diagnostics.selected)}",
+        f"SKIPPED_SINGULAR {_csv_or_none(diagnostics.skipped_singular)}",
+        f"SKIPPED_DEPENDENT {_csv_or_none(diagnostics.skipped_dependent)}",
+    ]
+
+
+def _make_reduction_diagnostics(
+    selected: list[GICPrimitive],
+    *,
+    skipped_singular: list[str],
+    skipped_dependent: list[str],
+) -> GICReductionDiagnostics:
+    return GICReductionDiagnostics(
+        rank_method=RANK_METHOD,
+        reduction_policy=REDUCTION_POLICY,
+        selected=tuple(primitive.identifier for primitive in selected),
+        skipped_singular=tuple(skipped_singular),
+        skipped_dependent=tuple(skipped_dependent),
+    )
+
+
+def _record_skip(
+    primitive: GICPrimitive,
+    status: str,
+    skipped_singular: list[str],
+    skipped_dependent: list[str],
+) -> None:
+    if status == "singular":
+        skipped_singular.append(primitive.identifier)
+    elif status == "dependent":
+        skipped_dependent.append(primitive.identifier)
+
+
 def _try_select_ranked_primitive(
     primitive: GICPrimitive,
     coords: np.ndarray,
@@ -617,34 +703,36 @@ def _try_select_ranked_primitive(
     rank: int,
     *,
     rank_tolerance: float,
-) -> int:
+) -> tuple[int, str]:
     normalized = _normalized_b_row_or_none(
         primitive,
         coords,
         rank_tolerance=rank_tolerance,
     )
     if normalized is None:
-        return rank
+        return rank, "singular"
     orthonormal = _orthonormal_residual_or_none(
         basis,
         normalized,
         rank_tolerance=rank_tolerance,
     )
     if orthonormal is None:
-        return rank
+        return rank, "dependent"
     selected.append(primitive)
     basis.append(orthonormal)
-    return rank + 1
+    return rank + 1, "selected"
 
 
 def _raise_if_remaining_special_independent(
-    primitives: list[GICPrimitive],
+    primitives: tuple[GICPrimitive, ...],
     coords: np.ndarray,
     basis: list[np.ndarray],
     rank: int,
     *,
     rank_tolerance: float,
-) -> None:
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    skipped_singular: list[str] = []
+    skipped_dependent: list[str] = []
     for primitive in primitives:
         normalized = _normalized_b_row_or_none(
             primitive,
@@ -652,6 +740,7 @@ def _raise_if_remaining_special_independent(
             rank_tolerance=rank_tolerance,
         )
         if normalized is None:
+            skipped_singular.append(primitive.identifier)
             continue
         if _orthonormal_residual_or_none(
             basis,
@@ -663,6 +752,8 @@ def _raise_if_remaining_special_independent(
                 f"{primitive.identifier} {primitive.name} would add an independent "
                 "row after the target rank was reached"
             )
+        skipped_dependent.append(primitive.identifier)
+    return tuple(skipped_singular), tuple(skipped_dependent)
 
 
 def _normalized_b_row_or_none(
@@ -1384,7 +1475,10 @@ def _interaction_center_primitive_candidates(
 ) -> tuple[GICPrimitive, ...]:
     if definition is None:
         return ()
-    centers = {getattr(center, "identifier"): center for center in getattr(definition, "centers", ())}
+    centers = {
+        getattr(center, "identifier"): center
+        for center in getattr(definition, "centers", ())
+    }
     candidates: list[GICPrimitive] = []
     for interaction in getattr(definition, "interactions", ()):
         center = centers.get(getattr(interaction, "center_id"))
@@ -1701,6 +1795,28 @@ def _parse_frozen_gic_line(line: str) -> FrozenGIC:
         raise GICForgeContractError(f"invalid frozen GIC line: {line}") from exc
 
 
+def _parse_reduction_diagnostics(
+    section_lines: list[str],
+    *,
+    selected: tuple[str, ...],
+) -> GICReductionDiagnostics:
+    lines = _subsection(section_lines, "REDUCTION_DIAGNOSTICS")
+    if not lines:
+        return GICReductionDiagnostics(
+            rank_method=_section_value(section_lines, "RANK_METHOD") or RANK_METHOD,
+            reduction_policy=_section_value(section_lines, "REDUCTION_POLICY")
+            or REDUCTION_POLICY,
+            selected=selected,
+        )
+    return GICReductionDiagnostics(
+        rank_method=_section_value(lines, "RANK_METHOD") or RANK_METHOD,
+        reduction_policy=_section_value(lines, "REDUCTION_POLICY") or REDUCTION_POLICY,
+        selected=_parse_text_list(_section_value(lines, "SELECTED") or "") or selected,
+        skipped_singular=_parse_text_list(_section_value(lines, "SKIPPED_SINGULAR") or ""),
+        skipped_dependent=_parse_text_list(_section_value(lines, "SKIPPED_DEPENDENT") or ""),
+    )
+
+
 def _key_values(parts: list[str]) -> dict[str, str]:
     fields: dict[str, str] = {}
     for part in parts:
@@ -1721,9 +1837,13 @@ def _parse_atom_list(text: str) -> tuple[int, ...]:
 
 
 def _parse_text_list(text: str) -> tuple[str, ...]:
-    if not text:
+    if not text or text.upper() == "NONE":
         return ()
     return tuple(item for item in text.split(",") if item)
+
+
+def _csv_or_none(values: tuple[str, ...]) -> str:
+    return ",".join(values) if values else "NONE"
 
 
 def _parse_coefficients(text: str) -> tuple[tuple[str, float], ...]:

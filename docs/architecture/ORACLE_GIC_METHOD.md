@@ -23,6 +23,12 @@ GICForge is not allowed to rediscover molecular state. It consumes the enriched
 The output is a frozen `#GIC` section. Downstream tools must consume that
 section and must not regenerate topology, fragments, centers or GIC rows.
 
+The Python source of truth for the contract is `oracle_gicforge.policy`. It
+defines backend names, rank method, reduction policy, primitive families,
+reduction classes and symmetry source blocks. Strict Fortran77 kernels must
+mirror this module rather than introduce independent family names or pruning
+rules.
+
 ## Primitive Families
 
 Ordinary primitives describe local molecular deformations:
@@ -95,6 +101,11 @@ RANK_METHOD analytic_b_matrix_mgs_greedy
 REDUCTION_POLICY SPECIAL_PROTECTED_FIRST_THEN_ORDINARY_ANALYTIC_RANK
 ```
 
+The frozen `#GIC` section also stores `[REDUCTION_DIAGNOSTICS]` with selected
+primitive ids and primitives skipped because their analytic rows were singular
+or linearly dependent. Human reports are generated from that frozen diagnostic
+state, not by recomputing the reduction.
+
 ## Symmetrization
 
 Symmetrization is applied after a valid non-redundant basis exists. It is not a
@@ -116,6 +127,35 @@ classes themselves:
 The symmetrized block must preserve the family counts and the protected
 semantic role. If symmetry projection would destroy these counts or produce
 ambiguous labels, the correct behavior is a clean stop.
+
+The helper `oracle_gicforge.symmetry.gic_symmetry_source_blocks` exposes these
+homogeneous blocks to future GICSYM implementations and reports. It is a
+preparatory layer: non-C1 projection remains constrained by backend
+availability, but the grouping contract is now explicit.
+
+## Python And Fortran Backends
+
+ORACLE keeps two Fortran layers:
+
+- `engines/fortran/gicforge/frag_tric_bmat.f`, the ORACLE fragment/TRIC kernel
+  that mirrors Python definitions for special coordinates and protected-first
+  reduction;
+- `engines/fortran/gicforge/legacy_merlino`, the imported Merlino3.0 strict
+  Fortran77 GICForge source tree.
+
+The legacy tree is compiled with `engines/fortran/gicforge/compile_legacy` and
+is treated as a reference identity target. Python and Fortran paths are allowed
+to coexist only when they share the frozen `#GIC` contract, family names,
+protected-class policy, B-matrix definitions and regression fixtures.
+
+## Reports
+
+`oracle gicforge report molecule.xyzin [report.txt]` emits a readable report
+from the frozen `#GIC` state. It includes backend, point group, rank, candidate
+count, selected family counts, protected counts, reduction diagnostics, symmetry
+source blocks and final frozen GIC labels. This report is intended for method
+debugging and scientific review before GF, SEfit or anharmonic steps consume the
+coordinates.
 
 ## Gaussian Export
 

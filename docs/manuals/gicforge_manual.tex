@@ -603,6 +603,9 @@ File & Meaning \\
 \endhead
 \provout{} & Human-readable report: point group, topology summary, candidate
 families, pruning diagnostics, final counts and final coordinate definitions. \\
+\texttt{gicforge\_report.txt} & ORACLE-native report generated from frozen
+\xyzin{} state with rank method, reduction diagnostics, family counts,
+protected-coordinate counts, symmetry source blocks and final GIC labels. \\
 \gauin{} & Gaussian ReadGIC input block for the final post-pruning coordinate
 basis.  With \texttt{GICSYM}, this is the promoted symmetrized block. \\
 \texttt{gauin.raw} & Preserved unsymmetrized Gaussian block when \texttt{GICSYM}
@@ -667,6 +670,33 @@ Run the contract with:
 \begin{lstlisting}[style=oracle]
 python -m oracle gic-contract --geometry examples/pyrene.xyz \
   --workdir work/gic_contract_pyrene
+\end{lstlisting}
+
+\noindent
+The imported Merlino3.0 strict Fortran77 backend is vendored and compiled with:
+
+\begin{lstlisting}[style=oracle]
+engines/fortran/gicforge/legacy_merlino
+engines/fortran/gicforge/compile_legacy
+\end{lstlisting}
+
+\noindent
+ORACLE-specific Fortran fragment/TRIC kernels remain in:
+
+\begin{lstlisting}[style=oracle]
+engines/fortran/gicforge/frag_tric_bmat.f
+\end{lstlisting}
+
+\noindent
+Both layers must mirror \texttt{oracle\_gicforge.policy}: primitive families,
+reduction classes, rank method, protected-first pruning and symmetry source
+blocks are shared contract data, not backend-local choices.
+
+\noindent
+The readable ORACLE report is generated directly from the frozen \xyzin{}:
+
+\begin{lstlisting}[style=oracle]
+oracle gicforge report molecule.xyzin gicforge_report.txt
 \end{lstlisting}
 
 \noindent

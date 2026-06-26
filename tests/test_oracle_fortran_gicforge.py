@@ -6,6 +6,40 @@ from pathlib import Path
 
 import pytest
 
+from oracle_engines import (
+    LEGACY_GICFORGE_FILES,
+    gicforge_fortran_layout,
+    validate_legacy_gicforge_sources,
+)
+
+
+def test_legacy_merlino_gicforge_sources_are_vendored():
+    missing = validate_legacy_gicforge_sources(Path(__file__).resolve().parents[1])
+
+    assert missing == ()
+    assert "dina25.f" in LEGACY_GICFORGE_FILES
+    assert "gicprune.f" in LEGACY_GICFORGE_FILES
+
+
+def test_legacy_merlino_gicforge_backend_compiles():
+    gfortran = shutil.which("gfortran")
+    if gfortran is None:
+        pytest.skip("gfortran is not available")
+
+    root = Path(__file__).resolve().parents[1]
+    layout = gicforge_fortran_layout(root)
+
+    result = subprocess.run(
+        [str(layout.legacy_compile_script)],
+        check=True,
+        cwd=root,
+        capture_output=True,
+        text=True,
+    )
+
+    assert layout.legacy_executable.is_file()
+    assert str(layout.legacy_executable) in result.stdout
+
 
 def test_fortran_fragment_tric_bmat_compiles_and_runs(tmp_path):
     gfortran = shutil.which("gfortran")

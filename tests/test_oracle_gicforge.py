@@ -17,8 +17,10 @@ from oracle_gicforge import (
     build_gic_b_matrix_from_xyzin,
     build_gic_definition_from_xyzin,
     gaussian_gic_lines_from_xyzin,
+    gic_report_from_xyzin,
     gic_b_matrix_lines,
     gic_definition_section_lines,
+    special_symmetry_source_blocks,
     write_gicforge_build_sections,
     write_gicforge_gaussian_input,
     write_gicforge_plan_sections,
@@ -344,6 +346,8 @@ def test_gicforge_build_uses_built_fragments_for_relative_coordinates(tmp_path):
         "REDUCTION_POLICY SPECIAL_PROTECTED_FIRST_THEN_ORDINARY_ANALYTIC_RANK"
         in gic
     )
+    assert "[REDUCTION_DIAGNOSTICS]" in gic
+    assert any(line.startswith("SELECTED P") for line in gic)
     assert any(
         "FAMILY=FRAG_DISTANCE CLASS=SPECIAL_PROTECTED FUNCTION=FC_DIST" in line
         for line in primitive_lines
@@ -436,6 +440,19 @@ def test_gicforge_b_matrix_includes_fragment_coordinate_rows(tmp_path):
     analytic = _analytic_b_row(frot, coords)
     diagnostic_fd = _finite_difference_b_row(frot, coords, step_angstrom=1.0e-6)
     assert np.max(np.abs(analytic - diagnostic_fd)) < 1.0e-5
+
+    blocks = special_symmetry_source_blocks(definition)
+    assert {block.block for block in blocks} >= {
+        "SPECIAL_FRAGMENT_DISTANCE",
+        "SPECIAL_FRAGMENT_CENTER_ATOM",
+        "SPECIAL_FRAGMENT_TRANSLATION",
+        "SPECIAL_FRAGMENT_ORIENTATION",
+    }
+
+    report_lines = gic_report_from_xyzin(xyzin)
+    assert "ORACLE GICForge Report" in report_lines
+    assert "Rank method: analytic_b_matrix_mgs_greedy" in report_lines
+    assert any("SPECIAL_FRAGMENT_DISTANCE" in line for line in report_lines)
 
 
 def test_gicforge_center_atom_distance_uses_analytic_b_and_gaussian_center():

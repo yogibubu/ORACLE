@@ -3,6 +3,17 @@
 This directory contains the strict Fortran77-side building blocks used while
 porting the legacy Merlino GICForge backend into ORACLE.
 
+`legacy_merlino/` vendors the complete Merlino3.0 GICForge Fortran source set.
+It is built with:
+
+```sh
+./compile_legacy
+```
+
+The wrapper writes `build/gicforge_legacy` and keeps build logs under
+`build/`. This backend is treated as a reference/identity target until the
+ORACLE-native and legacy implementations agree on the frozen `#GIC` contract.
+
 `frag_tric_bmat.f` is the first shared fragment-coordinate library. It mirrors
 the native Python GICForge definitions for:
 
