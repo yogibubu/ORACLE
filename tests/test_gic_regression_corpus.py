@@ -72,12 +72,14 @@ def test_oracle_environment_helpers_define_oracle_style_commands():
 
     for name in (
         "oracle-set()",
+        "oracle-unset()",
         "oracle-run()",
         "oracle-run-bg()",
         "oracle-run-check()",
         "oracle-test-all()",
         "oracle-clean()",
         "oracle-create-venv()",
+        "oracle-save-shell-state()",
         "oracle-install-runtime-deps()",
         "oracle-gic-corpus-list()",
         "oracle-gic-corpus-summary()",
@@ -86,4 +88,5 @@ def test_oracle_environment_helpers_define_oracle_style_commands():
         assert name in text
     assert "ORACLE_AUTO_CREATE_VENV" in text
     assert "ORACLE_AUTO_INSTALL_RUNTIME_DEPS" in text
+    assert "ORACLE_ENV_ACTIVE" in text
     assert "rdkit" in text

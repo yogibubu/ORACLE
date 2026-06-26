@@ -14,6 +14,9 @@ The helper defines:
   ORACLE environment, install runtime dependencies including RDKit when needed,
   export `ORACLE_HOME`, add package `src` directories to `PYTHONPATH`, add local
   tools to `PATH`, and `cd` to the repo.
+- `oracle-unset`: deactivate the ORACLE virtualenv/conda env when active,
+  restore the previous `PATH`, `PYTHONPATH` and working directory saved by
+  `oracle-set`.
 - `oracle-run`: launch `oracle_gui.app` when it exists, otherwise dispatch to
   `python -m oracle`.
 - `oracle-cli`: run `python -m oracle` directly.

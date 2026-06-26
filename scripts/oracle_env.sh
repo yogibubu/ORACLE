@@ -34,6 +34,16 @@ oracle-package-path() {
         '
 }
 
+oracle-save-shell-state() {
+    if [ "${ORACLE_ENV_ACTIVE:-0}" = "1" ]; then
+        return 0
+    fi
+    export ORACLE_SAVED_CWD="$PWD"
+    export ORACLE_SAVED_PATH="${PATH:-}"
+    export ORACLE_SAVED_PYTHONPATH="${PYTHONPATH:-}"
+    export ORACLE_ENV_ACTIVE=1
+}
+
 oracle-ensure-gui-deps() {
     if [ "$ORACLE_AUTO_INSTALL_GUI_DEPS" = "0" ]; then
         return 0
@@ -120,6 +130,7 @@ oracle-conda-hook() {
 }
 
 oracle-set() {
+    oracle-save-shell-state
     if oracle-activate-venv; then
         :
     elif oracle-conda-hook && conda env list | awk '{print $1}' | grep -qx "$ORACLE_CONDA_ENV"; then
@@ -143,6 +154,44 @@ oracle-set() {
     oracle-ensure-runtime-deps || return
     oracle-ensure-gui-deps || return
     cd "$ORACLE_HOME" || return
+}
+
+oracle-unset() {
+    if [ -n "${VIRTUAL_ENV:-}" ]; then
+        case "$VIRTUAL_ENV" in
+            "$ORACLE_VENV"|"$ORACLE_HOME/.venv")
+                if command -v deactivate >/dev/null 2>&1; then
+                    deactivate
+                fi
+                ;;
+        esac
+    fi
+
+    if [ -n "${CONDA_DEFAULT_ENV:-}" ] \
+        && { [ "$CONDA_DEFAULT_ENV" = "$ORACLE_CONDA_ENV" ] || [ "$CONDA_DEFAULT_ENV" = "oracle" ]; } \
+        && command -v conda >/dev/null 2>&1
+    then
+        conda deactivate
+    fi
+
+    if [ "${ORACLE_ENV_ACTIVE:-0}" = "1" ]; then
+        export PATH="${ORACLE_SAVED_PATH:-$PATH}"
+        if [ -n "${ORACLE_SAVED_PYTHONPATH+x}" ]; then
+            if [ -n "$ORACLE_SAVED_PYTHONPATH" ]; then
+                export PYTHONPATH="$ORACLE_SAVED_PYTHONPATH"
+            else
+                unset PYTHONPATH
+            fi
+        fi
+        if [ -n "${ORACLE_SAVED_CWD:-}" ] && [ -d "$ORACLE_SAVED_CWD" ]; then
+            cd "$ORACLE_SAVED_CWD" || return
+        fi
+    fi
+
+    unset ORACLE_SAVED_CWD
+    unset ORACLE_SAVED_PATH
+    unset ORACLE_SAVED_PYTHONPATH
+    unset ORACLE_ENV_ACTIVE
 }
 
 oracle-cli() {
