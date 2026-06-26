@@ -23,7 +23,11 @@ from oracle_gicforge import (
     write_gicforge_gaussian_input,
     write_gicforge_plan_sections,
 )
-from oracle_gicforge.definition import _analytic_b_row, _finite_difference_b_row
+from oracle_gicforge.definition import (
+    _analytic_b_row,
+    _finite_difference_b_row,
+    _select_ranked_primitives,
+)
 
 
 def test_gicforge_plan_requires_validation_pass(tmp_path):
@@ -335,22 +339,29 @@ def test_gicforge_build_uses_built_fragments_for_relative_coordinates(tmp_path):
     assert definition.target_rank == 12
     assert definition.rank == 12
     assert len(definition.gics) == 12
-    assert any("FAMILY=FRAG_DISTANCE FUNCTION=FC_DIST" in line for line in primitive_lines)
     assert any(
-        "FAMILY=FRAG_CENTER_ATOM_DISTANCE FUNCTION=FCA_DIST" in line
+        "FAMILY=FRAG_DISTANCE CLASS=SPECIAL_PROTECTED FUNCTION=FC_DIST" in line
         for line in primitive_lines
     )
-    assert any("FAMILY=FRAG_ORIENTATION FUNCTION=FROT" in line for line in primitive_lines)
+    assert any(
+        "FAMILY=FRAG_CENTER_ATOM_DISTANCE CLASS=SPECIAL_PROTECTED FUNCTION=FCA_DIST"
+        in line
+        for line in primitive_lines
+    )
+    assert any(
+        "FAMILY=FRAG_ORIENTATION CLASS=SPECIAL_PROTECTED FUNCTION=FROT" in line
+        for line in primitive_lines
+    )
     assert any("REFS=F002,F001" in line for line in primitive_lines)
     assert "F001=Fragment(1-3)" in gaussian_lines
     assert "F002=Fragment(4-6)" in gaussian_lines
     assert "CxF001(Inactive)=XCntr(F001)" in gaussian_lines
-    assert any(line.startswith("GIC005 = SQRT((CxF001-CxF002)**2") for line in gaussian_lines)
-    assert any(line.startswith("GIC006 = SQRT((CxF002-X(1))**2") for line in gaussian_lines)
+    assert any("= SQRT((CxF001-CxF002)**2" in line for line in gaussian_lines)
+    assert any("= SQRT((CxF002-X(1))**2" in line for line in gaussian_lines)
     assert any("KxF002F001" in line for line in gaussian_lines)
     assert any("ExF002F001" in line for line in gaussian_lines)
     assert any("1.0D-24" in line and line.startswith("KnF002F001") for line in gaussian_lines)
-    assert any(line.startswith("GIC011 = ExF002F001") for line in gaussian_lines)
+    assert any(" = ExF002F001" in line for line in gaussian_lines)
 
 
 def test_gicforge_b_matrix_includes_fragment_coordinate_rows(tmp_path):
@@ -385,7 +396,7 @@ def test_gicforge_b_matrix_includes_fragment_coordinate_rows(tmp_path):
     assert len(matrix.rows[0]) == 18
     assert all(value == value for row in matrix.rows for value in row)
 
-    center_distance_row = matrix.rows[matrix.coordinate_labels.index("GIC005")]
+    center_distance_row = matrix.rows[matrix.coordinate_names.index("FCDi0001")]
     assert center_distance_row[2] == pytest.approx(-1.0 / 3.0, abs=1.0e-8)
     assert center_distance_row[5] == pytest.approx(-1.0 / 3.0, abs=1.0e-8)
     assert center_distance_row[8] == pytest.approx(-1.0 / 3.0, abs=1.0e-8)
@@ -393,7 +404,7 @@ def test_gicforge_b_matrix_includes_fragment_coordinate_rows(tmp_path):
     assert center_distance_row[14] == pytest.approx(1.0 / 3.0, abs=1.0e-8)
     assert center_distance_row[17] == pytest.approx(1.0 / 3.0, abs=1.0e-8)
 
-    translation_row = matrix.rows[matrix.coordinate_labels.index("GIC009")]
+    translation_row = matrix.rows[matrix.coordinate_names.index("FTrn0001")]
     assert translation_row[0] == pytest.approx(-1.0 / 3.0, abs=1.0e-8)
     assert translation_row[3] == pytest.approx(-1.0 / 3.0, abs=1.0e-8)
     assert translation_row[6] == pytest.approx(-1.0 / 3.0, abs=1.0e-8)
@@ -407,7 +418,13 @@ def test_gicforge_b_matrix_includes_fragment_coordinate_rows(tmp_path):
     assert "DERIVATIVE_MODE ANALYTIC" in lines
     assert "ROW_COUNT 12" in lines
     assert "COLUMN_COUNT 18" in lines
-    assert any(line.startswith("GIC005 NAME=FCDi0001 IRREP=A VALUES=") for line in lines)
+    center_distance_label = matrix.coordinate_labels[
+        matrix.coordinate_names.index("FCDi0001")
+    ]
+    assert any(
+        line.startswith(f"{center_distance_label} NAME=FCDi0001 IRREP=A VALUES=")
+        for line in lines
+    )
 
     coords = np.asarray(definition.reference_coordinates_angstrom, dtype=float)
     frot = next(primitive for primitive in definition.primitives if primitive.function == "FROT")
@@ -466,3 +483,41 @@ def test_gicforge_center_atom_distance_uses_analytic_b_and_gaussian_center():
     gaussian_lines = gic_definition_section_lines(definition)
     assert "CxC001(Inactive)=(X(1)+X(2))/2" in gaussian_lines
     assert any(line.startswith("GIC001 = SQRT((CxC001-X(3))**2") for line in gaussian_lines)
+
+
+def test_gicforge_rank_reduction_protects_special_coordinates():
+    ordinary = GICPrimitive(
+        identifier="P001",
+        name="Str0001",
+        family="STRETCH",
+        function="R",
+        atoms=(1, 2),
+    )
+    special = GICPrimitive(
+        identifier="P002",
+        name="CnAt0001",
+        family="CENTER_ATOM_DISTANCE",
+        function="CENTER_ATOM_DIST",
+        atoms=(1,),
+        ref_atoms=(2,),
+        refs=("C001", "A2"),
+    )
+    coords = np.asarray(
+        [
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+        ],
+        dtype=float,
+    )
+
+    selected, rank = _select_ranked_primitives(
+        (ordinary, special),
+        coords,
+        target_rank=1,
+        rank_tolerance=1.0e-7,
+    )
+
+    assert rank == 1
+    assert selected == (special,)
+    assert selected[0].reduction_class == "SPECIAL_PROTECTED"

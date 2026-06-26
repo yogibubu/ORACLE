@@ -23,6 +23,18 @@ B_MATRIX_BACKEND = "oracle-native-analytic-bmatrix.v1"
 RANK_TOLERANCE = 1.0e-7
 DIAGNOSTIC_FINITE_DIFFERENCE_STEP = 1.0e-5
 LINEAR_ANGLE_DEGREES = 175.0
+ORDINARY_REDUCTION_CLASS = "ORDINARY"
+SPECIAL_REDUCTION_CLASS = "SPECIAL_PROTECTED"
+REDUCTION_POLICY = "SPECIAL_PROTECTED_FIRST_THEN_ORDINARY_ANALYTIC_RANK"
+SPECIAL_PRIMITIVE_FAMILIES = frozenset(
+    {
+        "FRAG_DISTANCE",
+        "FRAG_CENTER_ATOM_DISTANCE",
+        "FRAG_TRANSLATION",
+        "FRAG_ORIENTATION",
+        "CENTER_ATOM_DISTANCE",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -49,6 +61,12 @@ class GICPrimitive:
     @property
     def is_gaussian_native(self) -> bool:
         return self.function in {"R", "A", "L", "D", "U"}
+
+    @property
+    def reduction_class(self) -> str:
+        if self.family in SPECIAL_PRIMITIVE_FAMILIES:
+            return SPECIAL_REDUCTION_CLASS
+        return ORDINARY_REDUCTION_CLASS
 
 
 @dataclass(frozen=True)
@@ -193,7 +211,9 @@ def gic_definition_section_lines(definition: GICDefinition) -> list[str]:
         f"CANDIDATE_COUNT {definition.candidate_count}",
         f"PRIMITIVE_COUNT {len(definition.primitives)}",
         f"GIC_COUNT {len(definition.gics)}",
+        f"PROTECTED_GIC_COUNT {_protected_gic_count(definition.primitives)}",
         "RANK_METHOD analytic_b_matrix_greedy",
+        f"REDUCTION_POLICY {REDUCTION_POLICY}",
         "B_MATRIX_DERIVATIVE_MODE ANALYTIC",
         f"RANK_TOLERANCE {RANK_TOLERANCE:.12g}",
         "[PRIMITIVES]",
@@ -537,22 +557,131 @@ def _select_ranked_primitives(
     selected: list[GICPrimitive] = []
     rows: list[np.ndarray] = []
     rank = 0
-    for primitive in candidates:
-        row = _analytic_b_row(primitive, coords)
-        norm = float(np.linalg.norm(row))
-        if not np.isfinite(norm) or norm <= rank_tolerance:
-            continue
-        normalized = row / norm
-        trial = np.vstack([*rows, normalized]) if rows else normalized.reshape(1, -1)
-        trial_rank = int(np.linalg.matrix_rank(trial, tol=rank_tolerance))
-        if trial_rank <= rank:
-            continue
-        selected.append(primitive)
-        rows.append(normalized)
-        rank = trial_rank
+
+    special_candidates = [
+        primitive for primitive in candidates if _is_special_primitive(primitive)
+    ]
+    ordinary_candidates = [
+        primitive for primitive in candidates if not _is_special_primitive(primitive)
+    ]
+    for index, primitive in enumerate(special_candidates):
+        if rank == target_rank:
+            _raise_if_remaining_special_independent(
+                special_candidates[index:],
+                coords,
+                rows,
+                rank,
+                rank_tolerance=rank_tolerance,
+            )
+            return tuple(selected), rank
+        rank = _try_select_ranked_primitive(
+            primitive,
+            coords,
+            selected,
+            rows,
+            rank,
+            rank_tolerance=rank_tolerance,
+        )
+
+    for primitive in ordinary_candidates:
         if rank == target_rank:
             break
+        rank = _try_select_ranked_primitive(
+            primitive,
+            coords,
+            selected,
+            rows,
+            rank,
+            rank_tolerance=rank_tolerance,
+        )
+    if rank == target_rank:
+        return tuple(selected), rank
+
     return tuple(selected), rank
+
+
+def _is_special_primitive(primitive: GICPrimitive) -> bool:
+    return primitive.reduction_class == SPECIAL_REDUCTION_CLASS
+
+
+def _protected_gic_count(primitives: tuple[GICPrimitive, ...]) -> int:
+    return sum(1 for primitive in primitives if _is_special_primitive(primitive))
+
+
+def _try_select_ranked_primitive(
+    primitive: GICPrimitive,
+    coords: np.ndarray,
+    selected: list[GICPrimitive],
+    rows: list[np.ndarray],
+    rank: int,
+    *,
+    rank_tolerance: float,
+) -> int:
+    normalized = _normalized_b_row_or_none(
+        primitive,
+        coords,
+        rank_tolerance=rank_tolerance,
+    )
+    if normalized is None:
+        return rank
+    trial_rank = _trial_rank(rows, normalized, rank_tolerance=rank_tolerance)
+    if trial_rank <= rank:
+        return rank
+    selected.append(primitive)
+    rows.append(normalized)
+    return trial_rank
+
+
+def _raise_if_remaining_special_independent(
+    primitives: list[GICPrimitive],
+    coords: np.ndarray,
+    rows: list[np.ndarray],
+    rank: int,
+    *,
+    rank_tolerance: float,
+) -> None:
+    for primitive in primitives:
+        normalized = _normalized_b_row_or_none(
+            primitive,
+            coords,
+            rank_tolerance=rank_tolerance,
+        )
+        if normalized is None:
+            continue
+        trial_rank = _trial_rank(rows, normalized, rank_tolerance=rank_tolerance)
+        if trial_rank > rank:
+            raise GICForgeContractError(
+                "protected special primitive set exceeds the vibrational rank: "
+                f"{primitive.identifier} {primitive.name} would add an independent "
+                "row after the target rank was reached"
+            )
+        rows.append(normalized)
+
+
+def _normalized_b_row_or_none(
+    primitive: GICPrimitive,
+    coords: np.ndarray,
+    *,
+    rank_tolerance: float,
+) -> np.ndarray | None:
+    try:
+        row = _analytic_b_row(primitive, coords)
+    except FloatingPointError:
+        return None
+    norm = float(np.linalg.norm(row))
+    if not np.isfinite(norm) or norm <= rank_tolerance:
+        return None
+    return row / norm
+
+
+def _trial_rank(
+    rows: list[np.ndarray],
+    normalized: np.ndarray,
+    *,
+    rank_tolerance: float,
+) -> int:
+    trial = np.vstack([*rows, normalized]) if rows else normalized.reshape(1, -1)
+    return int(np.linalg.matrix_rank(trial, tol=rank_tolerance))
 
 
 def _analytic_b_row(primitive: GICPrimitive, coords: np.ndarray) -> np.ndarray:
@@ -1643,7 +1772,8 @@ def _primitive_line(primitive: GICPrimitive) -> str:
     )
     return (
         f"{primitive.identifier} NAME={primitive.name} FAMILY={primitive.family} "
-        f"FUNCTION={primitive.function} ATOMS={atoms}{ref_atoms}{refs}"
+        f"CLASS={primitive.reduction_class} FUNCTION={primitive.function} "
+        f"ATOMS={atoms}{ref_atoms}{refs}"
         f"{frame_atoms}{ref_frame_atoms}{mode} "
         f"GAUSSIAN={primitive.gaussian_expression()}"
     )

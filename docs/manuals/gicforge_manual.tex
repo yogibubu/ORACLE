@@ -436,6 +436,30 @@ rank basis.  The rank test is still numerical and B-matrix based, but the
 admissible competition is restricted to coordinates with the same physical
 role.
 
+Fragment and virtual-center coordinates are treated as a separate protected
+class.  These coordinates include fragment-center distances, fragment-center to
+atom distances, fragment translations, fragment orientations and atom to
+virtual-center distances for ring centers, bond centers and contact centers.
+They are not ordinary valence-graph primitives, and they can carry chemical
+information that no single stretch, bend or torsion should be allowed to erase.
+For this reason \program{} first tests all protected special coordinates
+against each other by analytic B-matrix rank.  Only after that protected pass
+does it use ordinary primitives to complete the vibrational rank.  A special
+coordinate may be skipped only when its own row is singular or linearly
+dependent on previously accepted special rows.  If the independent protected
+set alone is larger than the vibrational rank, \program{} stops with a contract
+error instead of silently deleting a protected coordinate.
+
+The frozen \xyzin{} schema records this distinction explicitly.  Ordinary
+coordinates are written with \texttt{CLASS=ORDINARY}.  Fragment and
+virtual-center coordinates are written with the protected class token
+\texttt{SPECIAL\_PROTECTED}.  The header also records the reduction policy
+\texttt{SPECIAL\_PROTECTED\_FIRST\_THEN\_ORDINARY\_}
+\texttt{ANALYTIC\_RANK}.
+This makes restarts reproducible and tells downstream programs that the
+protected coordinates are part of the molecular model, not disposable
+redundant candidates.
+
 The target rank is \(3N-6\) for nonlinear molecules and \(3N-5\) for linear
 molecules.  If the final non-redundant count does not match the target,
 \program{} stops with an error.  If the pre-pruning count differs from the
@@ -498,10 +522,13 @@ re-symmetrize; they must consume the frozen schema and its labels.
 The post-check is deliberately constrained.  A symmetry-adapted coordinate must
 be expressible from a physically homogeneous source block.  The allowed blocks
 are primitive stretches, ordinary bends, linear bends, torsions, out-of-plane
-coordinates, ring bends, ring torsions and local out-of-plane/improper blocks
-around the same center.  There is no global fallback that mixes every primitive
-in the molecule.  This preserves the meaning of the final coordinates and makes
-the result comparable between Fortran and Python.
+coordinates, ring bends, ring torsions, local out-of-plane/improper blocks
+around the same center and protected special-coordinate blocks.  Protected
+special-coordinate blocks are fragment-center distances, fragment-center to atom
+distances, fragment translations, fragment orientations and atom to
+virtual-center distances.  There is no global fallback that mixes every
+primitive in the molecule.  This preserves the meaning of the final coordinates
+and makes the result comparable between Fortran and Python.
 
 Within a homogeneous block, equivalent primitives are collected by the symmetry
 operations.  The totally symmetric combination is the normalized sum over the

@@ -42,6 +42,12 @@ Additional tilt, torsion and frame-orientation primitives should reuse the same
 center records rather than introducing separate center parsers.
 
 These primitives are frozen in `#GIC` and available to ORACLE downstream tools.
+They are serialized with `CLASS=SPECIAL_PROTECTED` and are reduced before
+ordinary primitives. This prevents a stretch, bend or torsion from eliminating
+an inter-fragment or atom-center coordinate that was explicitly requested by
+fragment/topology state. Redundancy among special coordinates is still tested by
+analytic B-matrix rank.
+
 `[GAUSSIAN_GIC]` exports them as Gaussian symbolic GIC expressions using
 `Fragment(...)`, `XCntr/YCntr/ZCntr(...)`, Cartesian `X/Y/Z`, and the
 fragment-frame `P/Q/S` plus quaternion/exponential-map construction documented

@@ -1,0 +1,143 @@
+# ORACLE GIC Method
+
+Date: 2026-06-26
+
+## Scope
+
+This note documents the ORACLE-native generalized internal coordinate method
+implemented by GICForge. It covers coordinate construction, non-redundant
+reduction, B-matrix ownership and symmetry policy. The same frozen definition is
+used by Gaussian export, GF, SEfit, thermochemistry and anharmonic modules.
+
+GICForge is not allowed to rediscover molecular state. It consumes the enriched
+`xyzin` container produced upstream:
+
+- geometry from ORACLE-Babel;
+- validation status;
+- topology, bonds, rings and synthons;
+- point-group assignment;
+- fragment records;
+- interaction-center records for bond midpoints, ring centers and future
+  eta-n/contact centers.
+
+The output is a frozen `#GIC` section. Downstream tools must consume that
+section and must not regenerate topology, fragments, centers or GIC rows.
+
+## Primitive Families
+
+Ordinary primitives describe local molecular deformations:
+
+- `STRETCH` / `R`;
+- `BEND` / `A`;
+- `LINEAR_BEND` / `L`;
+- `TORSION` / `D`;
+- `OUT_OF_PLANE` / `U`.
+
+Special primitives describe objects that are not ordinary valence graph edges:
+
+- `FRAG_DISTANCE` / `FC_DIST`, the distance between two fragment centers;
+- `FRAG_CENTER_ATOM_DISTANCE` / `FCA_DIST`, the distance between a fragment
+  center and an atom;
+- `FRAG_TRANSLATION` / `FTRANS`, one Cartesian component of a fragment-center
+  displacement;
+- `FRAG_ORIENTATION` / `FROT`, one exponential-map component of a relative
+  fragment orientation;
+- `CENTER_ATOM_DISTANCE` / `CENTER_ATOM_DIST`, the distance between an atom and
+  a virtual center such as a ring centroid, bond midpoint or eta/contact center.
+
+Every primitive stored in `#GIC` carries a `CLASS` field. Ordinary primitives
+are written as `CLASS=ORDINARY`. Special primitives are written as
+`CLASS=SPECIAL_PROTECTED`.
+
+## B Matrix
+
+The Wilson B matrix is evaluated analytically from the frozen `#GIC` section.
+Distance, angle and center-distance rows use closed-form derivatives. Fragment
+translations use direct centroid derivatives. Fragment orientations use the
+relative frame quaternion and its exponential-map components, with the same
+small-rotation limit used by the Gaussian symbolic export.
+
+This makes the B matrix a shared service. Python and Fortran backends must use
+the same mathematical definitions, and downstream programs must call the
+GICForge B-matrix API rather than carrying private derivative code.
+
+## Non-Redundant Reduction
+
+The reduction target is the vibrational rank:
+
+- `3N-6` for nonlinear molecules;
+- `3N-5` for linear molecules.
+
+All rank decisions use normalized analytic B rows and a single numerical
+tolerance. The important ORACLE-specific rule is the reduction order:
+
+1. Special protected primitives are tested first.
+2. Ordinary primitives are used only to complete the rank after the protected
+   set has been handled.
+3. A protected primitive can be skipped only if its B row is singular or
+   linearly dependent on previously accepted protected rows.
+4. A protected primitive is never eliminated because an ordinary stretch, bend
+   or torsion was accepted earlier.
+5. If independent protected primitives alone exceed the vibrational rank,
+   GICForge stops with a contract error instead of silently discarding one.
+
+This policy is different from a global SVD or a pure candidate-order greedy
+selection. It preserves chemically meaningful inter-fragment, atom-center and
+fragment-orientation coordinates even when an ordinary primitive spans a similar
+first-order displacement.
+
+The `#GIC` header records the policy as:
+
+```text
+RANK_METHOD analytic_b_matrix_greedy
+REDUCTION_POLICY SPECIAL_PROTECTED_FIRST_THEN_ORDINARY_ANALYTIC_RANK
+```
+
+## Symmetrization
+
+Symmetrization is applied after a valid non-redundant basis exists. It is not a
+repair step for a redundant coordinate set. The symmetry layer may combine only
+homogeneous source blocks: stretches with stretches, bends with bends,
+fragment-orientation coordinates with fragment-orientation coordinates, and so
+on. It must not mix unrelated coordinate families just because they share an
+irreducible representation.
+
+For special coordinates, the intended symmetry source blocks are the protected
+classes themselves:
+
+- fragment-center distances;
+- fragment-center to atom distances;
+- fragment translations;
+- fragment orientations;
+- atom to virtual-center distances.
+
+The symmetrized block must preserve the family counts and the protected
+semantic role. If symmetry projection would destroy these counts or produce
+ambiguous labels, the correct behavior is a clean stop.
+
+## Gaussian Export
+
+Gaussian output is a representation of the frozen ORACLE GICs, not the owner of
+the method. Native Gaussian primitives are emitted directly where possible.
+Fragment and virtual-center coordinates are emitted through Gaussian ReadGIC
+symbolic expressions using `Fragment(...)`, `XCntr/YCntr/ZCntr(...)`,
+coordinate references and regularized exponential-map expressions.
+
+The Gaussian block is therefore reproducible from the frozen `#GIC` section and
+the saved geometry. It is not used as the internal source of truth for rank,
+symmetry or B-matrix construction.
+
+## Guarantees
+
+For a successful build, GICForge guarantees:
+
+- the final GIC count equals the vibrational rank;
+- all selected rows have finite analytic B rows;
+- special protected coordinates are selected before ordinary coordinates;
+- the frozen primitive list, Gaussian export and B-matrix rows refer to the same
+  coordinate labels;
+- downstream modules can restart from `xyzin` without rerunning topology,
+  fragmentation or coordinate selection.
+
+Any violation of these guarantees is a contract failure and should stop the
+pipeline before GF, SEfit, thermochemistry or anharmonic analysis starts.
