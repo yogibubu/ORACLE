@@ -11,10 +11,13 @@ from oracle_gaussian import hessian_input_from_gaussian_fchk
 from oracle_gicforge import read_gic_definition_from_xyzin
 
 from .internal import (
+    GFLocalOptions,
     InternalGFResult,
     gf_from_hessian_input_and_xyzin,
     gf_from_hessian_input_with_oracle_gics,
+    topology_bonds_from_xyzin,
 )
+from .nonbonded import nonbonded_cartesian_hessian_correction, synthon_charges_from_xyzin
 
 
 @dataclass(frozen=True)
@@ -40,12 +43,39 @@ def run_xyzin_gf_report_from_fchk(
     *,
     scale_path: Path | None = None,
     scale_records: tuple[str, ...] = (),
+    local: bool = False,
+    force_threshold: float | None = None,
+    block_by_irrep: bool = False,
+    subtract_electrostatic: bool = False,
+    subtract_uff_vdw: bool = False,
+    nonbonded_14_scale: float = 0.5,
 ) -> GFReport:
     """Run the frozen-xyzin GF branch from a Cartesian Hessian FCHK adapter."""
     path = Path(fchk_path)
     xyzin = Path(xyzin_path)
     definition = read_gic_definition_from_xyzin(xyzin)
     hessian_input = hessian_input_from_gaussian_fchk(path)
+    correction = None
+    correction_label = "NONE"
+    if subtract_electrostatic or subtract_uff_vdw:
+        topology_bonds = topology_bonds_from_xyzin(xyzin)
+        charges = None
+        labels: list[str] = []
+        if subtract_electrostatic:
+            charges, charge_source = synthon_charges_from_xyzin(xyzin, len(hessian_input.atomic_numbers))
+            labels.append(f"ELECTROSTATIC({charge_source})")
+        if subtract_uff_vdw:
+            labels.append("UFF_VDW")
+        correction = nonbonded_cartesian_hessian_correction(
+            hessian_input.cartesian_coordinates_bohr,
+            hessian_input.atomic_numbers,
+            topology_bonds,
+            charges=charges,
+            electrostatic=subtract_electrostatic,
+            uff_vdw=subtract_uff_vdw,
+            one_four_scale=nonbonded_14_scale,
+        )
+        correction_label = "+".join(labels) + f"; 1-4 scale={float(nonbonded_14_scale):g}"
     names = tuple(gic.name for gic in definition.gics)
     labels = tuple(_gic_display_label(gic.identifier, gic.gaussian_expression) for gic in definition.gics)
     scaling = pulay_scaling_factors(
@@ -59,6 +89,11 @@ def run_xyzin_gf_report_from_fchk(
         hessian_input,
         xyzin,
         scaling_factors=scaling,
+        local_options=GFLocalOptions(enabled=local),
+        force_threshold=force_threshold,
+        block_by_irrep=block_by_irrep,
+        cartesian_hessian_correction=correction,
+        cartesian_hessian_correction_label=correction_label,
     )
     return GFReport(
         path,
@@ -82,6 +117,8 @@ def format_gf_report(
         f"Coordinate source: {result.coordinate_source}",
         f"Point group: {result.point_group}",
         f"Symmetrized GICs: {result.symmetrized_gics}",
+        f"Matrix model: {result.matrix_model}",
+        f"Cartesian Hessian correction: {result.hessian_correction}",
         f"GIC count: {len(result.gic_labels)}",
         "",
         "Frequencies (cm-1):",
@@ -95,6 +132,17 @@ def format_gf_report(
             "Pulay Hessian scaling: "
             f"applied ({changed} factors != 1; file={Path(scale_path) if scale_path else 'inline/default'})",
         )
+    if result.force_threshold is not None:
+        lines.insert(
+            3 if xyzin_path is not None else 2,
+            f"Force-constant threshold: {result.force_threshold:g}",
+        )
+    if result.block_labels:
+        counts = ", ".join(
+            f"{label}:{result.block_labels.count(label)}"
+            for label in dict.fromkeys(result.block_labels)
+        )
+        lines.insert(3 if xyzin_path is not None else 2, f"GF blocks: {counts}")
     for idx, freq in enumerate(result.frequencies_cm, start=1):
         lines.append(f"  mode {idx:3d}: {freq:12.3f}")
 

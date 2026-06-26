@@ -67,6 +67,49 @@ def test_babel_preprocess_writes_avogadro_compatible_enriched_xyz(tmp_path):
     assert set(geometry.metadata["sections"]) >= {"SOURCE", "SYMMETRY", "TOPOLOGY", "SYNTHONS"}
 
 
+def test_babel_preprocess_imports_gaussian_cm5_and_mayer_topology(tmp_path):
+    source = tmp_path / "water.log"
+    source.write_text(
+        "\n".join(
+            [
+                " Standard orientation:",
+                " ---------------------------------------------------------------------",
+                " Center     Atomic      Atomic             Coordinates (Angstroms)",
+                " Number     Number       Type             X           Y           Z",
+                " ---------------------------------------------------------------------",
+                "      1          8           0        0.000000    0.000000    0.000000",
+                "      2          1           0        0.000000    0.000000    0.960000",
+                "      3          1           0        0.000000    0.760000   -0.580000",
+                " ---------------------------------------------------------------------",
+                " Hirshfeld charges, spin densities, dipoles, and CM5 charges",
+                "   1  O   -0.0100   0.0000  -0.4000",
+                "   2  H    0.0100   0.0000   0.2000",
+                "   3  H    0.0100   0.0000   0.2000",
+                "",
+                " Mayer bond orders and valences:",
+                "  B( 1-O, 2-H)=0.9000 B( 1-O, 3-H)=0.9100",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    target = tmp_path / "water.xyzin"
+
+    result = preprocess_to_enriched_xyz(source, target)
+    lines = read_sectioned_lines(target)
+    gaussian = section_content(lines, "GAUSSIAN_TOPOLOGY")
+    synthons = section_content(lines, "SYNTHONS")
+    topology = section_content(lines, "TOPOLOGY")
+
+    assert result.topology_bond_count == 2
+    assert "CM5 1 -0.4000000000" in gaussian
+    assert "BO_SOURCE = Mayer" in gaussian
+    assert "CHARGE_SOURCE Gaussian CM5" in synthons
+    assert "BOND_ORDER_SOURCE Gaussian Mayer" in topology
+    oxygen_line = next(line for line in synthons if line.startswith("1 O "))
+    assert float(oxygen_line.split()[3]) == -0.4
+
+
 def test_symmetry_candidate_operations_include_nonprimitive_rotation_powers():
     labels = {label for label, _operation in candidate_ops(max_n=4)}
 

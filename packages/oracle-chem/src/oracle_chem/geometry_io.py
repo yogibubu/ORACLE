@@ -126,4 +126,8 @@ def read_geometry(path: Path) -> MolecularGeometry:
         if is_legacy_smiles_input(target):
             return read_legacy_smiles_input(target)
         return read_gaussian_input(target)
+    if suffix in {".log", ".out"}:
+        from oracle_gaussian import read_gaussian_log_geometry
+
+        return read_gaussian_log_geometry(target)
     raise GeometryParseError(f"unsupported geometry format: {target}")

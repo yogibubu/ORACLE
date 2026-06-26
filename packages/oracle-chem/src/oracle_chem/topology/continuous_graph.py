@@ -36,10 +36,11 @@ class ContinuousGraph:
     - BO (bond order matrix)
     """
 
-    def __init__(self, coords, Z):
+    def __init__(self, coords, Z, *, bond_order_overrides=None):
         self.coords = np.array(coords, dtype=float)
         self.Z = np.array(Z, dtype=int)
         self.natoms = len(self.Z)
+        self.bond_order_overrides = bond_order_overrides or {}
 
         neighbors = [list(range(self.natoms)) for _ in range(self.natoms)]
         for i in range(self.natoms):
@@ -49,7 +50,10 @@ class ContinuousGraph:
         cache = {}
         for i in range(self.natoms):
             for j in range(i + 1, self.natoms):
-                bo = bond_order(i, j, self.Z, self.coords, neighbors, cache)
+                key = (i, j) if i < j else (j, i)
+                bo = self.bond_order_overrides.get(key)
+                if bo is None:
+                    bo = bond_order(i, j, self.Z, self.coords, neighbors, cache)
                 self.BO[i, j] = self.BO[j, i] = bo
 
 

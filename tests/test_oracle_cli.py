@@ -273,8 +273,31 @@ def test_gf_cli_runs_xyzin_report_and_csv_export(tmp_path, monkeypatch, capsys):
     out = tmp_path / "gf.txt"
     csv_dir = tmp_path / "csv"
 
-    def fake_run(fchk_path, xyzin_path, *, scale_path=None, scale_records=()):
-        calls["run"] = (fchk_path, xyzin_path, scale_path, scale_records)
+    def fake_run(
+        fchk_path,
+        xyzin_path,
+        *,
+        scale_path=None,
+        scale_records=(),
+        local=False,
+        force_threshold=None,
+        block_by_irrep=False,
+        subtract_electrostatic=False,
+        subtract_uff_vdw=False,
+        nonbonded_14_scale=0.5,
+    ):
+        calls["run"] = (
+            fchk_path,
+            xyzin_path,
+            scale_path,
+            scale_records,
+            local,
+            force_threshold,
+            block_by_irrep,
+            subtract_electrostatic,
+            subtract_uff_vdw,
+            nonbonded_14_scale,
+        )
         return SimpleNamespace(text="gf report")
 
     def fake_csv(report, outdir, *, prefix="gf"):
@@ -297,11 +320,30 @@ def test_gf_cli_runs_xyzin_report_and_csv_export(tmp_path, monkeypatch, capsys):
             str(csv_dir),
             "--scale",
             "GIC003=0.9",
+            "--local",
+            "--symmetry-blocks",
+            "--force-threshold",
+            "1e-8",
+            "--subtract-electrostatic",
+            "--subtract-uff-vdw",
+            "--nonbonded-14-scale",
+            "0.25",
         ]
     )
 
     assert rc == 0
-    assert calls["run"] == (fchk, xyzin, None, ("GIC003=0.9",))
+    assert calls["run"] == (
+        fchk,
+        xyzin,
+        None,
+        ("GIC003=0.9",),
+        True,
+        1.0e-8,
+        True,
+        True,
+        True,
+        0.25,
+    )
     assert calls["csv"] == ("gf report", csv_dir, "gic_gf")
     assert out.read_text(encoding="utf-8") == "gf report\n"
     assert "Wrote GF/PED report" in capsys.readouterr().out

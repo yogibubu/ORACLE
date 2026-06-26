@@ -25,6 +25,10 @@ def build_topology_objects(
     coords,
     Z,
     *,
+    bond_order_overrides=None,
+    external_charges=None,
+    charge_source="Synthons electronegativity model",
+    bond_order_source="Topology Pauling continuous model",
     force_aromatic=False,
 ):
     """
@@ -51,7 +55,7 @@ def build_topology_objects(
     # --------------------------------------------------------
     # Continuous topology (geometry-first)
     # --------------------------------------------------------
-    cg = ContinuousGraph(coords, Z)
+    cg = ContinuousGraph(coords, Z, bond_order_overrides=bond_order_overrides)
 
     # --------------------------------------------------------
     # Discrete topology (H-robust)
@@ -72,6 +76,10 @@ def build_topology_objects(
         coords=cg.coords,
         neighbors=neighbors,
     )
+    synthons._external_charges = external_charges or None
+    synthons._external_bond_orders = bond_order_overrides or None
+    synthons._charge_source = charge_source
+    synthons._bond_order_source = bond_order_source
 
     # --------------------------------------------------------
     # Aromaticity (ring-driven, discrete + geometry)

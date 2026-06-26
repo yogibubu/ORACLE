@@ -87,6 +87,25 @@ def build_parser(*, repo_root: Path | None = None) -> argparse.ArgumentParser:
     gf.add_argument("--csv-dir", type=Path, help="Write GF/PED CSV tables")
     gf.add_argument("--scale-file", type=Path)
     gf.add_argument("--scale", action="append", default=[])
+    gf.add_argument("--local", action="store_true", help="Apply local force-field filtering")
+    gf.add_argument("--symmetry-blocks", action="store_true", help="Solve separated irrep blocks")
+    gf.add_argument("--force-threshold", type=float, help="Zero internal force constants below threshold")
+    gf.add_argument(
+        "--subtract-electrostatic",
+        action="store_true",
+        help="Subtract CM5/synthon electrostatic Hessian terms before GF",
+    )
+    gf.add_argument(
+        "--subtract-uff-vdw",
+        action="store_true",
+        help="Subtract UFF van der Waals Hessian terms before GF",
+    )
+    gf.add_argument(
+        "--nonbonded-14-scale",
+        type=float,
+        default=0.5,
+        help="Scale factor for 1-4 electrostatic and UFF-vdW terms",
+    )
 
     gicforge = sub.add_parser("gicforge", help="Plan GICForge post-validation sections")
     gicforge_sub = gicforge.add_subparsers(dest="gicforge_command")
@@ -250,6 +269,12 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
                 args.xyzin,
                 scale_path=args.scale_file,
                 scale_records=tuple(args.scale),
+                local=args.local,
+                force_threshold=args.force_threshold,
+                block_by_irrep=args.symmetry_blocks,
+                subtract_electrostatic=args.subtract_electrostatic,
+                subtract_uff_vdw=args.subtract_uff_vdw,
+                nonbonded_14_scale=args.nonbonded_14_scale,
             )
             prefix = "gic_gf"
         if args.out is not None:

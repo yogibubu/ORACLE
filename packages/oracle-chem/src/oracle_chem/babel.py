@@ -6,7 +6,7 @@ from typing import Literal
 
 import numpy as np
 
-from oracle_core import replace_section, replace_xyz_block
+from oracle_core import read_sectioned_lines, replace_section, replace_xyz_block, section_content
 
 from .geometry import MolecularGeometry
 from .geometry_io import read_geometry
@@ -45,6 +45,7 @@ def preprocess_to_enriched_xyz(
     geometry = read_geometry(Path(source))
     write_enriched_geometry(target, geometry)
     write_source_section(target, source=Path(source), source_kind=source_kind, geometry=geometry)
+    write_gaussian_topology_section(target, source=Path(source))
     symmetry = determine_initial_symmetry(geometry, symmetry_thresholds)
     point_group = symmetry.point_group
     write_symmetry_section(target, symmetry=symmetry, thresholds=symmetry_thresholds)
@@ -79,6 +80,20 @@ def write_source_section(
             f"PATH {source}",
         ],
     )
+
+
+def write_gaussian_topology_section(path: Path, *, source: Path) -> int:
+    """Write Gaussian CM5/Mayer annotations when the import source provides them."""
+    suffix = Path(source).suffix.lower()
+    if suffix not in {".log", ".out"}:
+        return 0
+    from oracle_gaussian import gaussian_topology_section_lines
+
+    lines = gaussian_topology_section_lines(Path(source))
+    if not lines:
+        return 0
+    replace_section(Path(path), "GAUSSIAN_TOPOLOGY", lines)
+    return len(lines)
 
 
 def determine_initial_symmetry(
@@ -118,13 +133,19 @@ def write_topology_and_synthons_sections(
     geometry: MolecularGeometry,
 ) -> tuple[int, int]:
     atomic_numbers = [_atomic_number(atom) for atom in geometry.atoms]
+    gaussian = gaussian_topology_overrides_from_xyzin(Path(path))
     continuous, discrete, ringset, synthons, aromaticity = build_topology_objects(
         geometry.coordinates_angstrom,
         atomic_numbers,
+        bond_order_overrides=gaussian["bond_orders"],
+        external_charges=gaussian["charges"],
+        charge_source=gaussian["charge_source"],
+        bond_order_source=gaussian["bond_order_source"],
     )
     topology_lines = [
         "SCHEMA oracle.xyz.topology.v1",
         "INDEXING ATOMS=ONE_BASED",
+        f"BOND_ORDER_SOURCE {gaussian['bond_order_source']}",
         "[BONDS]",
     ]
     if discrete.bonds:
@@ -149,6 +170,8 @@ def write_topology_and_synthons_sections(
     synthon_lines = [
         "SCHEMA oracle.xyz.synthons.v1",
         "INDEXING ATOMS=ONE_BASED",
+        f"CHARGE_SOURCE {gaussian['charge_source']}",
+        f"BOND_ORDER_SOURCE {gaussian['bond_order_source']}",
         "COLUMNS ATOM Z ZEFF CHARGE COVALENCY DELOCALIZATION STRAIN SIGNATURE",
     ]
     for idx, atom in enumerate(geometry.atoms):
@@ -165,6 +188,42 @@ def write_topology_and_synthons_sections(
         )
     replace_section(Path(path), "SYNTHONS", synthon_lines)
     return len(discrete.bonds), len(ringset.rings)
+
+
+def gaussian_topology_overrides_from_xyzin(path: Path) -> dict[str, object]:
+    """Read #GAUSSIAN_TOPOLOGY as Merlino-compatible topology overrides."""
+    content = section_content(read_sectioned_lines(Path(path)), "GAUSSIAN_TOPOLOGY")
+    charges: dict[int, float] = {}
+    bond_orders: dict[tuple[int, int], float] = {}
+    bo_source: str | None = None
+    for raw in content:
+        text = raw.strip()
+        if not text or text.upper().startswith(("SCHEMA ", "INDEXING ", "CM5_COUNT", "BO_COUNT")):
+            continue
+        parts = text.replace("=", " = ").split()
+        key = parts[0].upper() if parts else ""
+        if key == "CM5" and len(parts) >= 3:
+            idx = int(parts[1]) - 1
+            if idx >= 0:
+                charges[idx] = float(parts[2])
+            continue
+        if key == "BO_SOURCE" and len(parts) >= 2:
+            bo_source = parts[2] if len(parts) >= 3 and parts[1] == "=" else parts[1]
+            continue
+        if key == "BO" and len(parts) >= 4:
+            i = int(parts[1]) - 1
+            j = int(parts[2]) - 1
+            if i >= 0 and j >= 0 and i != j:
+                pair = (i, j) if i < j else (j, i)
+                bond_orders[pair] = float(parts[3])
+    return {
+        "charges": charges,
+        "bond_orders": bond_orders,
+        "charge_source": "Gaussian CM5" if charges else "Synthons electronegativity model",
+        "bond_order_source": (
+            f"Gaussian {bo_source}" if bond_orders and bo_source else "Topology Pauling continuous model"
+        ),
+    }
 
 
 def _atomic_number(symbol: str) -> int:

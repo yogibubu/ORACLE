@@ -274,6 +274,43 @@ Scaling factors must be non-negative.  Ambiguous or unmatched selectors are
 fatal errors because silent scaling of the wrong coordinate would invalidate the
 PED interpretation.
 
+\section{Non-Bonded Hessian Subtraction and Local Models}
+
+Before the Cartesian Hessian is transformed to the GIC basis, GF/PED may
+subtract model electrostatic and van der Waals contributions:
+
+\begin{lstlisting}[style=oracle]
+python -m oracle gf \
+  --fchk working/gauin.fchk \
+  --xyzin working/xyzin \
+  --subtract-electrostatic \
+  --subtract-uff-vdw \
+  --nonbonded-14-scale 0.5 \
+  --local
+\end{lstlisting}
+
+\noindent
+The charge vector is read from the canonical \texttt{\#SYNTHONS} section.  If
+Gaussian CM5 charges were imported during ORACLE-Babel preprocessing, those are
+used.  Otherwise the same synthon charge column is present and comes from the
+ORACLE electronegativity model.  GF/PED therefore never reparses Gaussian text
+for charges.
+
+The van der Waals correction uses ORACLE topology radii and UFF well-depth
+coefficients where available.  Unsupported element pairs fail explicitly
+rather than silently using zeros.
+
+Both electrostatic and UFF-vdW corrections use the same topological pair
+policy: 1-2 and 1-3 pairs are excluded, 1-4 pairs are included with
+\texttt{--nonbonded-14-scale} (default 0.5), and pairs beyond 1-4 are included
+with full weight.  Disconnected inter-fragment pairs are treated as beyond
+1-4.
+
+The optional \texttt{--local} model is applied after this Cartesian subtraction
+and after transformation to internal coordinates.  It keeps diagonal primitive
+terms and local bonded couplings while zeroing non-local internal
+force-constant terms.
+
 \section{Output Files}
 
 \begin{longtable}{@{}p{0.31\linewidth}p{0.59\linewidth}@{}}

@@ -8,8 +8,11 @@ import numpy as np
 
 from oracle_chem import preprocess_to_enriched_xyz, write_validation_section
 from oracle_chem.topology.elements import atomic_symbol
+from oracle_core import read_sectioned_lines, section_content
 from oracle_gicforge import (
+    FrozenGIC,
     GICDefinition,
+    GICPrimitive,
     build_gic_b_matrix,
     read_gic_definition_from_xyzin,
     write_gicforge_build_sections,
@@ -31,6 +34,13 @@ class PEDTable:
 
 
 @dataclass(frozen=True)
+class GFLocalOptions:
+    """Pulay-style local force-field filtering options."""
+
+    enabled: bool = False
+
+
+@dataclass(frozen=True)
 class InternalGFResult:
     frequencies_cm: np.ndarray
     force_constants: np.ndarray
@@ -47,6 +57,10 @@ class InternalGFResult:
     symmetrized_gics: bool = False
     scaling_factors: np.ndarray | None = None
     coordinate_source: str = "frozen-gic-definition"
+    matrix_model: str = "FULL"
+    block_labels: tuple[str, ...] = ()
+    force_threshold: float | None = None
+    hessian_correction: str = "NONE"
 
 
 def primitive_label(primitive: object) -> str:
@@ -145,10 +159,20 @@ def gf_from_cartesian_hessian_and_gic_b_matrix(
     point_group: str = "UNKNOWN",
     symmetrized_gics: bool = False,
     scaling_factors: np.ndarray | None = None,
+    local_mask: np.ndarray | None = None,
+    force_threshold: float | None = None,
+    block_by_irrep: bool = False,
+    cartesian_hessian_correction: np.ndarray | None = None,
+    cartesian_hessian_correction_label: str = "NONE",
     coordinate_source: str = "frozen-gic-definition",
 ) -> InternalGFResult:
     """Run Wilson GF from a Cartesian Hessian and a fixed non-redundant B matrix."""
     hessian = np.asarray(cartesian_hessian, dtype=float)
+    if cartesian_hessian_correction is not None:
+        correction = np.asarray(cartesian_hessian_correction, dtype=float)
+        if correction.shape != hessian.shape:
+            raise ValueError("Cartesian Hessian correction has inconsistent dimensions")
+        hessian = hessian - correction
     bq = np.asarray(b_matrix_internal, dtype=float)
     masses = np.asarray(masses_amu, dtype=float)
     if hessian.shape != (3 * len(masses), 3 * len(masses)):
@@ -164,8 +188,29 @@ def gf_from_cartesian_hessian_and_gic_b_matrix(
     force_constants = backtransform.T @ hessian @ backtransform
     force_constants = 0.5 * (force_constants + force_constants.T)
     force_constants = pulay_scale_internal_hessian(force_constants, scaling_factors)
+    matrix_model = "FULL"
+    if local_mask is not None:
+        mask = np.asarray(local_mask, dtype=bool)
+        if mask.shape != force_constants.shape:
+            raise ValueError("Local force-constant mask has inconsistent dimensions")
+        force_constants = np.where(mask, force_constants, 0.0)
+        force_constants = 0.5 * (force_constants + force_constants.T)
+        matrix_model = "LOCAL"
+    if force_threshold is not None:
+        threshold = float(force_threshold)
+        if threshold < 0.0:
+            raise ValueError("Force-constant threshold must be non-negative")
+        force_constants = np.where(np.abs(force_constants) < threshold, 0.0, force_constants)
+        force_constants = 0.5 * (force_constants + force_constants.T)
 
-    gf = solve_wilson_gf(force_constants, g_matrix, scale_to_cm=True)
+    gf, g_matrix, force_constants, block_labels = _solve_internal_gf(
+        force_constants,
+        g_matrix,
+        gic_irreps=tuple(gic_irreps),
+        block_by_irrep=block_by_irrep,
+    )
+    if block_labels:
+        matrix_model = f"{matrix_model}+IRREP_BLOCKS"
     g_eval, g_vec = np.linalg.eigh(0.5 * (g_matrix + g_matrix.T))
     g_inv_half = (g_vec * (1.0 / np.sqrt(np.clip(g_eval, 1.0e-14, None)))) @ g_vec.T
     modes_internal = g_inv_half @ gf.normal_modes
@@ -190,6 +235,10 @@ def gf_from_cartesian_hessian_and_gic_b_matrix(
         symmetrized_gics=bool(symmetrized_gics),
         scaling_factors=None if scaling_factors is None else np.asarray(scaling_factors, dtype=float),
         coordinate_source=coordinate_source,
+        matrix_model=matrix_model,
+        block_labels=block_labels,
+        force_threshold=force_threshold,
+        hessian_correction=cartesian_hessian_correction_label,
     )
 
 
@@ -199,6 +248,12 @@ def gf_from_hessian_input_and_gic_definition(
     *,
     coordinates_angstrom: np.ndarray | None = None,
     scaling_factors: np.ndarray | None = None,
+    topology_bonds: tuple[tuple[int, int], ...] = (),
+    local_options: GFLocalOptions | None = None,
+    force_threshold: float | None = None,
+    block_by_irrep: bool = False,
+    cartesian_hessian_correction: np.ndarray | None = None,
+    cartesian_hessian_correction_label: str = "NONE",
 ) -> InternalGFResult:
     """Run GF/PED using a frozen GIC definition and canonical Hessian input."""
     input_data.validate()
@@ -210,6 +265,9 @@ def gf_from_hessian_input_and_gic_definition(
         else np.asarray(coordinates_angstrom, dtype=float) / BOHR_TO_ANGSTROM
     )
     b_matrix = build_gic_b_matrix(definition, coordinates_angstrom=coords_for_b)
+    local_mask = None
+    if local_options is not None and local_options.enabled:
+        local_mask = local_force_constant_mask(definition, topology_bonds)
     return gf_from_cartesian_hessian_and_gic_b_matrix(
         input_data.cartesian_hessian,
         np.asarray(b_matrix.rows, dtype=float),
@@ -221,6 +279,11 @@ def gf_from_hessian_input_and_gic_definition(
         point_group=definition.point_group,
         symmetrized_gics=definition.symmetrize,
         scaling_factors=scaling_factors,
+        local_mask=local_mask,
+        force_threshold=force_threshold,
+        block_by_irrep=block_by_irrep,
+        cartesian_hessian_correction=cartesian_hessian_correction,
+        cartesian_hessian_correction_label=cartesian_hessian_correction_label,
         coordinate_source=f"frozen-gic-definition:{definition.point_group}",
     )
 
@@ -230,6 +293,11 @@ def gf_from_hessian_input_and_xyzin(
     xyzin_path: Path,
     *,
     scaling_factors: np.ndarray | None = None,
+    local_options: GFLocalOptions | None = None,
+    force_threshold: float | None = None,
+    block_by_irrep: bool = False,
+    cartesian_hessian_correction: np.ndarray | None = None,
+    cartesian_hessian_correction_label: str = "NONE",
 ) -> InternalGFResult:
     """Run GF/PED using the frozen #GIC section stored in an ORACLE xyzin file."""
     input_data.validate()
@@ -238,6 +306,12 @@ def gf_from_hessian_input_and_xyzin(
         definition,
         coordinates_angstrom=np.asarray(input_data.cartesian_coordinates_bohr, dtype=float),
     )
+    local_mask = None
+    if local_options is not None and local_options.enabled:
+        local_mask = local_force_constant_mask(
+            definition,
+            topology_bonds_from_xyzin(Path(xyzin_path)),
+        )
     return gf_from_cartesian_hessian_and_gic_b_matrix(
         input_data.cartesian_hessian,
         np.asarray(b_matrix.rows, dtype=float),
@@ -249,6 +323,11 @@ def gf_from_hessian_input_and_xyzin(
         point_group=definition.point_group,
         symmetrized_gics=definition.symmetrize,
         scaling_factors=scaling_factors,
+        local_mask=local_mask,
+        force_threshold=force_threshold,
+        block_by_irrep=block_by_irrep,
+        cartesian_hessian_correction=cartesian_hessian_correction,
+        cartesian_hessian_correction_label=cartesian_hessian_correction_label,
         coordinate_source=f"xyzin-frozen-gic:{Path(xyzin_path)}",
     )
 
@@ -316,6 +395,195 @@ def gf_from_gaussian_fchk_with_oracle_gics(path: Path) -> InternalGFResult:
     from oracle_gaussian import hessian_input_from_gaussian_fchk
 
     return gf_from_hessian_input_with_oracle_gics(hessian_input_from_gaussian_fchk(path))
+
+
+def topology_bonds_from_xyzin(path: Path) -> tuple[tuple[int, int], ...]:
+    """Read one-based topology bonds from an ORACLE xyzin file."""
+    lines = read_sectioned_lines(Path(path))
+    topology = section_content(lines, "TOPOLOGY")
+    bond_lines = _subsection(topology, "BONDS")
+    bonds: list[tuple[int, int]] = []
+    for line in bond_lines:
+        text = line.strip()
+        if not text or text.upper() == "NONE":
+            continue
+        parts = text.split()
+        if len(parts) < 2:
+            continue
+        left, right = int(parts[0]), int(parts[1])
+        bonds.append(tuple(sorted((left, right))))
+    return tuple(dict.fromkeys(bonds))
+
+
+def local_force_constant_mask(
+    definition: GICDefinition,
+    topology_bonds: tuple[tuple[int, int], ...],
+) -> np.ndarray:
+    """Return a local force-field mask in the frozen GIC basis."""
+    primitive_by_id = {primitive.identifier: primitive for primitive in definition.primitives}
+    sources = tuple(_gic_source_primitives(gic, primitive_by_id) for gic in definition.gics)
+    graph = _bond_graph(topology_bonds)
+    ncoord = len(definition.gics)
+    mask = np.eye(ncoord, dtype=bool)
+    for i in range(ncoord):
+        for j in range(i + 1, ncoord):
+            allowed = any(
+                _local_primitive_pair_allowed(left, right, graph)
+                for left in sources[i]
+                for right in sources[j]
+            )
+            mask[i, j] = allowed
+            mask[j, i] = allowed
+    return mask
+
+
+def _solve_internal_gf(
+    force_constants: np.ndarray,
+    g_matrix: np.ndarray,
+    *,
+    gic_irreps: tuple[str, ...],
+    block_by_irrep: bool,
+):
+    if not block_by_irrep:
+        return solve_wilson_gf(force_constants, g_matrix, scale_to_cm=True), g_matrix, force_constants, ()
+    blocks = _irrep_blocks(gic_irreps)
+    if len(blocks) <= 1:
+        return solve_wilson_gf(force_constants, g_matrix, scale_to_cm=True), g_matrix, force_constants, ()
+
+    f_block = np.zeros_like(force_constants, dtype=float)
+    g_block = np.zeros_like(g_matrix, dtype=float)
+    eigenvalues: list[float] = []
+    frequencies: list[float] = []
+    modes: list[np.ndarray] = []
+    block_labels: list[str] = []
+    ncoord = force_constants.shape[0]
+    for irrep, indices in blocks:
+        index = np.asarray(indices, dtype=int)
+        f_sub = force_constants[np.ix_(index, index)]
+        g_sub = g_matrix[np.ix_(index, index)]
+        gf_sub = solve_wilson_gf(f_sub, g_sub, scale_to_cm=True)
+        f_block[np.ix_(index, index)] = f_sub
+        g_block[np.ix_(index, index)] = g_sub
+        for col in range(gf_sub.normal_modes.shape[1]):
+            mode = np.zeros(ncoord, dtype=float)
+            mode[index] = gf_sub.normal_modes[:, col]
+            modes.append(mode)
+            eigenvalues.append(float(gf_sub.eigenvalues[col]))
+            frequencies.append(float(gf_sub.frequencies_cm[col]))
+            block_labels.append(irrep)
+    normal_modes = np.column_stack(modes) if modes else np.zeros((ncoord, 0), dtype=float)
+    from .harmonic import GFResult
+
+    return (
+        GFResult(
+            eigenvalues=np.asarray(eigenvalues, dtype=float),
+            frequencies_cm=np.asarray(frequencies, dtype=float),
+            normal_modes=normal_modes,
+        ),
+        g_block,
+        f_block,
+        tuple(block_labels),
+    )
+
+
+def _irrep_blocks(gic_irreps: tuple[str, ...]) -> tuple[tuple[str, tuple[int, ...]], ...]:
+    blocks: dict[str, list[int]] = {}
+    for idx, irrep in enumerate(gic_irreps):
+        label = (irrep or "UNASSIGNED").strip()
+        if label.upper() in {"", "UNK", "UNKNOWN", "UNASSIGNED"}:
+            return ()
+        blocks.setdefault(label, []).append(idx)
+    return tuple((label, tuple(indices)) for label, indices in blocks.items())
+
+
+def _gic_source_primitives(
+    gic: FrozenGIC,
+    primitive_by_id: dict[str, GICPrimitive],
+) -> tuple[GICPrimitive, ...]:
+    coefficients = gic.coefficients or ((gic.primitive_id, 1.0),)
+    sources: list[GICPrimitive] = []
+    for primitive_id, coefficient in coefficients:
+        if abs(float(coefficient)) <= 1.0e-14:
+            continue
+        primitive = primitive_by_id.get(primitive_id)
+        if primitive is not None:
+            sources.append(primitive)
+    return tuple(sources)
+
+
+def _local_primitive_pair_allowed(
+    left: GICPrimitive,
+    right: GICPrimitive,
+    graph: dict[int, set[int]],
+) -> bool:
+    left_kind = _primitive_local_kind(left)
+    right_kind = _primitive_local_kind(right)
+    if left_kind is None or right_kind is None:
+        return False
+    kinds = {left_kind, right_kind}
+    if kinds == {"STRETCH"}:
+        return bool(set(left.atoms) & set(right.atoms))
+    if kinds == {"STRETCH", "BEND"}:
+        stretch = left if left_kind == "STRETCH" else right
+        bend = right if left_kind == "STRETCH" else left
+        return set(stretch.atoms).issubset(set(bend.atoms))
+    if kinds == {"BEND"}:
+        return left.atoms[1] == right.atoms[1] or len(set(left.atoms) & set(right.atoms)) >= 2
+    if kinds == {"STRETCH", "TORSION"}:
+        stretch = left if left_kind == "STRETCH" else right
+        torsion = right if left_kind == "STRETCH" else left
+        return _sets_are_vicinal(set(stretch.atoms), set(torsion.atoms), graph)
+    if kinds == {"BEND", "TORSION"}:
+        bend = left if left_kind == "BEND" else right
+        torsion = right if left_kind == "BEND" else left
+        return len(set(bend.atoms) & set(torsion.atoms)) >= 2 or _sets_are_vicinal(
+            set(bend.atoms),
+            set(torsion.atoms[1:3] if len(torsion.atoms) == 4 else torsion.atoms),
+            graph,
+        )
+    return False
+
+
+def _primitive_local_kind(primitive: GICPrimitive) -> str | None:
+    if primitive.function == "R":
+        return "STRETCH"
+    if primitive.function in {"A", "L"}:
+        return "BEND"
+    if primitive.function in {"D", "RPCK"}:
+        return "TORSION"
+    return None
+
+
+def _sets_are_vicinal(left: set[int], right: set[int], graph: dict[int, set[int]]) -> bool:
+    if left & right:
+        return True
+    return any(atom in graph.get(other, set()) for atom in left for other in right)
+
+
+def _bond_graph(bonds: tuple[tuple[int, int], ...]) -> dict[int, set[int]]:
+    graph: dict[int, set[int]] = {}
+    for left, right in bonds:
+        graph.setdefault(left, set()).add(right)
+        graph.setdefault(right, set()).add(left)
+    return graph
+
+
+def _subsection(section_lines: list[str], name: str) -> list[str]:
+    header = f"[{name.upper()}]"
+    start = None
+    for idx, line in enumerate(section_lines):
+        if line.strip().upper() == header:
+            start = idx + 1
+            break
+    if start is None:
+        return []
+    end = len(section_lines)
+    for idx in range(start, len(section_lines)):
+        text = section_lines[idx].strip()
+        if text.startswith("[") and text.endswith("]"):
+            end = idx
+            break
+    return list(section_lines[start:end])
 
 
 def _write_xyz_from_hessian_geometry(

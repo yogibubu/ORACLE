@@ -42,6 +42,26 @@ model.
 The same file is also the standalone input contract. A tool may be run directly
 from an already prepared `xyzin` file when the sections it needs are present.
 
+## Gaussian Topology Overrides
+
+When ORACLE-Babel imports a Gaussian `.log` or `.out`, `oracle-gaussian` may
+write `#GAUSSIAN_TOPOLOGY` before the topology/synthon pass. Only two Gaussian
+quantities are accepted as topology overrides:
+
+- CM5 atomic charges;
+- Mayer bond orders.
+
+If CM5 charges are present, `#SYNTHONS` uses them as the atomic charge column
+and records `CHARGE_SOURCE Gaussian CM5`. If CM5 charges are absent, synthons
+use the ORACLE electronegativity charge model and record
+`CHARGE_SOURCE Synthons electronegativity model`.
+
+If Mayer bond orders are present, topology and synthons use them and record
+`BOND_ORDER_SOURCE Gaussian Mayer`. If Mayer bond orders are absent, topology
+uses the ORACLE continuous Pauling bond-order model and records
+`BOND_ORDER_SOURCE Topology Pauling continuous model`. Gaussian total bond
+orders are not a fallback source.
+
 ## GIC State
 
 `#GIC` stores the frozen coordinate contract, not only a list of Gaussian input

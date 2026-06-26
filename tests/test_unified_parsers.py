@@ -4,8 +4,10 @@ from pathlib import Path
 
 from oracle_chem import MolecularGeometry, read_enriched_xyz, read_geometry, read_xyz, read_zmatrix
 from oracle_gaussian import (
+    parse_gaussian_topology,
     read_gaussian_cartesian_input,
     read_gaussian_input,
+    read_gaussian_log_geometry,
     read_gaussian_zmatrix_input,
     summarize_gaussian_log,
 )
@@ -225,3 +227,47 @@ def test_gaussian_log_summary_uses_shared_geometry_for_last_orientation(tmp_path
     assert summary.frequencies_cm == (100.0, 200.0, 300.0)
     assert summary.last_orientation is not None
     assert summary.last_orientation.atoms == ("O", "H")
+
+
+def test_gaussian_log_geometry_dispatch_reads_last_orientation(tmp_path):
+    path = tmp_path / "job.out"
+    path.write_text(
+        "\n".join(
+            [
+                " Input orientation:",
+                " ---------------------------------------------------------------------",
+                " Center     Atomic      Atomic             Coordinates (Angstroms)",
+                " Number     Number       Type             X           Y           Z",
+                " ---------------------------------------------------------------------",
+                "      1          6           0        0.100000    0.200000    0.300000",
+                "      2          1           0        0.100000    0.200000    1.300000",
+                " ---------------------------------------------------------------------",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    geometry = read_gaussian_log_geometry(path)
+
+    assert geometry.atoms == ("C", "H")
+    assert geometry.source_format == "gaussian_log_orientation"
+
+
+def test_gaussian_topology_parser_uses_cm5_and_mayer_only():
+    data = parse_gaussian_topology(
+        [
+            " Hirshfeld charges, spin densities, dipoles, and CM5 charges",
+            "   1  C   -0.0100   0.0000  -0.1234",
+            "   2  H    0.0100   0.0000   0.0456",
+            "",
+            " Mayer bond orders and valences:",
+            "  B( 1-C, 2-H)=0.9123",
+            "",
+            " Total bond order between atoms:",
+            "  B( 1-C, 2-H)=1.5000",
+        ]
+    )
+
+    assert data.cm5_charges == {1: -0.1234, 2: 0.0456}
+    assert data.mayer_bond_orders == {(1, 2): 0.9123}

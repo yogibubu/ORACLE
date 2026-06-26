@@ -153,6 +153,15 @@ def summarize_gaussian_log(path: Path) -> GaussianLogSummary:
     )
 
 
+def read_gaussian_log_geometry(path: Path) -> MolecularGeometry:
+    """Read the last Gaussian orientation as the shared ORACLE geometry."""
+    target = Path(path)
+    geometry = summarize_gaussian_log(target).last_orientation
+    if geometry is None:
+        raise GeometryParseError("Gaussian log contains no readable orientation block")
+    return geometry
+
+
 def _route_end(lines: list[str]) -> int | None:
     idx = 0
     while idx < len(lines):
