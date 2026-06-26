@@ -57,7 +57,7 @@ def read_geometry_input(path: Path) -> SemiexperimentalGeometryInput:
             return read_semiexperimental_job_geometry(target)
     raise ValueError(
         "Semiexperimental geometry input must be .xyz, .xyzin, .com, .gjf, "
-        ".msr, .msr.inp or an ORACLE/Merlino semiexp job TOML"
+        ".msr, .msr.inp or an ORACLE semiexp job TOML"
     )
 
 

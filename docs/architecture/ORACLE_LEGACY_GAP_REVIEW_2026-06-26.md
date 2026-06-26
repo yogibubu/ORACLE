@@ -128,14 +128,40 @@ Closed in the first MORPHEUS cleanup pass:
 - Runtime aliases for `merlino_core`, `merlino_fortran`, `geometry` and
   `topology` were removed.
 
-Remaining intentional boundary:
-
-- `merlino_fit.survibfit` and `merlino_gic` are still the active SEfit/GIC
-  kernel interfaces. They should be ported as real ORACLE kernel modules or
-  replaced by adapters to `oracle_gicforge`; they should not be renamed
-  cosmetically.
-- Only `merlino_fit` and `merlino_gic` remain as runtime aliases, because they
-  are still the active SEfit/GIC kernel boundary.
-
 Validation for this cleanup pass: `PYTHONPATH=. pytest -q` returned
 `125 passed`.
+
+## Survibfit/GIC Runtime Port 2026-06-27
+
+Closed in the GIC kernel cleanup pass:
+
+- `survibfit` primitive, B-matrix, transform, local/global symmetry,
+  similarity and supporting utilities were ported under
+  `oracle_gicforge.survibfit`.
+- The legacy-compatible GIC runtime service/model/symmetry postprocessor were
+  ported under `oracle_gicforge.runtime`.
+- MORPHEUS imports now target `oracle_gicforge.survibfit` and
+  `oracle_gicforge.runtime` directly.
+- The MORPHEUS runtime alias installer was removed; no `merlino_fit` or
+  `merlino_gic` alias is installed at import time.
+- The old MORPHEUS-vendored `legacy/merlino_fit/survibfit` and
+  `legacy/merlino_gic` source trees were removed after the ORACLE port.
+- The old MORPHEUS-vendored topology wrappers were removed; the active
+  topology source is `oracle_chem.topology`.
+- `oracle_gicforge.survibfit.pipeline` now uses `oracle_chem.topology`
+  directly instead of loading a sibling topology package.
+- Runtime GIC definitions now write `oracle.gic.definition.v1` while still
+  accepting `merlino.gic.definition.v1` in readers for historical files.
+- `MERLINO_FIT_*` runtime environment names were replaced by
+  `ORACLE_GICFORGE_*`.
+
+Remaining intentional compatibility:
+
+- `LEGACY_*` schema constants with `merlino.*` values remain only where readers
+  must accept historical job/checkpoint/GIC files.
+
+Validation for this cleanup pass:
+
+- `PYTHONPATH=. pytest -q tests/test_oracle_morpheus.py tests/test_oracle_gicforge.py tests/test_gic_regression_corpus.py`
+  returned `46 passed`.
+- `PYTHONPATH=. pytest -q` returned `125 passed`.

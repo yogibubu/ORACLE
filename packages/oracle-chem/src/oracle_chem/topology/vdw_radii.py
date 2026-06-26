@@ -20,7 +20,7 @@ MERZ_KOLLMAN = {
     92: 1.86,
 }
 
-# UFF (Rappe et al.) diameters converted to radii; ported from Merlino RVdW97.
+# UFF (Rappe et al.) diameters converted to radii; ORACLE RVdW97 table.
 _UFF_DIAMETERS = [
     2.886, 2.362, 2.451, 2.745, 4.083, 3.851, 3.660, 3.500, 3.364, 3.243,
     2.983, 3.021, 4.499, 4.295, 4.147, 4.035, 3.947, 3.868, 3.812, 3.399,

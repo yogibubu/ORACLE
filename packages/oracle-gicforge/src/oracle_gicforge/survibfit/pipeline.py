@@ -1,34 +1,15 @@
 from __future__ import annotations
 
 import numpy as np
-import sys
 from pathlib import Path
-import importlib.util
-import importlib
 import hashlib
 import os
 
+from oracle_chem.topology.elements import atomic_number
+from oracle_chem.topology.pipeline import build_topology_objects
+
 from .primitives import Primitive, build_primitives, eval_primitive, grad_primitive
 from .geometry import norm
-
-# topology import (force local copy without clobbering global `topology`)
-_ROOT = Path(__file__).resolve().parents[1]
-_TOPO_DIR = _ROOT / "topology"
-_INIT = _TOPO_DIR / "__init__.py"
-_LOCAL_TOPO_PKG = "_merlino_fit_topology"
-
-if _LOCAL_TOPO_PKG not in sys.modules:
-    spec = importlib.util.spec_from_file_location(
-        _LOCAL_TOPO_PKG, str(_INIT), submodule_search_locations=[str(_TOPO_DIR)]
-    )
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[_LOCAL_TOPO_PKG] = module
-    assert spec.loader is not None
-    spec.loader.exec_module(module)
-
-build_topology_objects = importlib.import_module(
-    f"{_LOCAL_TOPO_PKG}.pipeline"
-).build_topology_objects
 
 BOHR_TO_ANG = 0.52917721092
 _TOPO_CACHE = []
@@ -36,7 +17,7 @@ _TOPO_CACHE_MAX = 4
 
 
 def _cache_dir():
-    return os.environ.get("MERLINO_FIT_CACHE_DIR")
+    return os.environ.get("ORACLE_GICFORGE_CACHE_DIR")
 
 
 def _hash_bytes(b: bytes) -> str:
@@ -51,7 +32,7 @@ def _prims_signature(prims):
 
 
 def _load_topology_elements():
-    return importlib.import_module(f"{_LOCAL_TOPO_PKG}.elements").atomic_number
+    return atomic_number
 
 
 def _coords_to_angstrom(coords: np.ndarray, Z=None, coords_units: str = "auto") -> np.ndarray:

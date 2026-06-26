@@ -241,7 +241,7 @@ def _generic_family_characters(
         return _dnh_characters(labels, n)
     if family == "D" and suffix == "D":
         if operation_matrices is None:
-            return _merlino_dnd_label_characters(labels, n)
+            return _oracle_dnd_label_characters(labels, n)
         return _dnd_characters(labels, n, operation_matrices=operation_matrices)
     return ()
 
@@ -625,18 +625,18 @@ def _dnd_odd_underlying_label(label: str, n: int) -> tuple[str | None, bool]:
     return None, False
 
 
-def _merlino_dnd_label_characters(
+def _oracle_dnd_label_characters(
     labels: tuple[str, ...],
     n: int,
 ) -> tuple[tuple[str, tuple[float, ...]], ...]:
-    canonical = tuple(_merlino_canonical_operation_label(label) for label in labels)
-    base = _merlino_dn_label_characters(canonical, n)
+    canonical = tuple(_oracle_canonical_operation_label(label) for label in labels)
+    base = _oracle_dn_label_characters(canonical, n)
     if "i" in canonical:
-        return _merlino_gerade_ungerade(base, canonical)
-    return _merlino_prime_doubleprime(base, canonical)
+        return _oracle_gerade_ungerade(base, canonical)
+    return _oracle_prime_doubleprime(base, canonical)
 
 
-def _merlino_dn_label_characters(
+def _oracle_dn_label_characters(
     labels: tuple[str, ...],
     n: int,
 ) -> tuple[tuple[str, tuple[float, ...]], ...]:
@@ -644,7 +644,7 @@ def _merlino_dn_label_characters(
         ("A1", tuple(1.0 for _label in labels)),
         (
             "A2",
-            tuple(-1.0 if _merlino_is_c2_perpendicular(label) else 1.0 for label in labels),
+            tuple(-1.0 if _oracle_is_c2_perpendicular(label) else 1.0 for label in labels),
         ),
     ]
     if n % 2 == 0:
@@ -652,14 +652,14 @@ def _merlino_dn_label_characters(
             (
                 (
                     "B1",
-                    tuple((-1.0) ** _merlino_rotation_power(label) for label in labels),
+                    tuple((-1.0) ** _oracle_rotation_power(label) for label in labels),
                 ),
                 (
                     "B2",
                     tuple(
-                        -((-1.0) ** _merlino_rotation_power(label))
-                        if _merlino_is_c2_perpendicular(label)
-                        else (-1.0) ** _merlino_rotation_power(label)
+                        -((-1.0) ** _oracle_rotation_power(label))
+                        if _oracle_is_c2_perpendicular(label)
+                        else (-1.0) ** _oracle_rotation_power(label)
                         for label in labels
                     ),
                 ),
@@ -669,7 +669,7 @@ def _merlino_dn_label_characters(
     for order in range(1, max_order + 1):
         values = []
         for label in labels:
-            if _merlino_is_c2_perpendicular(label):
+            if _oracle_is_c2_perpendicular(label):
                 values.append(0.0)
             else:
                 values.append(
@@ -678,7 +678,7 @@ def _merlino_dn_label_characters(
                         2.0
                         * np.pi
                         * order
-                        * _merlino_rotation_power(label)
+                        * _oracle_rotation_power(label)
                         / float(n)
                     )
                 )
@@ -686,7 +686,7 @@ def _merlino_dn_label_characters(
     return tuple(rows)
 
 
-def _merlino_gerade_ungerade(
+def _oracle_gerade_ungerade(
     base: tuple[tuple[str, tuple[float, ...]], ...],
     labels: tuple[str, ...],
 ) -> tuple[tuple[str, tuple[float, ...]], ...]:
@@ -701,7 +701,7 @@ def _merlino_gerade_ungerade(
     return tuple(rows)
 
 
-def _merlino_prime_doubleprime(
+def _oracle_prime_doubleprime(
     base: tuple[tuple[str, tuple[float, ...]], ...],
     labels: tuple[str, ...],
 ) -> tuple[tuple[str, tuple[float, ...]], ...]:
@@ -716,7 +716,7 @@ def _merlino_prime_doubleprime(
     return tuple(rows)
 
 
-def _merlino_rotation_power(label: str) -> int:
+def _oracle_rotation_power(label: str) -> int:
     if label == "E":
         return 0
     match = re.match(r"C(\d+)[xyz]\^(\d+)", label)
@@ -727,11 +727,11 @@ def _merlino_rotation_power(label: str) -> int:
     return 0
 
 
-def _merlino_is_c2_perpendicular(label: str) -> bool:
+def _oracle_is_c2_perpendicular(label: str) -> bool:
     return label == "C2_perp" or label.startswith("C2x") or label.startswith("C2y")
 
 
-def _merlino_canonical_operation_label(label: str) -> str:
+def _oracle_canonical_operation_label(label: str) -> str:
     text = str(label)
     if text == "E" or text == "i" or text.startswith("sigma"):
         return text
@@ -888,9 +888,9 @@ def _polyhedral_family_characters(
     | None,
 ) -> tuple[tuple[str, tuple[float, ...]], ...]:
     if operation_matrices is None:
-        merlino = _merlino_polyhedral_label_characters(labels, group_key)
-        if merlino:
-            return merlino
+        oracle = _oracle_polyhedral_label_characters(labels, group_key)
+        if oracle:
+            return oracle
     if group_key in {"T", "TD", "O"}:
         return _td_like_characters(labels, operation_matrices=operation_matrices)
     if group_key == "OH":
@@ -1003,7 +1003,7 @@ def _icosahedral_characters(
     return tuple(rows)
 
 
-def _merlino_polyhedral_label_characters(
+def _oracle_polyhedral_label_characters(
     labels: tuple[str, ...],
     group_key: str,
 ) -> tuple[tuple[str, tuple[float, ...]], ...]:
@@ -1018,7 +1018,7 @@ def _merlino_polyhedral_label_characters(
         return tuple(
             (
                 name,
-                tuple(_merlino_poly_char(label, values) for label in labels),
+                tuple(_oracle_poly_char(label, values) for label in labels),
             )
             for name, values in table.items()
         )
@@ -1032,12 +1032,12 @@ def _merlino_polyhedral_label_characters(
         return tuple(
             (
                 name,
-                tuple(_merlino_poly_char(label, values) for label in labels),
+                tuple(_oracle_poly_char(label, values) for label in labels),
             )
             for name, values in table.items()
         )
     if group_key == "OH":
-        base = _merlino_polyhedral_label_characters(labels, "O")
+        base = _oracle_polyhedral_label_characters(labels, "O")
         parity = tuple(
             -1.0
             if label == "i" or label.startswith("sigma") or label.startswith("S")
@@ -1050,7 +1050,7 @@ def _merlino_polyhedral_label_characters(
             rows.append((f"{name}u", tuple(char * sign for char, sign in zip(chars, parity))))
         return tuple(rows)
     if group_key == "IH":
-        base = _merlino_polyhedral_label_characters(labels, "I")
+        base = _oracle_polyhedral_label_characters(labels, "I")
         parity = tuple(
             -1.0
             if label == "i" or label.startswith("sigma") or label.startswith("S")
@@ -1074,14 +1074,14 @@ def _merlino_polyhedral_label_characters(
         return tuple(
             (
                 name,
-                tuple(_merlino_poly_char(label, values) for label in labels),
+                tuple(_oracle_poly_char(label, values) for label in labels),
             )
             for name, values in table.items()
         )
     return ()
 
 
-def _merlino_poly_char(label: str, values: tuple[float, ...]) -> float:
+def _oracle_poly_char(label: str, values: tuple[float, ...]) -> float:
     if label == "E":
         return float(values[0])
     if "C3" in label:

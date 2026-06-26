@@ -166,7 +166,7 @@ def write_topology_to_xyzin(
     """
 
     # ------------------------------------------------------
-    # Resolve path according to Merlino policy
+    # Resolve path according to ORACLE policy
     # ------------------------------------------------------
     basename = Path(xyz_filename).name
     xyz_path = Path.cwd() / "working" / basename
@@ -203,4 +203,3 @@ def write_topology_to_xyzin(
             if not after[0].startswith("\n"):
                 fh.write("\n")
             fh.writelines(after)
-

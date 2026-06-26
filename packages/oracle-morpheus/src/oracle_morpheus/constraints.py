@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from merlino_fit.survibfit.primitives import Primitive
+from oracle_gicforge.survibfit.primitives import Primitive
 
 from .fit import (
     GICExpressionConstraint,

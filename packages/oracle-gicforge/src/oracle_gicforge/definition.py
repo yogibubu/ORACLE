@@ -750,7 +750,7 @@ def _ring_pucker_component_candidates(
 def _ring_pucker_component_terms(
     ring_atoms: tuple[int, ...],
 ) -> tuple[tuple[tuple[float, tuple[int, int, int, int]], ...], ...]:
-    """Return Merlino-style RPck linear combinations for one ordered ring."""
+    """Return ORACLE RPck linear combinations for one ordered ring."""
     ncyc = len(ring_atoms)
     if ncyc <= 3:
         return ()

@@ -1,4 +1,4 @@
-"""GIC workflow services for Merlino4."""
+"""ORACLE GIC runtime services."""
 
 from .gicforge_service import GICForgeError, GICForgeResult, run_gicforge
 from .gicforge_python import (

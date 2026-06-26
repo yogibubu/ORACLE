@@ -8,10 +8,10 @@ from typing import Any
 
 import numpy as np
 
-from merlino_fit.survibfit.synthon_similarity import compare_against_library
-from merlino_fit.survibfit.primitives import Primitive, build_primitives, eval_primitives, grad_primitive
 from oracle_chem.geometry_io import read_xyz_atoms_coords, write_xyz
 from oracle_chem.topology.pipeline import build_topology_objects
+from oracle_gicforge.survibfit.primitives import Primitive, build_primitives, eval_primitives, grad_primitive
+from oracle_gicforge.survibfit.synthon_similarity import compare_against_library
 
 from .fit import _atomic_number
 

@@ -19,9 +19,9 @@ from oracle_chem.isotopes_table import get_default_isotope, get_isotope
 from oracle_chem.physical_constants import Phy, get_physical_constants
 from oracle_chem.rotational import rotational_constants_MHz
 from oracle_chem.structure import Structure
-from merlino_gic import GICDefinition, GICForge, define_gics_from_cartesian, run_gicforge
-from merlino_gic.gic_symmetry import SYMM_INERTIA_TOL as GIC_SYMM_INERTIA_TOL
-from merlino_gic.gic_symmetry import SYMM_TOL as GIC_SYMM_TOL
+from oracle_gicforge.runtime import GICDefinition, GICForge, define_gics_from_cartesian, run_gicforge
+from oracle_gicforge.runtime.gic_symmetry import SYMM_INERTIA_TOL as GIC_SYMM_INERTIA_TOL
+from oracle_gicforge.runtime.gic_symmetry import SYMM_TOL as GIC_SYMM_TOL
 from oracle_chem.geometry_io import write_xyz
 from oracle_chem.topology.covalent_radii import covalent_radius
 from oracle_chem.topology.elements import atomic_number as geometry_atomic_number
@@ -29,10 +29,10 @@ from oracle_chem.topology.elements import atomic_symbol
 from oracle_chem.topology.pipeline import build_topology_objects
 from oracle_core import ScientificValidationError, build_run_manifest
 from oracle_core.numerics import limit_step, objective, rank_condition
-from merlino_fit.survibfit.pipeline import b_matrix_analytic
-from merlino_fit.survibfit.primitives import Primitive, build_primitives, eval_primitives
-from merlino_fit.survibfit.symmetry_detector import orient_coords, symmetry_elements_from_geometry
-from merlino_fit.survibfit.symmetry_global import primitive_permutation
+from oracle_gicforge.survibfit.pipeline import b_matrix_analytic
+from oracle_gicforge.survibfit.primitives import Primitive, build_primitives, eval_primitives
+from oracle_gicforge.survibfit.symmetry_detector import orient_coords, symmetry_elements_from_geometry
+from oracle_gicforge.survibfit.symmetry_global import primitive_permutation
 
 from .contracts import (
     HYDROGEN_PARAMETER_CONSTRAINT,

@@ -1,1 +1,0 @@
-"""Merlino fit prototype."""

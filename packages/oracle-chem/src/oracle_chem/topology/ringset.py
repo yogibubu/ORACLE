@@ -1,5 +1,5 @@
 # ============================================================
-# RingSet class for Merlino (ROBUST VERSION)
+# RingSet class for ORACLE (robust version)
 #
 # Responsibilities:
 #   - detect all simple cycles in the molecular graph
@@ -196,4 +196,3 @@ class RingSet:
     def __repr__(self):
         lim = self.ring_max if self.ring_max is not None else "∞"
         return f"<RingSet: {len(self.rings)} rings (max={lim})>"
-

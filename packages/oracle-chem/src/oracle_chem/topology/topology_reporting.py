@@ -2,23 +2,21 @@ import numpy as np
 from pathlib import Path
 
 try:
-    from survibfit.primitives import build_primitives
-    from survibfit.symmetry_classifier import group_label as _group_label
-    from survibfit.symmetry_detector import (
+    from oracle_gicforge.survibfit.primitives import build_primitives
+    from oracle_gicforge.survibfit.symmetry_classifier import group_label as _group_label
+    from oracle_gicforge.survibfit.symmetry_detector import (
         is_linear,
         orient_coords,
         symmetry_elements_from_geometry,
     )
-    from survibfit.symmetry_global import primitive_permutation
+    from oracle_gicforge.survibfit.symmetry_global import primitive_permutation
 except Exception:  # pragma: no cover - fallback when `survibfit` is not top-level
-    from merlino_fit.survibfit.primitives import build_primitives
-    from merlino_fit.survibfit.symmetry_classifier import group_label as _group_label
-    from merlino_fit.survibfit.symmetry_detector import (
-        is_linear,
-        orient_coords,
-        symmetry_elements_from_geometry,
-    )
-    from merlino_fit.survibfit.symmetry_global import primitive_permutation
+    build_primitives = None
+    _group_label = None
+    is_linear = None
+    orient_coords = None
+    symmetry_elements_from_geometry = None
+    primitive_permutation = None
 
 
 # ============================================================
@@ -98,6 +96,14 @@ def _symmetry_summary(
     Compute point group and symmetry-equivalent primitive classes.
     Uses the same geometry already available in topology.
     """
+    if (
+        build_primitives is None
+        or _group_label is None
+        or is_linear is None
+        or symmetry_elements_from_geometry is None
+        or primitive_permutation is None
+    ):
+        raise RuntimeError("oracle_gicforge.survibfit is required for symmetry primitive reporting")
     Z = np.asarray(cg.Z, dtype=int)
     coords = np.asarray(cg.coords, dtype=float)
     symbols = [_element_symbol(z) for z in Z]
@@ -200,7 +206,7 @@ def print_topology_report(
     """
     Write a diagnostic report of the molecular topology to a file.
 
-    Atom indices in the report are 1-based (Merlino convention).
+    Atom indices in the report are 1-based (ORACLE convention).
     """
 
     Z = cg.Z

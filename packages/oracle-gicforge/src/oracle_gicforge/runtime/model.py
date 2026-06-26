@@ -15,13 +15,15 @@ from oracle_chem.topology.elements import atomic_number, atomic_symbol
 from oracle_chem.topology.pipeline import build_topology_objects
 from oracle_core import sha256_file
 from oracle_core.paths import repo_root
-from merlino_fit.survibfit.pipeline import b_matrix_analytic
-from merlino_fit.survibfit.primitives import Primitive, eval_primitives
+from oracle_gicforge.survibfit.pipeline import b_matrix_analytic
+from oracle_gicforge.survibfit.primitives import Primitive, eval_primitives
 
 from .gicforge_service import GICForgeResult, run_gicforge
 
 
-GIC_DEFINITION_SCHEMA = "merlino.gic.definition.v1"
+GIC_DEFINITION_SCHEMA = "oracle.gic.definition.v1"
+LEGACY_GIC_DEFINITION_SCHEMA = "merlino.gic.definition.v1"
+SUPPORTED_GIC_DEFINITION_SCHEMAS = (GIC_DEFINITION_SCHEMA, LEGACY_GIC_DEFINITION_SCHEMA)
 
 
 class GICDefinitionError(RuntimeError):
@@ -80,8 +82,11 @@ class GICDefinition:
     @classmethod
     def from_dict(cls, data: dict) -> "GICDefinition":
         schema = data.get("schema")
-        if schema != GIC_DEFINITION_SCHEMA:
-            raise GICDefinitionError(f"GIC definition schema must be {GIC_DEFINITION_SCHEMA!r}, got {schema!r}")
+        if schema not in SUPPORTED_GIC_DEFINITION_SCHEMAS:
+            raise GICDefinitionError(
+                "GIC definition schema must be one of "
+                f"{SUPPORTED_GIC_DEFINITION_SCHEMAS!r}, got {schema!r}"
+            )
         primitives = tuple(_primitive_from_dict(item) for item in data.get("primitives", ()))
         u_matrix = np.asarray(data.get("u_matrix", ()), dtype=float)
         if u_matrix.ndim != 2:
@@ -303,7 +308,7 @@ def define_gics_from_cartesian(
     if not atoms:
         raise GICDefinitionError("GIC definition needs at least one atom")
     _validate_gicforge_input_topology(atoms, coords)
-    run_dir = Path(workdir) if workdir is not None else Path(tempfile.mkdtemp(prefix="merlino_gic_define_"))
+    run_dir = Path(workdir) if workdir is not None else Path(tempfile.mkdtemp(prefix="oracle_gic_define_"))
     run_dir.mkdir(parents=True, exist_ok=True)
     _write_gicforge_inputs(
         run_dir,
@@ -794,7 +799,7 @@ def _write_gicforge_inputs(
     keywords = "# " + " ".join((*base_keywords, *extra_keywords))
     (workdir / "provin").write_text(
         f"{keywords}\n\n"
-        "Merlino GIC definition utility\n\n"
+        "ORACLE GIC definition utility\n\n"
         "0 1\n",
         encoding="utf-8",
     )

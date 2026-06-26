@@ -191,7 +191,7 @@ def write_topology_and_synthons_sections(
 
 
 def gaussian_topology_overrides_from_xyzin(path: Path) -> dict[str, object]:
-    """Read #GAUSSIAN_TOPOLOGY as Merlino-compatible topology overrides."""
+    """Read #GAUSSIAN_TOPOLOGY as ORACLE topology overrides."""
     content = section_content(read_sectioned_lines(Path(path)), "GAUSSIAN_TOPOLOGY")
     charges: dict[int, float] = {}
     bond_orders: dict[tuple[int, int], float] = {}

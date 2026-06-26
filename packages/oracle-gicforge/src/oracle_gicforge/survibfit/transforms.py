@@ -1387,7 +1387,7 @@ def build_u(
 ):
     """Assemble a full non-redundant U from primitive coordinates."""
     import os
-    if os.environ.get("MERLINO_FIT_PROFILE") == "1":
+    if os.environ.get("ORACLE_GICFORGE_PROFILE") == "1":
         import time
         t0 = time.perf_counter()
     nprim = len(prims)
@@ -1450,7 +1450,7 @@ def build_u(
             rep["global_symmetry"] = symm_info
             with open(pattern_report_path, "w", encoding="utf-8") as fh:
                 json.dump(rep, fh, indent=2)
-    if os.environ.get("MERLINO_FIT_PROFILE") == "1":
+    if os.environ.get("ORACLE_GICFORGE_PROFILE") == "1":
         import time
         t1 = time.perf_counter()
         print(f"build_u: {t1 - t0:.6f}s, nprim={nprim}, ncols={U.shape[1]}")

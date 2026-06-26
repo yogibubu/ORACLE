@@ -1,9 +1,5 @@
 """MORPHEUS semiexperimental equilibrium-geometry tools for ORACLE."""
 
-from ._legacy_aliases import install_legacy_aliases
-
-install_legacy_aliases()
-
 from .contracts import (
     CorrectedRotationalConstants,
     DEFAULT_SEMIEXP_OBSERVABLE,

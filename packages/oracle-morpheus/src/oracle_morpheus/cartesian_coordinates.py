@@ -4,9 +4,9 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from merlino_fit.survibfit.symmetry_detector import symmetry_elements_from_geometry
-from merlino_fit.survibfit.symmetry_global import irrep_characters_for_operations
-from merlino_gic.gic_symmetry import (
+from oracle_gicforge.survibfit.symmetry_detector import symmetry_elements_from_geometry
+from oracle_gicforge.survibfit.symmetry_global import irrep_characters_for_operations
+from oracle_gicforge.runtime.gic_symmetry import (
     SYMM_INERTIA_TOL,
     SYMM_TOL,
     _cartesian_operation,

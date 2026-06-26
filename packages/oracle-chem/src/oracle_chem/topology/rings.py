@@ -1,6 +1,6 @@
 # rings.py
 # ============================================================
-# Unified Ring class for Merlino
+# Unified Ring class for ORACLE
 #
 # Represents a single topological ring with optional
 # geometric information.
@@ -194,4 +194,3 @@ class Ring:
             f"size={self.n_atoms}, "
             f"atoms={self.atoms}>"
         )
-

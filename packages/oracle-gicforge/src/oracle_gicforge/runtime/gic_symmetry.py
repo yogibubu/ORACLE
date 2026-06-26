@@ -10,11 +10,11 @@ import numpy as np
 from oracle_chem.geometry_io import read_xyz_atoms_coords
 from oracle_chem.topology.elements import atomic_number, atomic_symbol
 from oracle_chem.topology.pipeline import build_topology_objects
-from merlino_fit.survibfit.pipeline import b_matrix_analytic
-from merlino_fit.survibfit.primitives import Primitive
-from merlino_fit.survibfit.symmetry_classifier import group_label as _group_label
-from merlino_fit.survibfit.symmetry_detector import orient_coords, symmetry_elements_from_geometry
-from merlino_fit.survibfit.symmetry_global import irrep_characters_for_operations, primitive_permutation
+from oracle_gicforge.survibfit.pipeline import b_matrix_analytic
+from oracle_gicforge.survibfit.primitives import Primitive
+from oracle_gicforge.survibfit.symmetry_classifier import group_label as _group_label
+from oracle_gicforge.survibfit.symmetry_detector import orient_coords, symmetry_elements_from_geometry
+from oracle_gicforge.survibfit.symmetry_global import irrep_characters_for_operations, primitive_permutation
 
 
 SYMM_TOL = 1.0e-2
@@ -741,7 +741,7 @@ def _write_gic_symmetry_diagnostics(
             rows = [column @ b_primitive @ vib_projector for _name, row_irrep, _source, column in sym_gics if row_irrep == irrep]
             b_ranks[irrep] = int(np.linalg.matrix_rank(np.array(rows), tol=RANK_TOL)) if rows else 0
     payload = {
-        "schema": "merlino.gic_symmetry.v1",
+        "schema": "oracle.gic_symmetry.v1",
         "symmetry_backend": symmetry_backend,
         "point_group": point_group,
         "python_point_group": python_point_group,

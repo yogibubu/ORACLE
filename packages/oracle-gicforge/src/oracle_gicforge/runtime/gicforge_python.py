@@ -7,9 +7,9 @@ from typing import Iterable
 
 import numpy as np
 
-from merlino_fit.survibfit.geometry import angle
-from merlino_fit.survibfit.pipeline import b_matrix_analytic
-from merlino_fit.survibfit.primitives import Primitive
+from oracle_gicforge.survibfit.geometry import angle
+from oracle_gicforge.survibfit.pipeline import b_matrix_analytic
+from oracle_gicforge.survibfit.primitives import Primitive
 from oracle_chem.topology.covalent_radii import covalent_radius
 from oracle_chem.topology.elements import atomic_number
 from oracle_chem.topology.pipeline import build_topology_objects

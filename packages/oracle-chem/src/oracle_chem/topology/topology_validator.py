@@ -1,5 +1,5 @@
 """
-Topology validator for Merlino.
+Topology validator for ORACLE.
 
 Guarantees:
 - All hydrogens are bound exactly once
@@ -28,4 +28,3 @@ def validate_topology(dg):
             "Topology validation failed:\n" +
             "\n".join(errors)
         )
-

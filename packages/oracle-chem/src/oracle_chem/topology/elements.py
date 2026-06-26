@@ -7,7 +7,7 @@ _MAX_EL = 118
 
 _SYMBOLS: Dict[int, str] = {
     -2: "TV",
-    -1: "XX",   # Dummy atom in Merlino
+    -1: "XX",   # Dummy atom in ORACLE
      0: "Bq",
      1: "H",   2: "He",  3: "Li",  4: "Be",  5: "B",
      6: "C",   7: "N",   8: "O",   9: "F",  10: "Ne",
@@ -64,4 +64,3 @@ def atomic_number(label: str) -> Optional[int]:
             return None
 
     return num if num > 0 else None
-
