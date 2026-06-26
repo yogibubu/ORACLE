@@ -62,6 +62,22 @@ uses the ORACLE continuous Pauling bond-order model and records
 `BOND_ORDER_SOURCE Topology Pauling continuous model`. Gaussian total bond
 orders are not a fallback source.
 
+## Gaussian Rovibrational Promotion
+
+Gaussian log/out text is converted once by `oracle-gaussian` before downstream
+tools run. `oracle gaussian promote-rovib` promotes harmonic frequencies, IR
+intensities, anharmonic chi matrices, rotational constants and vibrational
+rotational corrections into shared ORACLE sections:
+
+- `#VIBRATIONAL` stores frequencies, intensities and optional chi values.
+- `#ROTATIONAL` stores rotational constants, point group, temperature and the
+  DeltaBvib bridge values consumed by rovibrational utilities.
+- `#DELTABVIB` stores the normalized DeltaBvib values and, when available, the
+  Gaussian alpha rows used to compute them.
+
+GF, Thermo, SEfit/MORPHEUS and anharmonic workflows consume these sections
+rather than reparsing Gaussian output.
+
 ## GIC State
 
 `#GIC` stores the frozen coordinate contract, not only a list of Gaussian input

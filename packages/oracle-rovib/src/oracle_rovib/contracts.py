@@ -53,6 +53,28 @@ class VibrationalSection:
     schema: str = ORACLE_XYZ_VIBRATIONAL_SCHEMA
 
 
+@dataclass(frozen=True)
+class DeltaBVibAlphaRow:
+    mode: int
+    a_MHz: float
+    b_MHz: float
+    c_MHz: float
+
+
+@dataclass(frozen=True)
+class DeltaBVibSection:
+    delta_A_MHz: float | None = None
+    delta_B_MHz: float | None = None
+    delta_C_MHz: float | None = None
+    available: bool = True
+    source: str = ""
+    reason: str = ""
+    alpha_rows_MHz: tuple[DeltaBVibAlphaRow, ...] = ()
+    excluded_modes: tuple[int, ...] = ()
+    invert_imaginary_modes: bool = True
+    schema: str = ORACLE_XYZ_DELTABVIB_SCHEMA
+
+
 def parse_rotational_section(lines: Iterable[str]) -> RotationalSection:
     values = parse_key_value_section(lines)
     return RotationalSection(
@@ -176,6 +198,75 @@ def write_vibrational_section(path: Path, section: VibrationalSection) -> None:
     replace_section(Path(path), "VIBRATIONAL", vibrational_section_lines(section))
 
 
+def parse_deltabvib_section(lines: Iterable[str]) -> DeltaBVibSection:
+    raw_lines = list(lines)
+    values = parse_key_value_section(raw_lines)
+    return DeltaBVibSection(
+        delta_A_MHz=_optional_float(values.get("DVIBA_MHZ") or values.get("DELTA_A_MHZ")),
+        delta_B_MHz=_optional_float(values.get("DVIBB_MHZ") or values.get("DELTA_B_MHZ")),
+        delta_C_MHz=_optional_float(values.get("DVIBC_MHZ") or values.get("DELTA_C_MHZ")),
+        available=_optional_bool(values.get("AVAILABLE")) if values.get("AVAILABLE") is not None else True,
+        source=values.get("SOURCE", ""),
+        reason=values.get("REASON", ""),
+        alpha_rows_MHz=tuple(_parse_alpha_rows(raw_lines)),
+        excluded_modes=tuple(int(value) for value in _number_list(values.get("EXCLUDED_MODES"))),
+        invert_imaginary_modes=(
+            _optional_bool(values.get("INVERT_IMAGINARY_MODES"))
+            if values.get("INVERT_IMAGINARY_MODES") is not None
+            else True
+        ),
+        schema=values.get("SCHEMA", ORACLE_XYZ_DELTABVIB_SCHEMA),
+    )
+
+
+def deltabvib_section_lines(section: DeltaBVibSection) -> list[str]:
+    values: dict[str, object] = {
+        "AVAILABLE": int(bool(section.available)),
+        "SOURCE": section.source or None,
+        "REASON": section.reason or None,
+        "DVIBA_MHZ": _format_float(section.delta_A_MHz),
+        "DVIBB_MHZ": _format_float(section.delta_B_MHz),
+        "DVIBC_MHZ": _format_float(section.delta_C_MHz),
+        "INVERT_IMAGINARY_MODES": int(bool(section.invert_imaginary_modes)),
+        "EXCLUDED_MODES": (
+            " ".join(str(mode) for mode in section.excluded_modes)
+            if section.excluded_modes
+            else None
+        ),
+    }
+    lines = key_value_section_lines(
+        ORACLE_XYZ_DELTABVIB_SCHEMA,
+        values,
+        key_order=(
+            "AVAILABLE",
+            "SOURCE",
+            "REASON",
+            "DVIBA_MHZ",
+            "DVIBB_MHZ",
+            "DVIBC_MHZ",
+            "INVERT_IMAGINARY_MODES",
+            "EXCLUDED_MODES",
+        ),
+    )
+    if section.alpha_rows_MHz:
+        lines.append("ALPHA_MHZ = [")
+        lines.extend(
+            f"{row.mode:d} {row.a_MHz:.8f} {row.b_MHz:.8f} {row.c_MHz:.8f}"
+            for row in section.alpha_rows_MHz
+        )
+        lines.append("]")
+    return lines
+
+
+def read_deltabvib_section(path: Path) -> DeltaBVibSection:
+    content = section_content(read_sectioned_lines(Path(path)), "DELTABVIB")
+    return parse_deltabvib_section(content)
+
+
+def write_deltabvib_section(path: Path, section: DeltaBVibSection) -> None:
+    replace_section(Path(path), "DELTABVIB", deltabvib_section_lines(section))
+
+
 def _parse_delta_vib(
     values: dict[str, str],
 ) -> tuple[float | None, float | None, float | None] | None:
@@ -203,6 +294,32 @@ def _parse_chi_block(lines: list[str]) -> list[tuple[int, int, float]]:
         values = _number_list(line)
         if len(values) >= 3:
             out.append((int(values[0]), int(values[1]), float(values[2])))
+    return out
+
+
+def _parse_alpha_rows(lines: list[str]) -> list[DeltaBVibAlphaRow]:
+    out: list[DeltaBVibAlphaRow] = []
+    in_alpha = False
+    for raw in lines:
+        line = raw.strip()
+        upper = line.upper()
+        if upper.startswith("ALPHA_MHZ"):
+            in_alpha = True
+            continue
+        if in_alpha and "]" in line:
+            break
+        if not in_alpha or not line:
+            continue
+        values = _number_list(line)
+        if len(values) >= 4:
+            out.append(
+                DeltaBVibAlphaRow(
+                    mode=int(values[0]),
+                    a_MHz=float(values[1]),
+                    b_MHz=float(values[2]),
+                    c_MHz=float(values[3]),
+                )
+            )
     return out
 
 

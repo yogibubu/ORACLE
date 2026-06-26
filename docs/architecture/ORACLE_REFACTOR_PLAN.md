@@ -216,6 +216,9 @@ reuse the saved sections.
   directly.
 - Gaussian Z-matrix input delegates to the shared `oracle-chem` Z-matrix parser.
 - Gaussian input generation from GICForge consumes enriched XYZ plus `#GIC`.
+- Gaussian rovibrational log data is promoted to shared `#VIBRATIONAL`,
+  `#ROTATIONAL` and `#DELTABVIB` sections before GF, Thermo, SEfit/MORPHEUS or
+  anharmonic workflows consume it.
 
 `oracle-fragments`
 

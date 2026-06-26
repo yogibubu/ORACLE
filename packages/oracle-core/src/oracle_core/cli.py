@@ -80,6 +80,23 @@ def build_parser(*, repo_root: Path | None = None) -> argparse.ArgumentParser:
     gaussian_formchk.add_argument("--timeout", type=float)
     gaussian_fchk = gaussian_sub.add_parser("fchk-summary", help="Summarize FCHK/QFF blocks")
     gaussian_fchk.add_argument("fchk", type=Path)
+    gaussian_promote_rovib = gaussian_sub.add_parser(
+        "promote-rovib",
+        help="Promote Gaussian rovibrational log data into an ORACLE xyzin",
+    )
+    gaussian_promote_rovib.add_argument("log", type=Path)
+    gaussian_promote_rovib.add_argument("xyzin", type=Path)
+    gaussian_promote_rovib.add_argument("--no-vibrational", action="store_true")
+    gaussian_promote_rovib.add_argument("--no-rotational", action="store_true")
+    gaussian_promote_rovib.add_argument("--no-deltabvib", action="store_true")
+    gaussian_promote_rovib.add_argument("--no-invert-imaginary", action="store_true")
+    gaussian_promote_rovib.add_argument(
+        "--exclude-mode",
+        type=int,
+        action="append",
+        default=[],
+        help="Exclude a normal-mode index from alpha-derived DeltaBvib",
+    )
 
     lcb25 = sub.add_parser("lcb25", help="Manage the local ORACLE LCB25 geometry cache")
     lcb25_sub = lcb25.add_subparsers(dest="lcb25_command")
@@ -435,6 +452,23 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
         print(f"anharmonic_frequencies: {len(data.anharmonic_frequencies_cm)}")
         print(f"anharmonic_e2_values: {len(data.anharmonic_e2)}")
         print(f"normal_mode_values: {len(data.normal_modes)}")
+        return 0
+    if args.command == "gaussian" and args.gaussian_command == "promote-rovib":
+        from oracle_gaussian import promote_gaussian_rovib_to_xyzin
+
+        result = promote_gaussian_rovib_to_xyzin(
+            args.log,
+            args.xyzin,
+            write_vibrational=not args.no_vibrational,
+            write_rotational=not args.no_rotational,
+            write_deltabvib=not args.no_deltabvib,
+            invert_imaginary_modes=not args.no_invert_imaginary,
+            exclude_modes=tuple(args.exclude_mode),
+        )
+        print(f"Promoted Gaussian rovib data: {result.log_path} -> {result.xyzin}")
+        print(f"wrote_vibrational: {int(result.wrote_vibrational)}")
+        print(f"wrote_rotational: {int(result.wrote_rotational)}")
+        print(f"wrote_deltabvib: {int(result.wrote_deltabvib)}")
         return 0
     if args.command == "lcb25" and args.lcb25_command == "fetch":
         from oracle_babel import sync_lcb25_library

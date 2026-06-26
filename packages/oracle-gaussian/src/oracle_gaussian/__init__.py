@@ -42,6 +42,13 @@ from .jobs import (
     run_gaussian_job,
     select_latest_log,
 )
+from .rovib import (
+    GaussianRovibData,
+    GaussianRovibPromotion,
+    compute_deltavib_from_alpha,
+    parse_gaussian_rovib_log,
+    promote_gaussian_rovib_to_xyzin,
+)
 
 __all__ = [
     "FORMCHK_EXECUTABLE",
@@ -51,9 +58,12 @@ __all__ = [
     "GaussianInputError",
     "GaussianJobStatus",
     "GaussianLogSummary",
+    "GaussianRovibData",
+    "GaussianRovibPromotion",
     "GaussianRunResult",
     "GaussianTopologyData",
     "anharmonic_input_from_gaussian_fchk",
+    "compute_deltavib_from_alpha",
     "ensure_gjf_input",
     "formchk_checkpoint",
     "gaussian_completed_normally",
@@ -64,6 +74,8 @@ __all__ = [
     "hessian_input_from_gaussian_fchk",
     "lower_to_symmetric",
     "parse_gaussian_topology",
+    "parse_gaussian_rovib_log",
+    "promote_gaussian_rovib_to_xyzin",
     "read_gaussian_fchk",
     "read_gaussian_fchk_qff",
     "read_gaussian_input",

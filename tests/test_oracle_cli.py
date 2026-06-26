@@ -274,6 +274,65 @@ def test_gaussian_fchk_summary_cli_calls_qff_reader(tmp_path, monkeypatch, capsy
     assert "anharmonic_frequencies: 1" in out
 
 
+def test_gaussian_promote_rovib_cli_calls_adapter(tmp_path, monkeypatch, capsys):
+    calls = {}
+    log = tmp_path / "job.log"
+    xyzin = tmp_path / "mol.xyzin"
+
+    def fake_promote(
+        log_path,
+        xyzin_path,
+        *,
+        write_vibrational=True,
+        write_rotational=True,
+        write_deltabvib=True,
+        invert_imaginary_modes=True,
+        exclude_modes=(),
+    ):
+        calls["log"] = log_path
+        calls["xyzin"] = xyzin_path
+        calls["write_vibrational"] = write_vibrational
+        calls["write_rotational"] = write_rotational
+        calls["write_deltabvib"] = write_deltabvib
+        calls["invert_imaginary_modes"] = invert_imaginary_modes
+        calls["exclude_modes"] = exclude_modes
+        return SimpleNamespace(
+            log_path=log_path,
+            xyzin=xyzin_path,
+            wrote_vibrational=write_vibrational,
+            wrote_rotational=write_rotational,
+            wrote_deltabvib=write_deltabvib,
+        )
+
+    monkeypatch.setattr("oracle_gaussian.promote_gaussian_rovib_to_xyzin", fake_promote)
+
+    rc = oracle_run.main(
+        [
+            "gaussian",
+            "promote-rovib",
+            str(log),
+            str(xyzin),
+            "--no-rotational",
+            "--no-invert-imaginary",
+            "--exclude-mode",
+            "3",
+        ]
+    )
+    out = capsys.readouterr().out
+
+    assert rc == 0
+    assert calls == {
+        "log": log,
+        "xyzin": xyzin,
+        "write_vibrational": True,
+        "write_rotational": False,
+        "write_deltabvib": True,
+        "invert_imaginary_modes": False,
+        "exclude_modes": (3,),
+    }
+    assert "wrote_rotational: 0" in out
+
+
 def test_fragments_plan_cli_calls_writer(tmp_path, monkeypatch, capsys):
     calls = {}
     path = tmp_path / "molecule.xyz"
