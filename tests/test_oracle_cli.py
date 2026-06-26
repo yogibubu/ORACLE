@@ -1131,6 +1131,275 @@ def test_gicforge_corpus_audit_cli_prints_failures(capsys):
     assert "Error" in lines[0]
 
 
+def test_gicforge_fortran_audit_cli_prints_summary(tmp_path, monkeypatch, capsys):
+    from oracle_gicforge import GICForgeFortranAudit, GICForgeFortranAuditResult
+
+    calls = {}
+
+    def fake_audit(**kwargs):
+        calls.update(kwargs)
+        return GICForgeFortranAudit(
+            root=kwargs["root"],
+            workdir=kwargs["workdir"],
+            tolerance=kwargs["tolerance"],
+            results=(
+                GICForgeFortranAuditResult(
+                    molecule="naphtalene.inp",
+                    source=kwargs["root"] / "naphtalene.inp",
+                    status="PASS",
+                    oracle_rank=48,
+                    fortran_rank=48,
+                    oracle_row_rank=48,
+                    fortran_row_rank=48,
+                    row_space_residual=1.0e-10,
+                ),
+            ),
+        )
+
+    monkeypatch.setattr("oracle_gicforge.audit_gicforge_fortran_corpus", fake_audit)
+
+    rc = oracle_run.main(
+        [
+            "gicforge",
+            "fortran-audit",
+            "--root",
+            str(GIC_CORPUS),
+            "--workdir",
+            str(tmp_path / "audit"),
+            "--molecule",
+            "naphtalene.inp",
+            "--tolerance",
+            "1e-7",
+        ]
+    )
+    out = capsys.readouterr().out
+
+    assert rc == 0
+    assert calls["root"] == GIC_CORPUS
+    assert calls["workdir"] == tmp_path / "audit"
+    assert calls["molecules"] == ["naphtalene.inp"]
+    assert calls["tolerance"] == 1.0e-7
+    assert "PASS 1" in out
+    assert "CASE PASS naphtalene.inp" in out
+
+
+def test_semiexp_benchmark_cli_calls_paper_artifact_generator(tmp_path, monkeypatch, capsys):
+    calls = {}
+    snapshot = tmp_path / "snapshot.json"
+    outdir = tmp_path / "paper"
+
+    def fake_generate(**kwargs):
+        calls.update(kwargs)
+        return (
+            {"cases": {"water": {}}, "planar_pair_diagnostics": {"azulene": {}}},
+            {"summary_tex": outdir / "benchmark_summary.tex"},
+        )
+
+    monkeypatch.setattr("oracle_morpheus.generate_paper_benchmark_artifacts", fake_generate)
+
+    rc = oracle_run.main(
+        [
+            "semiexp-benchmark",
+            "--snapshot",
+            str(snapshot),
+            "--outdir",
+            str(outdir),
+            "--no-refresh",
+            "--update-snapshot",
+        ]
+    )
+    out = capsys.readouterr().out
+
+    assert rc == 0
+    assert calls == {
+        "snapshot_path": snapshot,
+        "outdir": outdir,
+        "refresh_from_outputs": False,
+        "update_snapshot": True,
+    }
+    assert "cases: 1" in out
+    assert f"summary_tex: {outdir / 'benchmark_summary.tex'}" in out
+
+
+def test_semiexp_ensemble_paper_cli_calls_artifact_writer(tmp_path, monkeypatch, capsys):
+    calls = {}
+    job = tmp_path / "ensemble.toml"
+    paper_dir = tmp_path / "paper"
+    outdir = tmp_path / "analysis"
+
+    def fake_write(job_path, target_paper_dir, **kwargs):
+        calls["job"] = job_path
+        calls["paper_dir"] = target_paper_dir
+        calls.update(kwargs)
+        return {"prior_comparison": paper_dir / "generated" / "prior.tex"}
+
+    monkeypatch.setattr("oracle_morpheus.write_ensemble_jpcl_artifacts", fake_write)
+
+    rc = oracle_run.main(
+        [
+            "semiexp-ensemble-paper",
+            "--job",
+            str(job),
+            "--paper-dir",
+            str(paper_dir),
+            "--outdir",
+            str(outdir),
+            "--soft-prior-sigma",
+            "0.002",
+        ]
+    )
+    out = capsys.readouterr().out
+
+    assert rc == 0
+    assert calls == {
+        "job": job,
+        "paper_dir": paper_dir,
+        "outdir": outdir,
+        "soft_prior_sigma": 0.002,
+    }
+    assert "prior_comparison:" in out
+
+
+def test_semiexp_ensemble_scan_cli_calls_scan_helpers(tmp_path, monkeypatch, capsys):
+    calls = {}
+    job = tmp_path / "ensemble.toml"
+    outdir = tmp_path / "scan"
+
+    def fake_prior(job_path, target, **kwargs):
+        calls["prior"] = (job_path, target, kwargs)
+        return [{"prior_sigma": 1.0e-4}, {"prior_sigma": 1.0e-3}]
+
+    def fake_synthon(job_path, target, **kwargs):
+        calls["synthon"] = (job_path, target, kwargs)
+        return [{"synthon_threshold": 0.01}]
+
+    monkeypatch.setattr("oracle_morpheus.run_ensemble_prior_scan", fake_prior)
+    monkeypatch.setattr("oracle_morpheus.run_ensemble_synthon_threshold_scan", fake_synthon)
+
+    rc_prior = oracle_run.main(
+        [
+            "semiexp-ensemble-prior-scan",
+            "--job",
+            str(job),
+            "--outdir",
+            str(outdir / "prior"),
+            "--sigma",
+            "0.0001",
+            "--sigma",
+            "0.001",
+        ]
+    )
+    out_prior = capsys.readouterr().out
+    rc_synthon = oracle_run.main(
+        [
+            "semiexp-ensemble-synthon-scan",
+            "--job",
+            str(job),
+            "--outdir",
+            str(outdir / "synthon"),
+            "--threshold",
+            "0.01",
+        ]
+    )
+    out_synthon = capsys.readouterr().out
+
+    assert rc_prior == 0
+    assert rc_synthon == 0
+    assert calls["prior"] == (job, outdir / "prior", {"sigmas": (1.0e-4, 1.0e-3)})
+    assert calls["synthon"] == (job, outdir / "synthon", {"thresholds": (0.01,)})
+    assert "rows: 2" in out_prior
+    assert "rows: 1" in out_synthon
+
+
+def test_multistructure_reference_search_cli_calls_library(tmp_path, monkeypatch, capsys):
+    calls = {}
+    query = tmp_path / "query.xyz"
+    outdir = tmp_path / "matches"
+
+    def fake_search(query_xyz, **kwargs):
+        calls["query"] = query_xyz
+        calls.update(kwargs)
+        return SimpleNamespace(
+            library_root=tmp_path / "se_geometries",
+            matches=(SimpleNamespace(slug="water", similarity_combined=0.99),),
+            skipped=(),
+        )
+
+    monkeypatch.setattr("oracle_morpheus.search_reference_library", fake_search)
+
+    rc = oracle_run.main(
+        [
+            "multistructure-reference-search",
+            "--query-xyz",
+            str(query),
+            "--outdir",
+            str(outdir),
+            "--top-k",
+            "3",
+            "--ring-weight",
+            "0.4",
+        ]
+    )
+    out = capsys.readouterr().out
+
+    assert rc == 0
+    assert calls["query"] == query
+    assert calls["outdir"] == outdir
+    assert calls["top_k"] == 3
+    assert calls["include_ring_comparison"] is True
+    assert calls["ring_weight"] == 0.4
+    assert "top_match: water similarity=0.99" in out
+
+
+def test_multistructure_build_reference_geometry_cli_calls_library(tmp_path, monkeypatch, capsys):
+    calls = {}
+    query = tmp_path / "query.xyz"
+    outdir = tmp_path / "assisted"
+
+    def fake_build(query_xyz, **kwargs):
+        calls["query"] = query_xyz
+        calls.update(kwargs)
+        return SimpleNamespace(
+            library_root=tmp_path / "se_geometries",
+            targets=(object(), object()),
+            unmatched=(object(),),
+            iterations=4,
+            rms_target_residual_final=1.2e-4,
+        )
+
+    monkeypatch.setattr("oracle_morpheus.build_reference_assisted_geometry", fake_build)
+
+    rc = oracle_run.main(
+        [
+            "multistructure-build-reference-geometry",
+            "--query-xyz",
+            str(query),
+            "--outdir",
+            str(outdir),
+            "--top-library-matches",
+            "5",
+            "--max-fragment-matches",
+            "2",
+            "--apply-kind",
+            "bond",
+            "--apply-kind",
+            "angle",
+            "--no-ring-comparison",
+        ]
+    )
+    out = capsys.readouterr().out
+
+    assert rc == 0
+    assert calls["query"] == query
+    assert calls["outdir"] == outdir
+    assert calls["top_library_matches"] == 5
+    assert calls["max_fragment_matches"] == 2
+    assert calls["apply_kinds"] == ("bond", "angle")
+    assert calls["include_ring_comparison"] is False
+    assert "targets: 2" in out
+    assert "unmatched: 1" in out
+
+
 def test_gicforge_gaussian_input_cli_calls_writer(tmp_path, monkeypatch, capsys):
     calls = {}
     xyzin = tmp_path / "molecule.xyzin"

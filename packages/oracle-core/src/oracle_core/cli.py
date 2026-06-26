@@ -369,6 +369,66 @@ def build_parser(*, repo_root: Path | None = None) -> argparse.ArgumentParser:
     semiexp_ensemble.add_argument("--job", type=Path, required=True)
     semiexp_ensemble.add_argument("--outdir", type=Path, required=True)
 
+    semiexp_ensemble_paper = sub.add_parser(
+        "semiexp-ensemble-paper",
+        help="Run ensemble paper comparisons and write JPCL-ready artifacts",
+    )
+    semiexp_ensemble_paper.add_argument("--job", type=Path, required=True)
+    semiexp_ensemble_paper.add_argument("--paper-dir", type=Path, required=True)
+    semiexp_ensemble_paper.add_argument("--outdir", type=Path)
+    semiexp_ensemble_paper.add_argument("--soft-prior-sigma", type=float, default=1.0e-3)
+
+    semiexp_ensemble_prior_scan = sub.add_parser(
+        "semiexp-ensemble-prior-scan",
+        help="Scan ensemble soft-prior sigma values",
+    )
+    semiexp_ensemble_prior_scan.add_argument("--job", type=Path, required=True)
+    semiexp_ensemble_prior_scan.add_argument("--outdir", type=Path, required=True)
+    semiexp_ensemble_prior_scan.add_argument("--sigma", type=float, action="append", default=[])
+
+    semiexp_ensemble_synthon_scan = sub.add_parser(
+        "semiexp-ensemble-synthon-scan",
+        help="Scan Zeff synthon thresholds for an ensemble job",
+    )
+    semiexp_ensemble_synthon_scan.add_argument("--job", type=Path, required=True)
+    semiexp_ensemble_synthon_scan.add_argument("--outdir", type=Path, required=True)
+    semiexp_ensemble_synthon_scan.add_argument("--threshold", type=float, action="append", default=[])
+
+    semiexp_benchmark = sub.add_parser(
+        "semiexp-benchmark",
+        help="Generate MORPHEUS benchmark and paper tables from a regression snapshot",
+    )
+    semiexp_benchmark.add_argument("--snapshot", type=Path)
+    semiexp_benchmark.add_argument("--outdir", type=Path)
+    semiexp_benchmark.add_argument("--no-refresh", action="store_true")
+    semiexp_benchmark.add_argument("--update-snapshot", action="store_true")
+
+    reference_search = sub.add_parser(
+        "multistructure-reference-search",
+        help="Search the local semiexperimental geometry reference library",
+    )
+    reference_search.add_argument("--query-xyz", type=Path, required=True)
+    reference_search.add_argument("--library-root", type=Path)
+    reference_search.add_argument("--outdir", type=Path, required=True)
+    reference_search.add_argument("--top-k", type=int, default=10)
+    reference_search.add_argument("--ring-weight", type=float, default=0.25)
+    reference_search.add_argument("--no-ring-comparison", action="store_true")
+
+    reference_build = sub.add_parser(
+        "multistructure-build-reference-geometry",
+        help="Build a reference-assisted geometry from local semiexperimental fragments",
+    )
+    reference_build.add_argument("--query-xyz", type=Path, required=True)
+    reference_build.add_argument("--library-root", type=Path)
+    reference_build.add_argument("--outdir", type=Path, required=True)
+    reference_build.add_argument("--top-library-matches", type=int, default=25)
+    reference_build.add_argument("--max-fragment-matches", type=int, default=8)
+    reference_build.add_argument("--min-fragment-support", type=int, default=1)
+    reference_build.add_argument("--zeff-threshold", type=float, default=0.08)
+    reference_build.add_argument("--apply-kind", action="append", default=[])
+    reference_build.add_argument("--ring-weight", type=float, default=0.25)
+    reference_build.add_argument("--no-ring-comparison", action="store_true")
+
     gicforge = sub.add_parser("gicforge", help="Plan GICForge post-validation sections")
     gicforge_sub = gicforge.add_subparsers(dest="gicforge_command")
     gic_plan = gicforge_sub.add_parser("plan", help="Write planned #GIC/#SYCART sections")
@@ -426,6 +486,24 @@ def build_parser(*, repo_root: Path | None = None) -> argparse.ArgumentParser:
         choices=("all", "pass", "fail"),
         default="all",
         help="Entry status filter for JSON output",
+    )
+    fortran_audit = gicforge_sub.add_parser(
+        "fortran-audit",
+        help="Compare ORACLE GIC/B rows against the vendored Merlino Fortran backend",
+    )
+    fortran_audit.add_argument("--root", type=Path, help="Override the GIC corpus root directory")
+    fortran_audit.add_argument("--workdir", type=Path, help="Keep audit work directories here")
+    fortran_audit.add_argument(
+        "--molecule",
+        action="append",
+        help="Corpus-relative molecule path to audit; repeatable",
+    )
+    fortran_audit.add_argument("--limit", type=int)
+    fortran_audit.add_argument("--tolerance", type=float, default=2.0e-8)
+    fortran_audit.add_argument(
+        "--format",
+        choices=("summary", "cases", "failures", "json"),
+        default="summary",
     )
     gaussian_input = gicforge_sub.add_parser(
         "gaussian-input",
@@ -1229,6 +1307,102 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
                 f"sigma={result.sigma[item.name]:.4g}"
             )
         return 0
+    if args.command == "semiexp-ensemble-paper":
+        from oracle_morpheus import write_ensemble_jpcl_artifacts
+
+        artifacts = write_ensemble_jpcl_artifacts(
+            args.job,
+            args.paper_dir,
+            outdir=args.outdir,
+            soft_prior_sigma=args.soft_prior_sigma,
+        )
+        print(f"paper_dir: {args.paper_dir}")
+        if args.outdir is not None:
+            print(f"analysis_dir: {args.outdir}")
+        for name, path in sorted(artifacts.items()):
+            print(f"{name}: {path}")
+        return 0
+    if args.command == "semiexp-ensemble-prior-scan":
+        from oracle_morpheus import run_ensemble_prior_scan
+
+        kwargs = {}
+        if args.sigma:
+            kwargs["sigmas"] = tuple(args.sigma)
+        rows = run_ensemble_prior_scan(args.job, args.outdir, **kwargs)
+        print(f"rows: {len(rows)}")
+        print(f"csv: {args.outdir / 'prior_sigma_scan.csv'}")
+        print(f"json: {args.outdir / 'prior_sigma_scan.json'}")
+        return 0
+    if args.command == "semiexp-ensemble-synthon-scan":
+        from oracle_morpheus import run_ensemble_synthon_threshold_scan
+
+        kwargs = {}
+        if args.threshold:
+            kwargs["thresholds"] = tuple(args.threshold)
+        rows = run_ensemble_synthon_threshold_scan(args.job, args.outdir, **kwargs)
+        print(f"rows: {len(rows)}")
+        print(f"csv: {args.outdir / 'synthon_threshold_scan.csv'}")
+        print(f"json: {args.outdir / 'synthon_threshold_scan.json'}")
+        return 0
+    if args.command == "semiexp-benchmark":
+        from oracle_morpheus import generate_paper_benchmark_artifacts
+
+        snapshot, artifacts = generate_paper_benchmark_artifacts(
+            snapshot_path=args.snapshot,
+            outdir=args.outdir,
+            refresh_from_outputs=not args.no_refresh,
+            update_snapshot=args.update_snapshot,
+        )
+        print(f"cases: {len(snapshot.get('cases', {}))}")
+        print(f"planar_diagnostics: {len(snapshot.get('planar_pair_diagnostics', {}))}")
+        for name, path in sorted(artifacts.items()):
+            print(f"{name}: {path}")
+        return 0
+    if args.command == "multistructure-reference-search":
+        from oracle_morpheus import search_reference_library
+
+        result = search_reference_library(
+            args.query_xyz,
+            library_root=args.library_root,
+            top_k=args.top_k,
+            include_ring_comparison=not args.no_ring_comparison,
+            ring_weight=args.ring_weight,
+            outdir=args.outdir,
+        )
+        print(f"reference_library: {result.library_root}")
+        print(f"matches: {len(result.matches)}")
+        print(f"skipped: {len(result.skipped)}")
+        if result.matches:
+            top = result.matches[0]
+            print(f"top_match: {top.slug} similarity={top.similarity_combined:.8g}")
+        print(f"outputs: {args.outdir}")
+        return 0
+    if args.command == "multistructure-build-reference-geometry":
+        from oracle_morpheus import build_reference_assisted_geometry
+
+        apply_kinds = tuple(args.apply_kind) if args.apply_kind else None
+        kwargs = {}
+        if apply_kinds is not None:
+            kwargs["apply_kinds"] = apply_kinds
+        result = build_reference_assisted_geometry(
+            args.query_xyz,
+            library_root=args.library_root,
+            top_library_matches=args.top_library_matches,
+            max_fragment_matches=args.max_fragment_matches,
+            min_fragment_support=args.min_fragment_support,
+            zeff_threshold=args.zeff_threshold,
+            include_ring_comparison=not args.no_ring_comparison,
+            ring_weight=args.ring_weight,
+            outdir=args.outdir,
+            **kwargs,
+        )
+        print(f"reference_library: {result.library_root}")
+        print(f"targets: {len(result.targets)}")
+        print(f"unmatched: {len(result.unmatched)}")
+        print(f"iterations: {result.iterations}")
+        print(f"rms_target_residual_final: {result.rms_target_residual_final:.8g}")
+        print(f"outputs: {args.outdir}")
+        return 0
     if args.command == "gicforge" and args.gicforge_command == "plan":
         from oracle_gicforge import write_gicforge_plan_sections
 
@@ -1350,6 +1524,49 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
             print("\n".join(format_gic_corpus_geometry_failures(audit, limit=args.limit)))
             return 0
         print("\n".join(format_gic_corpus_geometry_audit_summary(audit)))
+        return 0
+    if args.command == "gicforge" and args.gicforge_command == "fortran-audit":
+        from oracle_gicforge import (
+            audit_gicforge_fortran_corpus,
+            default_gic_corpus_root,
+            format_gicforge_fortran_audit_cases,
+            format_gicforge_fortran_audit_summary,
+            gicforge_fortran_audit_records,
+        )
+
+        corpus_root = args.root or default_gic_corpus_root(root)
+        audit = audit_gicforge_fortran_corpus(
+            root=corpus_root,
+            molecules=args.molecule,
+            workdir=args.workdir,
+            repo_root=root,
+            limit=args.limit,
+            tolerance=args.tolerance,
+        )
+        if args.format == "json":
+            payload = {
+                "root": str(audit.root),
+                "workdir": None if audit.workdir is None else str(audit.workdir),
+                "tolerance": audit.tolerance,
+                "cases": len(audit.results),
+                "passed": audit.passed,
+                "failed": audit.failed,
+                "errored": audit.errored,
+                "skipped": audit.skipped,
+                "max_row_space_residual": audit.max_row_space_residual,
+                "results": gicforge_fortran_audit_records(audit),
+            }
+            print(json.dumps(payload, indent=2, sort_keys=True))
+            return 0
+        if args.format == "failures":
+            lines = format_gicforge_fortran_audit_cases(audit, status="fail")
+            lines.extend(format_gicforge_fortran_audit_cases(audit, status="error"))
+            print("\n".join(lines))
+            return 0
+        if args.format == "cases":
+            print("\n".join(format_gicforge_fortran_audit_cases(audit)))
+            return 0
+        print("\n".join(format_gicforge_fortran_audit_summary(audit)))
         return 0
     if args.command == "gicforge" and args.gicforge_command == "gaussian-input":
         from oracle_gicforge import write_gicforge_gaussian_input

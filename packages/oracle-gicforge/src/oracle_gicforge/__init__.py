@@ -90,8 +90,18 @@ from .corpus import (
     gic_corpus_records,
     summarize_gic_corpus,
 )
+from .fortran_audit import (
+    DEFAULT_FORTRAN_AUDIT_MOLECULES,
+    GICForgeFortranAudit,
+    GICForgeFortranAuditResult,
+    audit_gicforge_fortran_corpus,
+    format_gicforge_fortran_audit_cases,
+    format_gicforge_fortran_audit_summary,
+    gicforge_fortran_audit_records,
+)
 
 __all__ = [
+    "DEFAULT_FORTRAN_AUDIT_MOLECULES",
     "GEOMETRY_IMPORT_SUFFIXES",
     "GICCorpusGeometryAudit",
     "GICCorpusGeometryAuditEntry",
@@ -99,6 +109,8 @@ __all__ = [
     "GICCorpusError",
     "GICCorpusSummary",
     "GICBMatrix",
+    "GICForgeFortranAudit",
+    "GICForgeFortranAuditResult",
     "FrozenGIC",
     "GICDefinition",
     "GICForgeContractError",
@@ -126,6 +138,7 @@ __all__ = [
     "SYMMETRIZATION_POLICY",
     "B_MATRIX_BACKEND",
     "audit_gic_corpus_geometry",
+    "audit_gicforge_fortran_corpus",
     "build_gic_b_matrix",
     "build_gic_b_matrix_from_xyzin",
     "build_gic_definition_from_xyzin",
@@ -137,8 +150,11 @@ __all__ = [
     "format_gic_corpus_geometry_failures",
     "format_gic_corpus_paths",
     "format_gic_corpus_summary",
+    "format_gicforge_fortran_audit_cases",
+    "format_gicforge_fortran_audit_summary",
     "gic_corpus_geometry_audit_records",
     "gic_corpus_records",
+    "gicforge_fortran_audit_records",
     "gaussian_gic_lines_from_xyzin",
     "gic_b_matrix_lines",
     "gic_definition_section_lines",

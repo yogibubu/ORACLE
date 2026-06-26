@@ -87,7 +87,11 @@ class SnapshotValidationError(ValueError):
 
 
 def repository_root() -> Path:
-    return Path(__file__).resolve().parents[1]
+    here = Path(__file__).resolve()
+    for candidate in here.parents:
+        if (candidate / "pyproject.toml").is_file() and (candidate / "packages").is_dir():
+            return candidate
+    return here.parents[1]
 
 
 def load_paper_benchmark_snapshot(path: Path | None = None) -> dict[str, Any]:

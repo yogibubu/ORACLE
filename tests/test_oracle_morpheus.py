@@ -11,6 +11,18 @@ def test_oracle_morpheus_imports_and_data_library():
     assert morpheus.XYZIN_ISOTOPOLOGUES_SCHEMA == "oracle.xyz.isotopologues.v1"
     assert morpheus.DEFAULT_SE_GEOMETRY_LIBRARY.is_dir()
     assert (morpheus.DEFAULT_SE_GEOMETRY_LIBRARY / "manifest.csv").is_file()
+    assert morpheus.DEFAULT_SEMIEXP_BENCHMARK_SNAPSHOT.parts[:2] == (
+        "benchmarks",
+        "semiexp_msr",
+    )
+
+
+def test_semiexp_paper_benchmark_paths_resolve_from_repo_root():
+    from oracle_morpheus.paper_benchmarks import repository_root
+
+    root = Path(__file__).resolve().parents[1]
+
+    assert repository_root() == root
 
 
 def test_semiexp_job_accepts_oracle_and_legacy_schemas(tmp_path):

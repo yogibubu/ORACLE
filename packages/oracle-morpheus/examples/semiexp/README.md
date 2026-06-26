@@ -68,6 +68,14 @@ python -m oracle semiexp-ensemble-paper \
   --outdir working/semiexp/anhydrides_full_analysis
 ```
 
+Single-structure paper benchmark tables are generated from a checked snapshot:
+
+```bash
+python -m oracle semiexp-benchmark \
+  --snapshot benchmarks/semiexp_msr/golden/semiexp_paper_regression.json \
+  --outdir benchmarks/semiexp_msr/generated
+```
+
 The two glycine conformers can be fitted together directly from the legacy MSR
 benchmark inputs.  C-H distances are kept at the BDPCS3 reference values.  The
 `synthon` variant uses continuous effective atomic numbers (`Zeff`) with a
@@ -88,4 +96,17 @@ python -m oracle semiexp-ensemble-synthon-scan \
   --outdir working/semiexp/glycine_synthon_threshold_scan_wide \
   --threshold 0.010 --threshold 0.035 --threshold 0.075 \
   --threshold 0.100 --threshold 0.150 --threshold 0.250
+```
+
+Search and use the local `se_geometries` library for reference-assisted
+starting structures with:
+
+```bash
+python -m oracle multistructure-reference-search \
+  --query-xyz path/to/query.xyz \
+  --outdir working/multistructure_reference_search/query
+
+python -m oracle multistructure-build-reference-geometry \
+  --query-xyz path/to/query.xyz \
+  --outdir working/multistructure_reference_geometry/query
 ```

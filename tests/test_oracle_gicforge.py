@@ -1877,3 +1877,138 @@ def test_gicforge_projector_symmetrizes_special_fragment_center_atom_coordinates
         "SPECIAL_FRAGMENT_CENTER_ATOM"
     )
     assert total_symmetric_gic_names(symmetrized) == ("AFCAt001",)
+
+
+def test_gicforge_projector_symmetrizes_butterfly_without_torsion_mixing():
+    primitives = (
+        GICPrimitive("P001", "BtFl0001", "BUTTERFLY", "D", (1, 2, 3, 4)),
+        GICPrimitive("P002", "BtFl0002", "BUTTERFLY", "D", (5, 6, 7, 8)),
+        GICPrimitive("P003", "Tors0001", "TORSION", "D", (1, 3, 4, 2)),
+        GICPrimitive("P004", "Tors0002", "TORSION", "D", (5, 7, 8, 6)),
+    )
+    definition = GICDefinition(
+        backend="test",
+        point_group="C2",
+        symmetrize=False,
+        target_rank=4,
+        rank=4,
+        candidate_count=4,
+        reference_coordinates_angstrom=((0.0, 0.0, 0.0),) * 8,
+        primitives=primitives,
+        gics=tuple(
+            FrozenGIC(
+                identifier=f"GIC{idx:03d}",
+                name=primitive.name,
+                family=primitive.family,
+                irrep="UNASSIGNED",
+                primitive_id=primitive.identifier,
+                gaussian_expression=primitive.gaussian_expression(),
+                coefficients=((primitive.identifier, 1.0),),
+            )
+            for idx, primitive in enumerate(primitives, start=1)
+        ),
+    )
+    operations = (
+        GICPointGroupOperation(
+            "E",
+            ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)),
+            tuple(range(1, 9)),
+        ),
+        GICPointGroupOperation(
+            "C2z^1",
+            ((-1.0, 0.0, 0.0), (0.0, -1.0, 0.0), (0.0, 0.0, 1.0)),
+            (5, 6, 7, 8, 1, 2, 3, 4),
+        ),
+    )
+
+    symmetrized = symmetrize_gic_definition(
+        definition,
+        atom_symbols=("C",) * 8,
+        symmetry_operations=operations,
+    )
+
+    assert symmetrized.symmetry_diagnostics is not None
+    assert symmetrized.symmetry_diagnostics.method == "POINT_GROUP_PROJECTOR"
+    assert [
+        (group.block, group.family, group.output_gics)
+        for group in symmetrized.symmetry_diagnostics.groups
+    ] == [
+        ("BUTTERFLY", "BUTTERFLY", ("ABtFl001", "BBtFl001")),
+        ("TORSION", "TORSION", ("ATors001", "BTors001")),
+    ]
+    assert [gic.irrep for gic in symmetrized.gics] == ["A", "B", "A", "B"]
+    assert total_symmetric_gic_names(symmetrized) == ("ABtFl001", "ATors001")
+
+
+def test_gicforge_projector_symmetrizes_special_fragment_orientation_components():
+    primitives = (
+        GICPrimitive(
+            "P001",
+            "FRot0001",
+            "FRAG_ORIENTATION",
+            "FROT",
+            (1, 2),
+            mode=0,
+            ref_atoms=(3, 4),
+            frame_atoms=(1, 2),
+            ref_frame_atoms=(3, 4),
+        ),
+        GICPrimitive(
+            "P002",
+            "FRot0002",
+            "FRAG_ORIENTATION",
+            "FROT",
+            (1, 2),
+            mode=2,
+            ref_atoms=(3, 4),
+            frame_atoms=(1, 2),
+            ref_frame_atoms=(3, 4),
+        ),
+    )
+    definition = GICDefinition(
+        backend="test",
+        point_group="C2",
+        symmetrize=False,
+        target_rank=2,
+        rank=2,
+        candidate_count=2,
+        reference_coordinates_angstrom=((0.0, 0.0, 0.0),) * 4,
+        primitives=primitives,
+        gics=tuple(
+            FrozenGIC(
+                identifier=f"GIC{idx:03d}",
+                name=primitive.name,
+                family=primitive.family,
+                irrep="UNASSIGNED",
+                primitive_id=primitive.identifier,
+                gaussian_expression=primitive.gaussian_expression(),
+                coefficients=((primitive.identifier, 1.0),),
+            )
+            for idx, primitive in enumerate(primitives, start=1)
+        ),
+    )
+    operations = (
+        GICPointGroupOperation(
+            "E",
+            ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)),
+            (1, 2, 3, 4),
+        ),
+        GICPointGroupOperation(
+            "C2z^1",
+            ((-1.0, 0.0, 0.0), (0.0, -1.0, 0.0), (0.0, 0.0, 1.0)),
+            (1, 2, 3, 4),
+        ),
+    )
+
+    symmetrized = symmetrize_gic_definition(
+        definition,
+        atom_symbols=("C", "H", "C", "H"),
+        symmetry_operations=operations,
+    )
+
+    assert symmetrized.symmetry_diagnostics is not None
+    assert symmetrized.symmetry_diagnostics.method == "POINT_GROUP_PROJECTOR"
+    assert symmetrized.symmetry_diagnostics.groups[0].block == "SPECIAL_FRAGMENT_ORIENTATION"
+    assert [gic.name for gic in symmetrized.gics] == ["AFRot001", "BFRot001"]
+    assert [gic.irrep for gic in symmetrized.gics] == ["A", "B"]
+    assert total_symmetric_gic_names(symmetrized) == ("AFRot001",)

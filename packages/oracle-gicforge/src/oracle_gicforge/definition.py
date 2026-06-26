@@ -1615,9 +1615,9 @@ def _next_projected_name(
 def _primitive_projector_key(primitive: GICPrimitive) -> tuple[object, ...] | None:
     if primitive.family == "STRETCH" and len(primitive.atoms) == 2:
         return ("STRETCH", tuple(sorted(primitive.atoms)))
-    if primitive.family == "BEND" and len(primitive.atoms) == 3:
+    if primitive.family in {"BEND", "CYCLIC_BEND"} and len(primitive.atoms) == 3:
         return (
-            "BEND",
+            primitive.family,
             primitive.atoms[1],
             tuple(sorted((primitive.atoms[0], primitive.atoms[2]))),
         )
@@ -1628,9 +1628,14 @@ def _primitive_projector_key(primitive: GICPrimitive) -> tuple[object, ...] | No
             tuple(sorted((primitive.atoms[0], primitive.atoms[2]))),
             primitive.mode,
         )
-    if primitive.family == "TORSION" and len(primitive.atoms) == 4:
+    if primitive.family in {
+        "TORSION",
+        "CYCLIC_TORSION",
+        "CONDENSED_RING_TORSION",
+        "BUTTERFLY",
+    } and len(primitive.atoms) == 4:
         canonical, _sign = _canonical_torsion_key_and_sign(primitive.atoms)
-        return ("TORSION", canonical)
+        return (primitive.family, canonical)
     if primitive.family == "RING_PUCKER_COMPONENT" and primitive.function == "RPCK":
         signature = _ring_pucker_projector_signature(primitive)
         if signature is None:
@@ -1694,11 +1699,11 @@ def _mapped_primitive_projector_terms(
 
     if primitive.family == "STRETCH" and len(mapped_atoms) == 2:
         return ((("STRETCH", tuple(sorted(mapped_atoms))), 1.0),)
-    if primitive.family == "BEND" and len(mapped_atoms) == 3:
+    if primitive.family in {"BEND", "CYCLIC_BEND"} and len(mapped_atoms) == 3:
         return (
             (
                 (
-                    "BEND",
+                    primitive.family,
                     mapped_atoms[1],
                     tuple(sorted((mapped_atoms[0], mapped_atoms[2]))),
                 ),
@@ -1710,9 +1715,14 @@ def _mapped_primitive_projector_terms(
             return None
         key = _primitive_projector_key(primitive)
         return ((key, 1.0),) if key is not None else None
-    if primitive.family == "TORSION" and len(mapped_atoms) == 4:
+    if primitive.family in {
+        "TORSION",
+        "CYCLIC_TORSION",
+        "CONDENSED_RING_TORSION",
+        "BUTTERFLY",
+    } and len(mapped_atoms) == 4:
         canonical, sign = _canonical_torsion_key_and_sign(mapped_atoms)
-        return ((("TORSION", canonical), sign),)
+        return (((primitive.family, canonical), sign),)
     if primitive.family == "RING_PUCKER_COMPONENT" and primitive.function == "RPCK":
         mapped_terms = []
         for coefficient, atoms in _ring_pucker_terms_from_refs(primitive):
@@ -1943,12 +1953,16 @@ def _local_symmetry_signature(
 ) -> str | None:
     if primitive.family == "STRETCH" and len(primitive.atoms) == 2:
         return "R:" + "-".join(_sorted_atom_symbols(primitive.atoms, atom_symbols))
-    if primitive.family == "BEND" and len(primitive.atoms) == 3:
+    if primitive.family in {"BEND", "CYCLIC_BEND"} and len(primitive.atoms) == 3:
         end_symbols = _sorted_atom_symbols(
             (primitive.atoms[0], primitive.atoms[2]),
             atom_symbols,
         )
-        return f"A:{_atom_symbol(primitive.atoms[1], atom_symbols)}:{'-'.join(end_symbols)}"
+        return (
+            f"{primitive.family}:A:"
+            f"{_atom_symbol(primitive.atoms[1], atom_symbols)}:"
+            f"{'-'.join(end_symbols)}"
+        )
     if primitive.family == "LINEAR_BEND" and len(primitive.atoms) == 3:
         end_symbols = _sorted_atom_symbols(
             (primitive.atoms[0], primitive.atoms[2]),
@@ -1958,8 +1972,16 @@ def _local_symmetry_signature(
             f"L:{primitive.mode}:{_atom_symbol(primitive.atoms[1], atom_symbols)}:"
             f"{'-'.join(end_symbols)}"
         )
-    if primitive.family == "TORSION" and len(primitive.atoms) == 4:
-        return "D:" + "-".join(_atom_symbol(atom, atom_symbols) for atom in primitive.atoms)
+    if primitive.family in {
+        "TORSION",
+        "CYCLIC_TORSION",
+        "CONDENSED_RING_TORSION",
+        "BUTTERFLY",
+    } and len(primitive.atoms) == 4:
+        return (
+            f"{primitive.family}:D:"
+            + "-".join(_atom_symbol(atom, atom_symbols) for atom in primitive.atoms)
+        )
     if primitive.family in {"OUT_OF_PLANE", "IMPROPER_DIHEDRAL"} and len(primitive.atoms) == 4:
         substituents = _sorted_atom_symbols(primitive.atoms[1:], atom_symbols)
         return (

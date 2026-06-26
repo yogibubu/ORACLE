@@ -33,3 +33,16 @@ Quick inventory:
 source /Users/vincenzobarone/ORACLE/scripts/oracle_env.sh
 oracle-gic-corpus-list
 ```
+
+Numerical Python/Fortran77 parity audit:
+
+```bash
+python -m oracle gicforge fortran-audit \
+  --root tests/fixtures/test_molecules/molecules \
+  --workdir runs/gicforge_fortran_audit
+```
+
+The audit preprocesses each selected corpus molecule through ORACLE-Babel,
+builds the frozen ORACLE GIC/B matrix, runs the vendored Merlino Fortran77
+GICForge harness, and compares final rank, row-space rank and Wilson-B row
+span. Add `--molecule name.inp` repeatedly to pin a smaller periodic audit set.
