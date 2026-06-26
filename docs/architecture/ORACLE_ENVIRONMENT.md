@@ -10,15 +10,18 @@ oracle-set
 
 The helper defines:
 
-- `oracle-set`: activate the first available ORACLE environment, export
-  `ORACLE_HOME`, add package `src` directories to `PYTHONPATH`, add local tools
-  to `PATH`, and `cd` to the repo.
+- `oracle-set`: create `ORACLE_VENV` when missing, activate the first available
+  ORACLE environment, install runtime dependencies including RDKit when needed,
+  export `ORACLE_HOME`, add package `src` directories to `PYTHONPATH`, add local
+  tools to `PATH`, and `cd` to the repo.
 - `oracle-run`: launch `oracle_gui.app` when it exists, otherwise dispatch to
   `python -m oracle`.
 - `oracle-cli`: run `python -m oracle` directly.
 - `oracle-run-bg`: launch the same target in background with a log file.
 - `oracle-run-check`: verify the current Python can import the core scientific
   runtime stack.
+- `oracle-install-runtime-deps`: explicitly install/upgrade the core runtime
+  stack in the active ORACLE environment.
 - `oracle-test`, `oracle-test-all`: run focused or full tests in the activated
   environment.
 - `oracle-clean`: remove Python cache by default; with `outputs` or `all`, also
@@ -31,14 +34,25 @@ Default variables use ORACLE names:
 ORACLE_HOME=/Users/vincenzobarone/ORACLE
 ORACLE_VENV=$HOME/.venvs/oracle
 ORACLE_CONDA_ENV=oracle_26
+ORACLE_PYTHON=python3
+ORACLE_AUTO_CREATE_VENV=1
+ORACLE_AUTO_INSTALL_RUNTIME_DEPS=1
 ORACLE_AUTO_INSTALL_GUI_DEPS=0
+ORACLE_RUNTIME_DEPS="numpy scipy matplotlib pytest rdkit"
+ORACLE_GUI_DEPS="PySide6 pytest-qt"
 ```
+
+Set `ORACLE_AUTO_CREATE_VENV=0` to prevent `oracle-set` from creating a
+virtualenv. Set `ORACLE_AUTO_INSTALL_RUNTIME_DEPS=0` to prevent automatic
+runtime dependency installation. RDKit is part of the runtime dependency set
+because ORACLE-Babel uses it for SMILES imports.
 
 Set `ORACLE_AUTO_INSTALL_GUI_DEPS=1` before `oracle-set` only when automatic
 GUI dependency installation is desired. For routine development, explicit
 dependency installation is safer:
 
 ```bash
+oracle-install-runtime-deps
 oracle-install-gui-deps
 ```
 
