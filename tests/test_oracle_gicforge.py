@@ -10,8 +10,10 @@ from oracle_fragments import write_fragment_build_section
 from oracle_gaussian import read_gaussian_cartesian_input
 from oracle_gicforge import (
     GICForgeContractError,
+    build_gic_b_matrix_from_xyzin,
     build_gic_definition_from_xyzin,
     gaussian_gic_lines_from_xyzin,
+    gic_b_matrix_lines,
     write_gicforge_build_sections,
     write_gicforge_gaussian_input,
     write_gicforge_plan_sections,
@@ -302,3 +304,58 @@ def test_gicforge_build_uses_built_fragments_for_relative_coordinates(tmp_path):
     assert any(line.startswith("GIC006 = SQRT((CxF002-X(1))**2") for line in gaussian_lines)
     assert any("KxF002F001" in line for line in gaussian_lines)
     assert any(line.startswith("GIC011 = KxF002F001") for line in gaussian_lines)
+
+
+def test_gicforge_b_matrix_includes_fragment_coordinate_rows(tmp_path):
+    source = tmp_path / "dimer.xyz"
+    source.write_text(
+        "\n".join(
+            [
+                "6",
+                "water dimer fragments",
+                "O 0.00 0.00 0.00",
+                "H 0.96 0.00 0.00",
+                "H -0.24 0.93 0.00",
+                "O 0.00 0.00 3.20",
+                "H 0.96 0.00 3.20",
+                "H -0.24 0.93 3.20",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    xyzin = tmp_path / "dimer.xyzin"
+
+    preprocess_to_enriched_xyz(source, xyzin)
+    write_validation_section(xyzin)
+    write_fragment_build_section(xyzin)
+    write_gicforge_build_sections(xyzin)
+    matrix = build_gic_b_matrix_from_xyzin(xyzin)
+
+    assert matrix.coordinate_labels == tuple(f"GIC{idx:03d}" for idx in range(1, 13))
+    assert matrix.cartesian_columns[:6] == ("1:X", "1:Y", "1:Z", "2:X", "2:Y", "2:Z")
+    assert len(matrix.rows) == 12
+    assert len(matrix.rows[0]) == 18
+    assert all(value == value for row in matrix.rows for value in row)
+
+    center_distance_row = matrix.rows[matrix.coordinate_labels.index("GIC005")]
+    assert center_distance_row[2] == pytest.approx(-1.0 / 3.0, abs=1.0e-8)
+    assert center_distance_row[5] == pytest.approx(-1.0 / 3.0, abs=1.0e-8)
+    assert center_distance_row[8] == pytest.approx(-1.0 / 3.0, abs=1.0e-8)
+    assert center_distance_row[11] == pytest.approx(1.0 / 3.0, abs=1.0e-8)
+    assert center_distance_row[14] == pytest.approx(1.0 / 3.0, abs=1.0e-8)
+    assert center_distance_row[17] == pytest.approx(1.0 / 3.0, abs=1.0e-8)
+
+    translation_row = matrix.rows[matrix.coordinate_labels.index("GIC009")]
+    assert translation_row[0] == pytest.approx(-1.0 / 3.0, abs=1.0e-8)
+    assert translation_row[3] == pytest.approx(-1.0 / 3.0, abs=1.0e-8)
+    assert translation_row[6] == pytest.approx(-1.0 / 3.0, abs=1.0e-8)
+    assert translation_row[9] == pytest.approx(1.0 / 3.0, abs=1.0e-8)
+    assert translation_row[12] == pytest.approx(1.0 / 3.0, abs=1.0e-8)
+    assert translation_row[15] == pytest.approx(1.0 / 3.0, abs=1.0e-8)
+
+    lines = gic_b_matrix_lines(matrix)
+    assert lines[0] == "SCHEMA oracle.gic.bmatrix.v1"
+    assert "ROW_COUNT 12" in lines
+    assert "COLUMN_COUNT 18" in lines
+    assert any(line.startswith("GIC005 NAME=FCDi0001 IRREP=A VALUES=") for line in lines)

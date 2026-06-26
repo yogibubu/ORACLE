@@ -19,6 +19,7 @@ from .contracts import (
 
 GIC_BACKEND = "oracle-native-primitive.v1"
 SYCART_BACKEND = "oracle-native-cartesian-nullspace.v1"
+B_MATRIX_BACKEND = "oracle-native-finite-difference-bmatrix.v1"
 RANK_TOLERANCE = 1.0e-7
 FINITE_DIFFERENCE_STEP = 1.0e-5
 LINEAR_ANGLE_DEGREES = 175.0
@@ -56,6 +57,7 @@ class FrozenGIC:
     irrep: str
     primitive_id: str
     gaussian_expression: str
+    coefficients: tuple[tuple[str, float], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -69,6 +71,17 @@ class GICDefinition:
     reference_coordinates_angstrom: tuple[tuple[float, float, float], ...]
     primitives: tuple[GICPrimitive, ...]
     gics: tuple[FrozenGIC, ...]
+
+
+@dataclass(frozen=True)
+class GICBMatrix:
+    backend: str
+    coordinate_labels: tuple[str, ...]
+    coordinate_names: tuple[str, ...]
+    irreps: tuple[str, ...]
+    cartesian_columns: tuple[str, ...]
+    finite_difference_step_angstrom: float
+    rows: tuple[tuple[float, ...], ...]
 
 
 @dataclass(frozen=True)
@@ -125,6 +138,7 @@ def build_gic_definition_from_xyzin(
             irrep="A" if point_group.upper() == "C1" else "UNASSIGNED",
             primitive_id=primitive.identifier,
             gaussian_expression=primitive.gaussian_expression(),
+            coefficients=((primitive.identifier, 1.0),),
         )
         for idx, primitive in enumerate(selected, start=1)
     )
@@ -241,6 +255,148 @@ def write_gicforge_build_sections(
         sycart_definition = build_sycart_definition_from_xyzin(target)
         replace_section(target, "SYCART", sycart_definition_section_lines(sycart_definition))
     return definition
+
+
+def build_gic_b_matrix(
+    definition: GICDefinition,
+    *,
+    coordinates_angstrom: tuple[tuple[float, float, float], ...] | np.ndarray | None = None,
+    step_angstrom: float = FINITE_DIFFERENCE_STEP,
+) -> GICBMatrix:
+    """Evaluate the Wilson B matrix for a frozen GIC definition."""
+    coords = (
+        np.asarray(definition.reference_coordinates_angstrom, dtype=float)
+        if coordinates_angstrom is None
+        else np.asarray(coordinates_angstrom, dtype=float)
+    )
+    if coords.ndim != 2 or coords.shape[1] != 3:
+        raise GICForgeContractError("B-matrix coordinates must have shape (natoms, 3)")
+    if not np.isfinite(step_angstrom) or step_angstrom <= 0.0:
+        raise GICForgeContractError("B-matrix finite-difference step must be positive")
+    primitive_by_id = {primitive.identifier: primitive for primitive in definition.primitives}
+    rows: list[tuple[float, ...]] = []
+    for gic in definition.gics:
+        row = np.zeros(coords.size, dtype=float)
+        coefficients = gic.coefficients or ((gic.primitive_id, 1.0),)
+        for primitive_id, coefficient in coefficients:
+            primitive = primitive_by_id.get(primitive_id)
+            if primitive is None:
+                raise GICForgeContractError(
+                    f"unknown primitive {primitive_id!r} in frozen GIC {gic.identifier}"
+                )
+            row += float(coefficient) * _finite_difference_b_row(
+                primitive,
+                coords,
+                step_angstrom=step_angstrom,
+            )
+        if not np.all(np.isfinite(row)):
+            raise GICForgeContractError(
+                f"non-finite B-matrix row for frozen GIC {gic.identifier}"
+            )
+        rows.append(tuple(float(value) for value in row))
+    return GICBMatrix(
+        backend=B_MATRIX_BACKEND,
+        coordinate_labels=tuple(gic.identifier for gic in definition.gics),
+        coordinate_names=tuple(gic.name for gic in definition.gics),
+        irreps=tuple(gic.irrep for gic in definition.gics),
+        cartesian_columns=_cartesian_column_labels(coords.shape[0]),
+        finite_difference_step_angstrom=float(step_angstrom),
+        rows=tuple(rows),
+    )
+
+
+def build_gic_b_matrix_from_xyzin(
+    path: Path,
+    *,
+    step_angstrom: float = FINITE_DIFFERENCE_STEP,
+) -> GICBMatrix:
+    """Evaluate the B matrix from the frozen #GIC section of an enriched XYZ."""
+    target = Path(path)
+    definition = read_gic_definition_from_xyzin(target)
+    geometry = read_enriched_xyz(target)
+    return build_gic_b_matrix(
+        definition,
+        coordinates_angstrom=geometry.coordinates_angstrom,
+        step_angstrom=step_angstrom,
+    )
+
+
+def read_gic_definition_from_xyzin(path: Path) -> GICDefinition:
+    """Read a frozen ORACLE GIC definition without regenerating coordinates."""
+    target = Path(path)
+    lines = read_sectioned_lines(target)
+    geometry = read_enriched_xyz(target)
+    section = section_content(lines, "GIC")
+    if not section:
+        raise GICForgeContractError("missing #GIC section")
+    if section[0].strip() != f"SCHEMA {ORACLE_XYZ_GIC_SCHEMA}":
+        raise GICForgeContractError("invalid #GIC schema")
+    status = _section_value(section, "STATUS")
+    if (status or "").upper() != "BUILT":
+        raise GICForgeContractError(f"#GIC status must be BUILT; found {status or 'UNKNOWN'}")
+    primitives = tuple(
+        _parse_primitive_line(line)
+        for line in _subsection(section, "PRIMITIVES")
+        if line.strip() and line.strip().upper() != "NONE"
+    )
+    gics = tuple(
+        _parse_frozen_gic_line(line)
+        for line in _subsection(section, "FROZEN_GICS")
+        if line.strip() and line.strip().upper() != "NONE"
+    )
+    return GICDefinition(
+        backend=_section_value(section, "BACKEND") or GIC_BACKEND,
+        point_group=_section_value(section, "POINT_GROUP") or _point_group(lines),
+        symmetrize=_parse_bool(_section_value(section, "SYMMETRIZE")),
+        target_rank=_parse_int(_section_value(section, "TARGET_RANK")),
+        rank=_parse_int(_section_value(section, "RANK")),
+        candidate_count=_parse_int(_section_value(section, "CANDIDATE_COUNT")),
+        reference_coordinates_angstrom=tuple(
+            tuple(float(value) for value in row)
+            for row in geometry.coordinates_angstrom
+        ),
+        primitives=primitives,
+        gics=gics,
+    )
+
+
+def gic_b_matrix_lines(matrix: GICBMatrix) -> list[str]:
+    """Serialize a GIC B matrix in a compact machine-readable text format."""
+    lines = [
+        "SCHEMA oracle.gic.bmatrix.v1",
+        f"BACKEND {matrix.backend}",
+        "UNITS MIXED_GIC_PER_ANGSTROM",
+        f"ROW_COUNT {len(matrix.rows)}",
+        f"COLUMN_COUNT {len(matrix.cartesian_columns)}",
+        f"FINITE_DIFFERENCE_STEP_ANGSTROM {matrix.finite_difference_step_angstrom:.12g}",
+        "[COLUMNS]",
+        " ".join(matrix.cartesian_columns) if matrix.cartesian_columns else "NONE",
+        "[ROWS]",
+    ]
+    if not matrix.rows:
+        lines.append("NONE")
+        return lines
+    for label, name, irrep, row in zip(
+        matrix.coordinate_labels,
+        matrix.coordinate_names,
+        matrix.irreps,
+        matrix.rows,
+    ):
+        values = ",".join(f"{value:.12g}" for value in row)
+        lines.append(f"{label} NAME={name} IRREP={irrep} VALUES={values}")
+    return lines
+
+
+def write_gic_b_matrix(
+    path: Path,
+    output: Path,
+    *,
+    step_angstrom: float = FINITE_DIFFERENCE_STEP,
+) -> GICBMatrix:
+    matrix = build_gic_b_matrix_from_xyzin(path, step_angstrom=step_angstrom)
+    target = Path(output)
+    target.write_text("\n".join(gic_b_matrix_lines(matrix)) + "\n", encoding="utf-8")
+    return matrix
 
 
 def gaussian_gic_lines_from_xyzin(path: Path) -> list[str]:
@@ -405,15 +561,20 @@ def _select_ranked_primitives(
     return tuple(selected), rank
 
 
-def _finite_difference_b_row(primitive: GICPrimitive, coords: np.ndarray) -> np.ndarray:
+def _finite_difference_b_row(
+    primitive: GICPrimitive,
+    coords: np.ndarray,
+    *,
+    step_angstrom: float = FINITE_DIFFERENCE_STEP,
+) -> np.ndarray:
     flat = np.asarray(coords, dtype=float).reshape(-1)
     base = _primitive_value(primitive, coords)
     row = np.zeros_like(flat)
     for idx in range(flat.size):
         plus = flat.copy()
         minus = flat.copy()
-        plus[idx] += FINITE_DIFFERENCE_STEP
-        minus[idx] -= FINITE_DIFFERENCE_STEP
+        plus[idx] += step_angstrom
+        minus[idx] -= step_angstrom
         try:
             value_plus = _primitive_value(primitive, plus.reshape(coords.shape))
             value_minus = _primitive_value(primitive, minus.reshape(coords.shape))
@@ -427,7 +588,7 @@ def _finite_difference_b_row(primitive: GICPrimitive, coords: np.ndarray) -> np.
         if not np.isfinite(delta) or not np.isfinite(base):
             row[idx] = np.nan
         else:
-            row[idx] = delta / (2.0 * FINITE_DIFFERENCE_STEP)
+            row[idx] = delta / (2.0 * step_angstrom)
     return row
 
 
@@ -872,6 +1033,122 @@ def _subsection(section_lines: list[str], name: str) -> list[str]:
     return list(section_lines[start:end])
 
 
+def _section_value(section_lines: list[str], key: str) -> str | None:
+    key_upper = key.upper()
+    for line in section_lines:
+        parts = line.split(maxsplit=1)
+        if len(parts) == 2 and parts[0].upper() == key_upper:
+            return parts[1].strip()
+    return None
+
+
+def _parse_primitive_line(line: str) -> GICPrimitive:
+    parts = line.split()
+    if not parts:
+        raise GICForgeContractError("empty primitive line")
+    fields = _key_values(parts[1:])
+    try:
+        return GICPrimitive(
+            identifier=parts[0],
+            name=fields["NAME"],
+            family=fields["FAMILY"],
+            function=fields["FUNCTION"],
+            atoms=_parse_atom_list(fields["ATOMS"]),
+            mode=int(fields.get("MODE", "0")),
+            ref_atoms=_parse_atom_list(fields.get("REF_ATOMS", "")),
+            refs=_parse_text_list(fields.get("REFS", "")),
+        )
+    except KeyError as exc:
+        raise GICForgeContractError(f"invalid primitive line: {line}") from exc
+    except ValueError as exc:
+        raise GICForgeContractError(f"invalid primitive numeric field: {line}") from exc
+
+
+def _parse_frozen_gic_line(line: str) -> FrozenGIC:
+    parts = line.split()
+    if not parts:
+        raise GICForgeContractError("empty frozen GIC line")
+    fields = _key_values(parts[1:])
+    coefficients = _parse_coefficients(fields.get("COEFFS", ""))
+    if not coefficients:
+        primitive_id = fields.get("PRIMITIVE")
+        if not primitive_id:
+            raise GICForgeContractError(f"invalid frozen GIC coefficients: {line}")
+        coefficients = ((primitive_id, 1.0),)
+    try:
+        return FrozenGIC(
+            identifier=parts[0],
+            name=fields["NAME"],
+            family=fields["FAMILY"],
+            irrep=fields["IRREP"],
+            primitive_id=coefficients[0][0],
+            gaussian_expression=fields.get("GAUSSIAN", "NONE"),
+            coefficients=coefficients,
+        )
+    except KeyError as exc:
+        raise GICForgeContractError(f"invalid frozen GIC line: {line}") from exc
+
+
+def _key_values(parts: list[str]) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    for part in parts:
+        if "=" not in part:
+            continue
+        key, value = part.split("=", 1)
+        fields[key.upper()] = value
+    return fields
+
+
+def _parse_atom_list(text: str) -> tuple[int, ...]:
+    if not text:
+        return ()
+    try:
+        return tuple(int(item) for item in text.split(",") if item)
+    except ValueError as exc:
+        raise GICForgeContractError(f"invalid atom list: {text}") from exc
+
+
+def _parse_text_list(text: str) -> tuple[str, ...]:
+    if not text:
+        return ()
+    return tuple(item for item in text.split(",") if item)
+
+
+def _parse_coefficients(text: str) -> tuple[tuple[str, float], ...]:
+    if not text:
+        return ()
+    coefficients: list[tuple[str, float]] = []
+    for item in text.replace(";", ",").split(","):
+        if not item:
+            continue
+        if ":" not in item:
+            raise GICForgeContractError(f"invalid GIC coefficient: {item}")
+        primitive_id, value = item.split(":", 1)
+        try:
+            coefficients.append((primitive_id, float(value)))
+        except ValueError as exc:
+            raise GICForgeContractError(f"invalid GIC coefficient value: {item}") from exc
+    return tuple(coefficients)
+
+
+def _parse_bool(text: str | None) -> bool:
+    return bool((text or "").strip().upper() == "TRUE")
+
+
+def _parse_int(text: str | None) -> int:
+    if text is None:
+        return 0
+    try:
+        return int(text)
+    except ValueError as exc:
+        raise GICForgeContractError(f"invalid integer field: {text}") from exc
+
+
+def _cartesian_column_labels(natoms: int) -> tuple[str, ...]:
+    axes = ("X", "Y", "Z")
+    return tuple(f"{atom}:{axis}" for atom in range(1, natoms + 1) for axis in axes)
+
+
 def _primitive_line(primitive: GICPrimitive) -> str:
     atoms = ",".join(str(atom) for atom in primitive.atoms)
     mode = f" MODE={primitive.mode}" if primitive.function == "L" else ""
@@ -1058,9 +1335,14 @@ def _atom_interval(atoms: tuple[int, ...]) -> str:
 
 
 def _frozen_gic_line(gic: FrozenGIC) -> str:
+    coefficients = gic.coefficients or ((gic.primitive_id, 1.0),)
+    coeffs = ",".join(
+        f"{primitive_id}:{coefficient:.12f}"
+        for primitive_id, coefficient in coefficients
+    )
     return (
         f"{gic.identifier} NAME={gic.name} FAMILY={gic.family} IRREP={gic.irrep} "
-        f"COEFFS={gic.primitive_id}:1.000000000000"
+        f"COEFFS={coeffs}"
     )
 
 

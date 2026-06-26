@@ -33,6 +33,20 @@ These primitives are frozen in `#GIC` and available to ORACLE downstream tools.
 fragment-frame `P/Q/S` plus quaternion construction documented in Gaussian's
 GIC guide.
 
+## B Matrix
+
+The Wilson B matrix is evaluated from the frozen `#GIC` section, not by
+regenerating the GIC basis. For fragment-aware coordinates, ORACLE differentiates
+the same scalar definitions used for the Gaussian symbolic export:
+
+- center-center and center-atom distances;
+- Cartesian center translations;
+- quaternion-vector components of relative fragment orientation.
+
+The first backend is finite-difference and intentionally centralized in
+`oracle-gicforge`; downstream GF, MORPHEUS and refinement tools must call this
+service instead of carrying their own fragment-coordinate derivatives.
+
 ## Legacy Origin
 
 The translation and rotation definitions follow the Merlino/Gaussian rotor

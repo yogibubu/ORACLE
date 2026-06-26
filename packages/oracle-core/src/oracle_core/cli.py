@@ -85,12 +85,20 @@ def build_parser(*, repo_root: Path | None = None) -> argparse.ArgumentParser:
     gic_build.add_argument("xyzin", type=Path)
     gic_build.add_argument("--symmetrize", action="store_true")
     gic_build.add_argument("--sycart", action="store_true")
+    bmatrix = gicforge_sub.add_parser("bmatrix", help="Evaluate the frozen GIC B matrix")
+    bmatrix.add_argument("xyzin", type=Path)
+    bmatrix.add_argument("output", type=Path, nargs="?")
+    bmatrix.add_argument("--step", type=float, default=1.0e-5)
     corpus = gicforge_sub.add_parser(
         "corpus",
         help="List or summarize the demanding GIC regression corpus",
     )
     corpus.add_argument("--root", type=Path, help="Override the GIC corpus root directory")
-    corpus.add_argument("--suffix", action="append", help="Filter by suffix, for example .inp or fchk")
+    corpus.add_argument(
+        "--suffix",
+        action="append",
+        help="Filter by suffix, for example .inp or fchk",
+    )
     corpus.add_argument("--limit", type=int, help="Limit listed records")
     corpus.add_argument(
         "--format",
@@ -103,7 +111,11 @@ def build_parser(*, repo_root: Path | None = None) -> argparse.ArgumentParser:
         help="Audit geometry imports for the GIC regression corpus",
     )
     corpus_audit.add_argument("--root", type=Path, help="Override the GIC corpus root directory")
-    corpus_audit.add_argument("--suffix", action="append", help="Filter by suffix; defaults to geometry inputs")
+    corpus_audit.add_argument(
+        "--suffix",
+        action="append",
+        help="Filter by suffix; defaults to geometry inputs",
+    )
     corpus_audit.add_argument("--limit", type=int, help="Limit audited or listed records")
     corpus_audit.add_argument(
         "--format",
@@ -216,6 +228,24 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
         print(
             "Built GICForge definition: "
             f"{args.xyzin} (GICs={len(definition.gics)}, rank={definition.rank})"
+        )
+        return 0
+    if args.command == "gicforge" and args.gicforge_command == "bmatrix":
+        from oracle_gicforge import (
+            build_gic_b_matrix_from_xyzin,
+            gic_b_matrix_lines,
+            write_gic_b_matrix,
+        )
+
+        if args.output is None:
+            matrix = build_gic_b_matrix_from_xyzin(args.xyzin, step_angstrom=args.step)
+            print("\n".join(gic_b_matrix_lines(matrix)))
+            return 0
+        matrix = write_gic_b_matrix(args.xyzin, args.output, step_angstrom=args.step)
+        print(
+            "Wrote GIC B matrix: "
+            f"{args.output} (rows={len(matrix.rows)}, "
+            f"columns={len(matrix.cartesian_columns)})"
         )
         return 0
     if args.command == "gicforge" and args.gicforge_command == "corpus":

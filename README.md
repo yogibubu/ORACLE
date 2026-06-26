@@ -73,6 +73,7 @@ Validation is the gate before GICForge:
 python -m oracle validate molecule.xyzin
 python -m oracle gicforge plan molecule.xyzin --symmetrize --sycart
 python -m oracle gicforge build molecule.xyzin --symmetrize --sycart
+python -m oracle gicforge bmatrix molecule.xyzin bmat.out
 python -m oracle gicforge gaussian-input molecule.xyzin job.gjf
 ```
 

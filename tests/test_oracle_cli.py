@@ -217,6 +217,32 @@ def test_gicforge_build_cli_calls_writer(tmp_path, monkeypatch, capsys):
     assert "Built GICForge definition" in capsys.readouterr().out
 
 
+def test_gicforge_bmatrix_cli_calls_writer(tmp_path, monkeypatch, capsys):
+    calls = {}
+    path = tmp_path / "molecule.xyzin"
+    output = tmp_path / "bmat.out"
+
+    class FakeMatrix:
+        rows = ((1.0, 2.0, 3.0),)
+        cartesian_columns = ("1:X", "1:Y", "1:Z")
+
+    def fake_write(target, out, *, step_angstrom):
+        calls["target"] = target
+        calls["output"] = out
+        calls["step_angstrom"] = step_angstrom
+        return FakeMatrix()
+
+    monkeypatch.setattr("oracle_gicforge.write_gic_b_matrix", fake_write)
+
+    rc = oracle_run.main(
+        ["gicforge", "bmatrix", str(path), str(output), "--step", "1e-6"]
+    )
+
+    assert rc == 0
+    assert calls == {"target": path, "output": output, "step_angstrom": 1.0e-6}
+    assert "Wrote GIC B matrix" in capsys.readouterr().out
+
+
 def test_gicforge_corpus_cli_prints_inventory(capsys):
     rc = oracle_run.main(["gicforge", "corpus", "--root", str(GIC_CORPUS)])
 
