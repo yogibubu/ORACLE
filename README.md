@@ -64,6 +64,7 @@ Fragment workflows are planned against existing topology/synthon sections:
 ```bash
 python -m oracle babel preprocess molecule.inp molecule.xyzin
 python -m oracle fragments plan molecule.xyzin
+python -m oracle fragments build molecule.xyzin
 ```
 
 Validation is the gate before GICForge:

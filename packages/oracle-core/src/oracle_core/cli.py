@@ -67,6 +67,8 @@ def build_parser(*, repo_root: Path | None = None) -> argparse.ArgumentParser:
     fragments_sub = fragments.add_subparsers(dest="fragments_command")
     plan = fragments_sub.add_parser("plan", help="Write the initial #FRAGMENTS section")
     plan.add_argument("xyzin", type=Path)
+    fragments_build = fragments_sub.add_parser("build", help="Build concrete #FRAGMENTS")
+    fragments_build.add_argument("xyzin", type=Path)
 
     rovib = sub.add_parser("rovib", help="Standalone rovibrational xyzin utilities")
     rovib_sub = rovib.add_subparsers(dest="rovib_command")
@@ -177,6 +179,16 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
 
         write_fragment_plan_section(args.xyzin)
         print(f"Planned ORACLE fragment workflow: {args.xyzin}")
+        return 0
+    if args.command == "fragments" and args.fragments_command == "build":
+        from oracle_fragments import write_fragment_build_section
+
+        definition = write_fragment_build_section(args.xyzin)
+        print(
+            "Built ORACLE fragments: "
+            f"{args.xyzin} (fragments={len(definition.fragments)}, "
+            f"reference={definition.reference_fragment})"
+        )
         return 0
     if args.command == "rovib" and args.rovib_command == "summarize":
         from oracle_rovib import rovib_summary_lines, summarize_xyzin

@@ -130,6 +130,27 @@ def test_fragments_plan_cli_calls_writer(tmp_path, monkeypatch, capsys):
     assert "Planned ORACLE fragment workflow" in capsys.readouterr().out
 
 
+def test_fragments_build_cli_calls_writer(tmp_path, monkeypatch, capsys):
+    calls = {}
+    path = tmp_path / "molecule.xyzin"
+
+    class FakeDefinition:
+        reference_fragment = "F001"
+        fragments = (object(), object())
+
+    def fake_write(target):
+        calls["target"] = target
+        return FakeDefinition()
+
+    monkeypatch.setattr("oracle_fragments.write_fragment_build_section", fake_write)
+
+    rc = oracle_run.main(["fragments", "build", str(path)])
+
+    assert rc == 0
+    assert calls == {"target": path}
+    assert "Built ORACLE fragments" in capsys.readouterr().out
+
+
 def test_rovib_summarize_cli_prints_summary(tmp_path, capsys):
     path = tmp_path / "molecule.xyzin"
     path.write_text(

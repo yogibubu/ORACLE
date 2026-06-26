@@ -6,6 +6,7 @@ import pytest
 
 from oracle_core import section_content
 from oracle_chem import preprocess_to_enriched_xyz, write_validation_section
+from oracle_fragments import write_fragment_build_section
 from oracle_gaussian import read_gaussian_cartesian_input
 from oracle_gicforge import (
     GICForgeContractError,
@@ -254,3 +255,50 @@ def test_gicforge_build_handles_corpus_zmatrix_case(tmp_path):
     assert definition.target_rank == 6
     assert definition.rank == 6
     assert len(definition.gics) == 6
+
+
+def test_gicforge_build_uses_built_fragments_for_relative_coordinates(tmp_path):
+    source = tmp_path / "dimer.xyz"
+    source.write_text(
+        "\n".join(
+            [
+                "6",
+                "water dimer fragments",
+                "O 0.00 0.00 0.00",
+                "H 0.96 0.00 0.00",
+                "H -0.24 0.93 0.00",
+                "O 0.00 0.00 3.20",
+                "H 0.96 0.00 3.20",
+                "H -0.24 0.93 3.20",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    xyzin = tmp_path / "dimer.xyzin"
+
+    preprocess_to_enriched_xyz(source, xyzin)
+    write_validation_section(xyzin)
+    write_fragment_build_section(xyzin)
+    definition = write_gicforge_build_sections(xyzin)
+    gic = section_content(xyzin.read_text(encoding="utf-8").splitlines(), "GIC")
+    primitive_lines = [line for line in gic if line.startswith("P")]
+    gaussian_lines = gaussian_gic_lines_from_xyzin(xyzin)
+
+    assert definition.target_rank == 12
+    assert definition.rank == 12
+    assert len(definition.gics) == 12
+    assert any("FAMILY=FRAG_DISTANCE FUNCTION=FC_DIST" in line for line in primitive_lines)
+    assert any(
+        "FAMILY=FRAG_CENTER_ATOM_DISTANCE FUNCTION=FCA_DIST" in line
+        for line in primitive_lines
+    )
+    assert any("FAMILY=FRAG_ORIENTATION FUNCTION=FROT" in line for line in primitive_lines)
+    assert any("REFS=F002,F001" in line for line in primitive_lines)
+    assert "F001=Fragment(1-3)" in gaussian_lines
+    assert "F002=Fragment(4-6)" in gaussian_lines
+    assert "CxF001(Inactive)=XCntr(F001)" in gaussian_lines
+    assert any(line.startswith("GIC005 = SQRT((CxF001-CxF002)**2") for line in gaussian_lines)
+    assert any(line.startswith("GIC006 = SQRT((CxF002-X(1))**2") for line in gaussian_lines)
+    assert any("KxF002F001" in line for line in gaussian_lines)
+    assert any(line.startswith("GIC011 = KxF002F001") for line in gaussian_lines)
