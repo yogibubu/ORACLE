@@ -27,6 +27,8 @@ the top-level README. New implementation files should not be added at root.
   `engines/fortran/gicforge`; DVR lives in `engines/fortran/dvr`; independent
   source kernels for harmonic GF, normal-mode VPT2/VCI and Davidson live in
   `engines/fortran/vpt2_vci`.
+- `engines/puckering_dvr/`: vendored Python backend for mass-weighted path DVR
+  analysis from completed Gaussian scan/path logs.
 
 ## Generated And Local Files
 

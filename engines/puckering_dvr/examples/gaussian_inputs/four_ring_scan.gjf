@@ -1,0 +1,123 @@
+%chk=four_ring_scan_-40.chk
+%mem=16GB
+%nprocshared=8
+#p b3lyp/def2tzvp empiricaldispersion=gd3bj opt=(addgic,calcfc,noeigentest,maxcycles=200) int=ultrafine scf=(xqc,tight) nosymm
+
+Five-membered-ring phase constrained optimization: absolute phi=-40.000 deg
+
+0 1
+C        1.00000000       1.00000000       0.22000000
+C       -1.00000000       1.00000000      -0.22000000
+C       -1.00000000      -1.00000000       0.22000000
+C        1.00000000      -1.00000000      -0.22000000
+H        1.56000000       1.56000000       1.01000000
+H        1.56000000       1.56000000      -0.57000000
+H       -1.56000000       1.56000000      -1.01000000
+H       -1.56000000       1.56000000       0.57000000
+H       -1.56000000      -1.56000000       1.01000000
+H       -1.56000000      -1.56000000      -0.57000000
+H        1.56000000      -1.56000000      -1.01000000
+H        1.56000000      -1.56000000       0.57000000
+
+Puck(Inactive)=D(2,3,4,1)
+PuckStep(NSteps=1,StepSize=-1.1214197923)=Puck
+
+--Link1--
+%chk=four_ring_scan_-20.chk
+%mem=16GB
+%nprocshared=8
+#p b3lyp/def2tzvp empiricaldispersion=gd3bj opt=(addgic,calcfc,noeigentest,maxcycles=200) int=ultrafine scf=(xqc,tight) nosymm
+
+Five-membered-ring phase constrained optimization: absolute phi=-20.000 deg
+
+0 1
+C        1.00000000       1.00000000       0.22000000
+C       -1.00000000       1.00000000      -0.22000000
+C       -1.00000000      -1.00000000       0.22000000
+C        1.00000000      -1.00000000      -0.22000000
+H        1.56000000       1.56000000       1.01000000
+H        1.56000000       1.56000000      -0.57000000
+H       -1.56000000       1.56000000      -1.01000000
+H       -1.56000000       1.56000000       0.57000000
+H       -1.56000000      -1.56000000       1.01000000
+H       -1.56000000      -1.56000000      -0.57000000
+H        1.56000000      -1.56000000      -1.01000000
+H        1.56000000      -1.56000000       0.57000000
+
+Puck(Inactive)=D(2,3,4,1)
+PuckStep(NSteps=1,StepSize=-0.7723539419)=Puck
+
+--Link1--
+%chk=four_ring_scan_000.chk
+%mem=16GB
+%nprocshared=8
+#p b3lyp/def2tzvp empiricaldispersion=gd3bj opt=(addgic,calcfc,noeigentest,maxcycles=200) int=ultrafine scf=(xqc,tight) nosymm
+
+Five-membered-ring phase constrained optimization: absolute phi=0.000 deg
+
+0 1
+C        1.00000000       1.00000000       0.22000000
+C       -1.00000000       1.00000000      -0.22000000
+C       -1.00000000      -1.00000000       0.22000000
+C        1.00000000      -1.00000000      -0.22000000
+H        1.56000000       1.56000000       1.01000000
+H        1.56000000       1.56000000      -0.57000000
+H       -1.56000000       1.56000000      -1.01000000
+H       -1.56000000       1.56000000       0.57000000
+H       -1.56000000      -1.56000000       1.01000000
+H       -1.56000000      -1.56000000      -0.57000000
+H        1.56000000      -1.56000000      -1.01000000
+H        1.56000000      -1.56000000       0.57000000
+
+Puck(Inactive)=D(2,3,4,1)
+PuckStep(NSteps=1,StepSize=-0.4232880915)=Puck
+
+--Link1--
+%chk=four_ring_scan_020.chk
+%mem=16GB
+%nprocshared=8
+#p b3lyp/def2tzvp empiricaldispersion=gd3bj opt=(addgic,calcfc,noeigentest,maxcycles=200) int=ultrafine scf=(xqc,tight) nosymm
+
+Five-membered-ring phase constrained optimization: absolute phi=20.000 deg
+
+0 1
+C        1.00000000       1.00000000       0.22000000
+C       -1.00000000       1.00000000      -0.22000000
+C       -1.00000000      -1.00000000       0.22000000
+C        1.00000000      -1.00000000      -0.22000000
+H        1.56000000       1.56000000       1.01000000
+H        1.56000000       1.56000000      -0.57000000
+H       -1.56000000       1.56000000      -1.01000000
+H       -1.56000000       1.56000000       0.57000000
+H       -1.56000000      -1.56000000       1.01000000
+H       -1.56000000      -1.56000000      -0.57000000
+H        1.56000000      -1.56000000      -1.01000000
+H        1.56000000      -1.56000000       0.57000000
+
+Puck(Inactive)=D(2,3,4,1)
+PuckStep(NSteps=1,StepSize=-0.0742222411)=Puck
+
+--Link1--
+%chk=four_ring_scan_040.chk
+%mem=16GB
+%nprocshared=8
+#p b3lyp/def2tzvp empiricaldispersion=gd3bj opt=(addgic,calcfc,noeigentest,maxcycles=200) int=ultrafine scf=(xqc,tight) nosymm
+
+Five-membered-ring phase constrained optimization: absolute phi=40.000 deg
+
+0 1
+C        1.00000000       1.00000000       0.22000000
+C       -1.00000000       1.00000000      -0.22000000
+C       -1.00000000      -1.00000000       0.22000000
+C        1.00000000      -1.00000000      -0.22000000
+H        1.56000000       1.56000000       1.01000000
+H        1.56000000       1.56000000      -0.57000000
+H       -1.56000000       1.56000000      -1.01000000
+H       -1.56000000       1.56000000       0.57000000
+H       -1.56000000      -1.56000000       1.01000000
+H       -1.56000000      -1.56000000      -0.57000000
+H        1.56000000      -1.56000000      -1.01000000
+H        1.56000000      -1.56000000       0.57000000
+
+Puck(Inactive)=D(2,3,4,1)
+PuckStep(NSteps=1,StepSize=0.2748436093)=Puck

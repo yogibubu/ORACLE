@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 
 from oracle_core import build_run_manifest
-from oracle_engines import dvr_executable
+from oracle_engines import dvr_executable, puckering_dvr_layout
 
 
 FORTRAN_SOLVERS = {"fortran-sinc-dvr", "fortran-gaussian"}
@@ -27,15 +27,15 @@ class DVRRequest:
 
     @property
     def dvr_root(self) -> Path:
-        return self.repo_root / "puckering_dvr"
+        return puckering_dvr_layout(self.repo_root).engine_dir
 
     @property
     def script(self) -> Path:
-        return self.dvr_root / "scripts" / "mw_path_dvr.py"
+        return puckering_dvr_layout(self.repo_root).path_analysis_script
 
     @property
     def fortran_bridge(self) -> Path:
-        return self.dvr_root / "scripts" / "fortran_bridge" / "run_fortran_dvr.py"
+        return puckering_dvr_layout(self.repo_root).fortran_bridge_script
 
     @property
     def normalized_prefix(self) -> str:

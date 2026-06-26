@@ -8,7 +8,13 @@ from oracle_dvr import (
     build_fortran_shell_command,
     build_path_analysis_args,
 )
-from oracle_engines import DVR_FORTRAN_FILES, dvr_fortran_layout, validate_dvr_sources
+from oracle_engines import (
+    DVR_FORTRAN_FILES,
+    dvr_fortran_layout,
+    puckering_dvr_layout,
+    validate_dvr_sources,
+    validate_puckering_dvr_backend,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -29,7 +35,9 @@ def test_dvr_request_builds_python_args(tmp_path):
 
     args = build_path_analysis_args(request)
 
-    assert args[0] == str(tmp_path / "puckering_dvr" / "scripts" / "mw_path_dvr.py")
+    assert args[0] == str(
+        tmp_path / "engines" / "puckering_dvr" / "scripts" / "mw_path_dvr.py"
+    )
     assert "--gaussian-log" in args
     assert str(tmp_path / "scan.log") in args
     assert args[args.index("--solver") + 1] == "fourier"
@@ -69,3 +77,12 @@ def test_dvr_fortran_sources_are_vendored_under_oracle_engines():
     assert set(DVR_FORTRAN_FILES) == {"path_dvr.f", "dvr_hqrii.f"}
     assert layout.source_dir == ROOT / "engines" / "fortran" / "dvr"
     assert layout.compile_script.is_file()
+
+
+def test_puckering_dvr_backend_is_vendored_under_oracle_engines():
+    layout = puckering_dvr_layout(ROOT)
+
+    assert validate_puckering_dvr_backend(ROOT) == ()
+    assert layout.engine_dir == ROOT / "engines" / "puckering_dvr"
+    assert layout.path_analysis_script.is_file()
+    assert layout.fortran_bridge_script.is_file()
