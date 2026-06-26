@@ -38,6 +38,7 @@ from oracle_gicforge import (
 )
 from oracle_gicforge.definition import (
     _analytic_b_row,
+    _encode_ring_pucker_term,
     _finite_difference_b_row,
     _primitive_candidates,
     _primitive_value,
@@ -90,6 +91,26 @@ def _manual_rpck_value(primitive: GICPrimitive, coords: np.ndarray) -> float:
         assert len(atoms) == 4
         total += float(coefficient_text) * _test_dihedral_value(coords, atoms)
     return float(total)
+
+
+def _rpck_test_primitive(
+    identifier: str,
+    name: str,
+    ring: tuple[int, ...],
+    component_index: int,
+) -> GICPrimitive:
+    terms = _ring_pucker_component_terms(ring)[component_index]
+    return GICPrimitive(
+        identifier,
+        name,
+        "RING_PUCKER_COMPONENT",
+        "RPCK",
+        ring,
+        refs=tuple(
+            _encode_ring_pucker_term(coefficient, atoms)
+            for coefficient, atoms in terms
+        ),
+    )
 
 
 def _tetrahedral_operations() -> tuple[GICPointGroupOperation, ...]:
@@ -1452,6 +1473,82 @@ def test_gicforge_point_group_projector_uses_operations_without_type_mixing():
         ("BEND", "BEND", ("A1Bend001",)),
     ]
     assert total_symmetric_gic_names(symmetrized) == ("A1Str001", "A1Bend001")
+
+
+def test_gicforge_point_group_projector_symmetrizes_ring_puckering_components():
+    ring_left = (1, 2, 3, 4, 5, 6)
+    ring_right = (7, 8, 9, 10, 11, 12)
+    primitives = (
+        _rpck_test_primitive("P001", "RPck0001", ring_left, 0),
+        _rpck_test_primitive("P002", "RPck0002", ring_left, 1),
+        _rpck_test_primitive("P003", "RPck0003", ring_right, 0),
+        _rpck_test_primitive("P004", "RPck0004", ring_right, 1),
+    )
+    definition = GICDefinition(
+        backend="test",
+        point_group="C2",
+        symmetrize=False,
+        target_rank=4,
+        rank=4,
+        candidate_count=4,
+        reference_coordinates_angstrom=((0.0, 0.0, 0.0),) * 12,
+        primitives=primitives,
+        gics=tuple(
+            FrozenGIC(
+                identifier=f"GIC{idx:03d}",
+                name=primitive.name,
+                family=primitive.family,
+                irrep="UNASSIGNED",
+                primitive_id=primitive.identifier,
+                gaussian_expression="NONE",
+                coefficients=((primitive.identifier, 1.0),),
+            )
+            for idx, primitive in enumerate(primitives, start=1)
+        ),
+    )
+    operations = (
+        GICPointGroupOperation(
+            "E",
+            ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)),
+            tuple(range(1, 13)),
+        ),
+        GICPointGroupOperation(
+            "C2z^1",
+            ((-1.0, 0.0, 0.0), (0.0, -1.0, 0.0), (0.0, 0.0, 1.0)),
+            (7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6),
+        ),
+    )
+
+    symmetrized = symmetrize_gic_definition(
+        definition,
+        atom_symbols=("C",) * 12,
+        symmetry_operations=operations,
+    )
+    gaussian_lines = gic_definition_section_lines(symmetrized)
+
+    assert symmetrized.symmetry_diagnostics is not None
+    assert symmetrized.symmetry_diagnostics.method == "POINT_GROUP_PROJECTOR"
+    assert [gic.name for gic in symmetrized.gics] == [
+        "ARPck001",
+        "ARPck002",
+        "BRPck001",
+        "BRPck002",
+    ]
+    assert [gic.irrep for gic in symmetrized.gics] == ["A", "A", "B", "B"]
+    assert symmetrized.symmetry_diagnostics.groups[0].block == "RING_PUCKER_COMPONENT"
+    assert symmetrized.symmetry_diagnostics.groups[0].family == "RING_PUCKER_COMPONENT"
+    assert total_symmetric_gic_names(symmetrized) == ("ARPck001", "ARPck002")
+    assert any(line.startswith("ARPck001(Inactive)") for line in gaussian_lines)
+    assert any(
+        line == "QPck0001 = SQRT(ARPck001*ARPck001+ARPck002*ARPck002)"
+        for line in gaussian_lines
+    )
+    assert any(line == "PhiP0001 = ATAN2(ARPck002,ARPck001)" for line in gaussian_lines)
+    assert any(
+        line == "QPck0002 = SQRT(BRPck001*BRPck001+BRPck002*BRPck002)"
+        for line in gaussian_lines
+    )
+    assert any(line == "PhiP0002 = ATAN2(BRPck002,BRPck001)" for line in gaussian_lines)
 
 
 def test_gicforge_point_group_projector_handles_c3v_degenerate_irrep():

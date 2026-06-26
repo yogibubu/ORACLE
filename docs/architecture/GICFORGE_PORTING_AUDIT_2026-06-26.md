@@ -24,13 +24,13 @@ regression test and noted in the method documentation.
 | Area | Merlino3.0 source | ORACLE status | Action |
 | --- | --- | --- | --- |
 | Ordinary primitives | `survibfit/primitives.py`, `mkprim.f` | Present: stretch, bend, linear bend, torsion, out-of-plane | Keep parity tests against analytic/FD B rows. |
-| Ring bend/torsion blocks | `survibfit/transforms.py`, `mkcyc.f`, `mksalc.f`, Overleaf GICForge manual | Present: `CYCLIC_BEND`, `RING_PUCKER_COMPONENT`/`RPck`, `CONDENSED_RING_TORSION`, `BUTTERFLY`; Gaussian export derives `QPck`/`PhiP` from selected `RPck` pairs with the Merlino `PrtPckQP` rule | Next: add symmetry-projector corpus tests specifically involving selected `RPck` source blocks. |
-| Butterfly coordinates | `mksalc.f:BtFly`, `survibfit/transforms.py:ring_butterfly_u` | Present: fused-ring shared-bond torsions are classified as `BUTTERFLY`; corpus tests keep fused ring rank with RPck enabled | Next: compare coefficient vectors with executable Merlino output when the harness emits machine-readable ring blocks. |
+| Ring bend/torsion blocks | `survibfit/transforms.py`, `mkcyc.f`, `mksalc.f`, Overleaf GICForge manual | Present: `CYCLIC_BEND`, `RING_PUCKER_COMPONENT`/`RPck`, `CONDENSED_RING_TORSION`, `BUTTERFLY`; Gaussian export derives `QPck`/`PhiP` from selected `RPck` pairs with the Merlino `PrtPckQP` rule; projector golden tests cover `RPck` SALCs and derived `QPck`/`PhiP` labels | Next: add more chemically diverse corpus molecules, not new core machinery. |
+| Butterfly coordinates | `mksalc.f:BtFly`, `survibfit/transforms.py:ring_butterfly_u` | Present: fused-ring shared-bond torsions are classified as `BUTTERFLY`; corpus tests keep fused ring rank with RPck enabled | Next: compare coefficient vectors with executable Merlino output if the legacy backend later emits machine-readable ring-block coefficients. |
 | Non-redundant reduction | `gicprune.f`, `locsvd.f`, `transforms.py` | Present: analytic B-row MGS, protected special-first policy, ring families not mixed with ordinary blocks; fused corpus tests cover selected `RPck` value and B rows | Next: extend golden cases to bridged saturated rings where bend rank can saturate before puckering rows. |
 | Symmetrization | `gic_symmetry.py`, `symmetry_global.py`, `gic_type_symmetry.f`, `symm.f` | Present: Merlino label-only parity plus matrix projectors; no type mixing; total-symmetric subset stored | Next: full strict Fortran projector diagnostics, not only local SALC/static source checks. |
 | Fragment/TRIC coordinates | Merlino TRIC roadmap, Overleaf manual, geomeTRIC reference model | Present: fragment center distance, fragment center-atom distance, translations, orientations, analytic B rows, Gaussian symbolic export | Next: add atom-frame angle/torsion and center-frame tilt/orientation modes. |
 | Ring/bond/interaction centers | Fragment roadmap, topology ring docs | Present: bond centers, ring centers, atom-center distance candidates, analytic chain-rule B row | Next: add center-angle, center-torsion and hapticity/coordination center scoring. |
-| Python/Fortran parity | `doc/GIC_PYTHON_FORTRAN_COMPARISON.md`, Fortran GICForge sources | Partial: legacy source vendored and compiled; `frag_tric_bmat.f` mirrors special-coordinate B rows; tests assert legacy ring/symmetry sources remain present | Next: executable parity harness comparing primitive lists, GIC labels and B rows on corpus cases. |
+| Python/Fortran parity | `doc/GIC_PYTHON_FORTRAN_COMPARISON.md`, Fortran GICForge sources | Present for core GICForge: legacy source vendored and compiled; `frag_tric_bmat.f` mirrors special-coordinate B rows; executable harness runs Merlino on fused corpus cases and compares final rank, GIC labels and B-row subspaces | Next: expose stricter Fortran projector diagnostics for debugging, not for core parity. |
 | `xyzin` standalone restart | Merlino frozen schema docs | Present: frozen `#GIC`, `#SYCART`, report, B-matrix from saved sections | Next: extend downstream GF/SEFit/Thermo/VPT2 commands to consume the saved GIC section directly. |
 
 ## New Regression Anchors
@@ -45,9 +45,15 @@ regression test and noted in the method documentation.
 - `tests/test_oracle_gicforge.py::test_gicforge_ring_puckering_numeric_corpus_fused`
   compares selected RPck values and analytic B rows numerically on fused
   naphthalene/phenanthrene/pyrene corpus cases.
+- `tests/test_oracle_gicforge.py::test_gicforge_point_group_projector_symmetrizes_ring_puckering_components`
+  freezes point-group projector behavior for selected `RPck` sources and checks
+  that symmetrized Gaussian `QPck`/`PhiP` labels remain attached.
 - `tests/test_oracle_fortran_gicforge.py::test_legacy_merlino_ring_and_butterfly_blocks_remain_reference`
   prevents accidental removal of the strict Fortran77 ring/butterfly and
   `PrtPckQP` reference routines.
+- `tests/test_oracle_fortran_gicforge.py::test_legacy_merlino_executable_bmatrix_span_matches_oracle_corpus`
+  runs the vendored Merlino executable on naphthalene, phenanthrene and pyrene,
+  then compares final rank and the Wilson-B row space with ORACLE.
 
 ## Known Merlino Fragilities To Correct In ORACLE
 
@@ -61,13 +67,11 @@ regression test and noted in the method documentation.
   centralizes these rows in `oracle-gicforge` and mirrors them in
   `frag_tric_bmat.f`.
 
-## Immediate Remaining Work
+## Remaining Work Outside The Closed Core
 
-1. Add projector/symmetry golden cases for selected `RPck` source blocks and
-   the derived Gaussian `QPck`/`PhiP` functionals.
-2. Add golden corpus cases for pyridine, coronene-like fused rings and
+1. Add golden corpus cases for pyridine, coronene-like fused rings and
    norcamphor/testosterone-like bridged systems.
-3. Extend the strict Fortran executable harness to emit comparable primitive
-   lists and B rows for the same frozen `#GIC` contract.
-4. Add center-angle, center-torsion and atom-frame coordinates for
+2. Add center-angle, center-torsion and atom-frame coordinates for
    ring/metal/H-bond cases after the topology-center records are finalized.
+3. Expose full strict-Fortran projector diagnostics if downstream debugging
+   needs operation-by-operation projector traces.

@@ -4,13 +4,49 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import numpy as np
 import pytest
 
+from oracle_chem import (
+    preprocess_to_enriched_xyz,
+    read_enriched_xyz,
+    write_validation_section,
+)
 from oracle_engines import (
     LEGACY_GICFORGE_FILES,
     gicforge_fortran_layout,
+    run_legacy_gicforge,
     validate_legacy_gicforge_sources,
 )
+from oracle_gicforge import build_gic_b_matrix, write_gicforge_build_sections
+
+
+def _test_molecule_path(name: str) -> Path:
+    return (
+        Path(__file__).resolve().parents[1]
+        / "tests"
+        / "fixtures"
+        / "test_molecules"
+        / "molecules"
+        / name
+    )
+
+
+def _row_space_basis(matrix: np.ndarray) -> tuple[np.ndarray, int]:
+    singular_values: np.ndarray
+    _u, singular_values, vh = np.linalg.svd(matrix, full_matrices=False)
+    tolerance = max(matrix.shape) * float(singular_values[0]) * np.finfo(float).eps * 10.0
+    rank = int(np.sum(singular_values > tolerance))
+    return vh[:rank], rank
+
+
+def _row_space_residual(left: np.ndarray, right: np.ndarray) -> float:
+    left_basis, left_rank = _row_space_basis(left)
+    right_basis, right_rank = _row_space_basis(right)
+    if left_rank != right_rank:
+        return float("inf")
+    projected = left_basis @ right_basis.T @ right_basis
+    return float(np.linalg.norm(left_basis - projected) / np.sqrt(float(left_rank)))
 
 
 def test_legacy_merlino_gicforge_sources_are_vendored():
@@ -71,6 +107,61 @@ def test_legacy_merlino_gicforge_backend_compiles():
 
     assert layout.legacy_executable.is_file()
     assert str(layout.legacy_executable) in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("molecule", "expected_rank"),
+    [
+        ("naphtalene.inp", 48),
+        ("phenantrene.inp", 66),
+        ("pyrene.inp", 72),
+    ],
+)
+def test_legacy_merlino_executable_bmatrix_span_matches_oracle_corpus(
+    tmp_path,
+    molecule,
+    expected_rank,
+):
+    root = Path(__file__).resolve().parents[1]
+    layout = gicforge_fortran_layout(root)
+    if shutil.which("gfortran") is None and not layout.legacy_executable.is_file():
+        pytest.skip("gfortran is not available")
+
+    source = _test_molecule_path(molecule)
+    xyzin = tmp_path / f"{Path(molecule).stem}.xyzin"
+    preprocess_to_enriched_xyz(source, xyzin)
+    write_validation_section(xyzin)
+    definition = write_gicforge_build_sections(xyzin)
+    geometry = read_enriched_xyz(xyzin)
+    oracle_b_matrix = np.asarray(build_gic_b_matrix(definition).rows, dtype=float)
+
+    legacy = run_legacy_gicforge(
+        tmp_path / f"{Path(molecule).stem}-legacy",
+        atoms=geometry.atoms,
+        coordinates_angstrom=geometry.coordinates_angstrom,
+        point_group="C1",
+        title=Path(molecule).stem,
+        keywords=("GNIC", "BMAT"),
+        repo_root=root,
+    )
+    legacy_b_matrix = np.asarray(legacy.b_matrix_rows, dtype=float)
+    legacy_prefixes = {label[:4] for label in legacy.gic_labels}
+    oracle_rpck_labels = {
+        gic.name for gic in definition.gics if gic.family == "RING_PUCKER_COMPONENT"
+    }
+
+    assert definition.target_rank == expected_rank
+    assert definition.rank == expected_rank
+    assert legacy.final_counts[-1] == expected_rank
+    assert legacy_b_matrix.shape == oracle_b_matrix.shape
+    assert _row_space_basis(legacy_b_matrix)[1] == expected_rank
+    assert _row_space_basis(oracle_b_matrix)[1] == expected_rank
+    assert _row_space_residual(oracle_b_matrix, legacy_b_matrix) < 2.0e-8
+    if molecule == "pyrene.inp":
+        assert "Dihe" in legacy_prefixes
+    else:
+        assert {"RPck", "QPck", "PhiP"}.issubset(legacy_prefixes)
+    assert oracle_rpck_labels
 
 
 def test_legacy_merlino_icosahedral_group_builder_runs(tmp_path):

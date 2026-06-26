@@ -1605,6 +1605,12 @@ def _primitive_projector_key(primitive: GICPrimitive) -> tuple[object, ...] | No
     if primitive.family == "TORSION" and len(primitive.atoms) == 4:
         canonical, _sign = _canonical_torsion_key_and_sign(primitive.atoms)
         return ("TORSION", canonical)
+    if primitive.family == "RING_PUCKER_COMPONENT" and primitive.function == "RPCK":
+        signature = _ring_pucker_projector_signature(primitive)
+        if signature is None:
+            return None
+        key, _sign = signature
+        return ("RING_PUCKER_COMPONENT", key)
     if primitive.family == "OUT_OF_PLANE" and len(primitive.atoms) == 4:
         return (
             "OUT_OF_PLANE",
@@ -1681,6 +1687,18 @@ def _mapped_primitive_projector_terms(
     if primitive.family == "TORSION" and len(mapped_atoms) == 4:
         canonical, sign = _canonical_torsion_key_and_sign(mapped_atoms)
         return ((("TORSION", canonical), sign),)
+    if primitive.family == "RING_PUCKER_COMPONENT" and primitive.function == "RPCK":
+        mapped_terms = []
+        for coefficient, atoms in _ring_pucker_terms_from_refs(primitive):
+            mapped_term_atoms = tuple(_mapped_atom(operation, atom) for atom in atoms)
+            if any(atom < 1 for atom in mapped_term_atoms):
+                return None
+            mapped_terms.append((coefficient, mapped_term_atoms))
+        signature = _ring_pucker_projector_signature_from_terms(tuple(mapped_terms))
+        if signature is None:
+            return None
+        key, sign = signature
+        return ((("RING_PUCKER_COMPONENT", key), sign),)
     if primitive.family == "OUT_OF_PLANE" and len(mapped_atoms) == 4:
         center = mapped_atoms[0]
         substituents = mapped_atoms[1:]
@@ -1799,6 +1817,43 @@ def _canonical_torsion_key_and_sign(atoms: tuple[int, ...]) -> tuple[tuple[int, 
     if backward < forward:
         return backward, -1.0
     return forward, 1.0
+
+
+def _ring_pucker_projector_signature(
+    primitive: GICPrimitive,
+) -> tuple[tuple[tuple[tuple[int, ...], float], ...], float] | None:
+    return _ring_pucker_projector_signature_from_terms(
+        _ring_pucker_terms_from_refs(primitive)
+    )
+
+
+def _ring_pucker_projector_signature_from_terms(
+    terms: tuple[tuple[float, tuple[int, ...]], ...],
+) -> tuple[tuple[tuple[tuple[int, ...], float], ...], float] | None:
+    by_torsion: dict[tuple[int, ...], float] = {}
+    for coefficient, atoms in terms:
+        if len(atoms) != 4:
+            return None
+        canonical, sign = _canonical_torsion_key_and_sign(atoms)
+        by_torsion[canonical] = by_torsion.get(canonical, 0.0) + float(coefficient) * sign
+    compact = {
+        atoms: coefficient
+        for atoms, coefficient in by_torsion.items()
+        if abs(float(coefficient)) > 1.0e-12
+    }
+    if not compact:
+        return None
+    dominant_atoms, dominant_coefficient = max(
+        compact.items(),
+        key=lambda item: (abs(float(item[1])), tuple(-atom for atom in item[0])),
+    )
+    del dominant_atoms
+    overall_sign = -1.0 if dominant_coefficient < 0.0 else 1.0
+    key = tuple(
+        (atoms, round(float(coefficient) * overall_sign, 12))
+        for atoms, coefficient in sorted(compact.items())
+    )
+    return key, overall_sign
 
 
 def _permutation_parity_sign(
@@ -3495,6 +3550,8 @@ def _gaussian_label_for_gic(definition: GICDefinition, gic: FrozenGIC) -> str:
 
 
 def _gaussian_ring_puckering_function_lines(definition: GICDefinition) -> list[str]:
+    if definition.symmetrize:
+        return _gaussian_symmetrized_ring_puckering_function_lines(definition)
     primitive_by_id = {primitive.identifier: primitive for primitive in definition.primitives}
     groups: dict[tuple[int, ...], list[tuple[str, GICPrimitive]]] = {}
     for gic in definition.gics:
@@ -3520,6 +3577,30 @@ def _gaussian_ring_puckering_function_lines(definition: GICDefinition) -> list[s
         while component_index + 1 < len(components):
             left = components[component_index][0]
             right = components[component_index + 1][0]
+            pair_index += 1
+            lines.append(
+                f"QPck{pair_index:04d} = SQRT({left}*{left}+{right}*{right})"
+            )
+            lines.append(f"PhiP{pair_index:04d} = ATAN2({right},{left})")
+            component_index += 2
+    return lines
+
+
+def _gaussian_symmetrized_ring_puckering_function_lines(
+    definition: GICDefinition,
+) -> list[str]:
+    groups: dict[str, list[str]] = {}
+    for gic in definition.gics:
+        if gic.family != "RING_PUCKER_COMPONENT":
+            continue
+        groups.setdefault(gic.irrep, []).append(_gaussian_label_for_gic(definition, gic))
+    lines: list[str] = []
+    pair_index = 0
+    for labels in groups.values():
+        component_index = 0
+        while component_index + 1 < len(labels):
+            left = labels[component_index]
+            right = labels[component_index + 1]
             pair_index += 1
             lines.append(
                 f"QPck{pair_index:04d} = SQRT({left}*{left}+{right}*{right})"

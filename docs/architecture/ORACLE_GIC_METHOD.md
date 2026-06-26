@@ -73,10 +73,18 @@ small-rotation limit used by the Gaussian symbolic export.
 Gaussian export marks the selected `RPck` components inactive and derives active
 `QPck`/`PhiP` functionals from consecutive pairs using the Merlino `PrtPckQP`
 rule.
+The point-group projector treats `RPck` as a homogeneous ring-puckering source
+block: operations map the underlying dihedral-term vector, so equivalent
+selected `RPck` components can form symmetry-adapted SALCs without mixing with
+ordinary torsions, bends or special fragment coordinates.
 
 This makes the B matrix a shared service. Python and Fortran backends must use
 the same mathematical definitions, and downstream programs must call the
 GICForge B-matrix API rather than carrying private derivative code.
+The executable Merlino parity harness compares final Wilson-B row spaces rather
+than row indexes. This is deliberate: two non-redundant GIC bases can differ in
+individual retained rows while spanning the same vibrational internal-coordinate
+space.
 
 ## Non-Redundant Reduction
 

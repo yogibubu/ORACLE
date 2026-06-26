@@ -58,9 +58,16 @@ with the Python character/projector layer for `Cn`, `Cnv`, `Cnh`, `Dn` and
 `Dnh`; `Dnd` is covered through the same Merlino-style `D_n + sigma_d D_n`
 operation construction. Python now has matrix-classified projector character
 tests for `Td`, `Oh` and `Ih`, and the strict Fortran77 source now exposes
-`OPS_I`/`OPS_IH` builders for the icosahedral groups. The next alignment step
-is to expose full projector diagnostics from strict Fortran77 instead of
-relying only on the local SALC helper.
+`OPS_I`/`OPS_IH` builders for the icosahedral groups. Python projector tests
+now include selected `RPck` ring-puckering sources and verify that derived
+`QPck`/`PhiP` Gaussian labels remain attached after symmetrization.
+
+`oracle_engines.run_legacy_gicforge` is the executable parity harness for this
+vendored backend. It writes normalized `provin` and lowercase `xyzin` files,
+runs `build/gicforge_legacy`, parses `provout` and `bmat.out`, and lets tests
+compare final GIC ranks, ring-puckering labels and Wilson-B row spaces against
+ORACLE-native GICForge. The harness writes eight-decimal XYZ coordinates because
+the legacy tokenizer is unstable with longer decimal tokens.
 
 Construction, symmetrization and B evaluation are intentionally separate.
 Fortran optimizers should read the frozen primitive/GIC coefficient table once,

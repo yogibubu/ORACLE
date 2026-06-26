@@ -47,8 +47,12 @@ the implementation is split into shared libraries and independent tools.
   Python: `CYCLIC_BEND`, `RING_PUCKER_COMPONENT`, `CONDENSED_RING_TORSION` and
   `BUTTERFLY`. Merlino ring-puckering combinations are ported as selected
   `RPck` linear components with Gaussian `QPck`/`PhiP` functionals generated
-  from consecutive pairs. Symmetry-specific projector tests for these
-  coordinates remain follow-up work.
+  from consecutive pairs. Symmetry-specific projector tests now cover selected
+  `RPck` sources and the derived symmetrized Gaussian labels.
+- `oracle_engines.run_legacy_gicforge` is the executable harness for the
+  vendored Merlino backend. It writes normalized `provin`/`xyzin` inputs, runs
+  `gicforge_legacy`, parses `provout`/`bmat.out`, and supports corpus-level
+  B-row subspace comparisons against ORACLE.
 
 ## Porting Order
 
