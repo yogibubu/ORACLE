@@ -4,6 +4,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from oracle_core import eigh_arrays
+
 
 CM_PER_HARTREE = 219474.6313705
 HESSIAN_EIGENVALUE_TO_CM = 5140.487143715055
@@ -30,12 +32,12 @@ def solve_wilson_gf(
     if f_mat.shape != g_mat.shape or f_mat.ndim != 2 or f_mat.shape[0] != f_mat.shape[1]:
         raise ValueError("F and G must be square matrices with the same shape")
 
-    g_eval, g_vec = np.linalg.eigh((g_mat + g_mat.T) * 0.5)
+    g_eval, g_vec = eigh_arrays((g_mat + g_mat.T) * 0.5)
     if np.any(g_eval <= 0.0):
         raise ValueError("G matrix must be positive definite")
     g_half = (g_vec * np.sqrt(g_eval)) @ g_vec.T
     sym = g_half @ ((f_mat + f_mat.T) * 0.5) @ g_half
-    eig, vec = np.linalg.eigh((sym + sym.T) * 0.5)
+    eig, vec = eigh_arrays((sym + sym.T) * 0.5)
     order = np.argsort(eig)
     eig = eig[order]
     vec = vec[:, order]

@@ -7,8 +7,12 @@ from oracle_core import (
     PLANNED_FRAMEWORK_EXPANSION,
     PLANNED_FRAMEWORK_NAME,
     XyzinIsotopologueRecord,
-    build_run_manifest,
     BasicSection,
+    available_diagonalizer_backends,
+    build_run_manifest,
+    diagonalize_hermitian,
+    eigh_arrays,
+    eigvalsh_array,
     ensure_workspace,
     parse_basic_section,
     parse_xyzin_isotopologue_records,
@@ -86,6 +90,48 @@ def test_tool_contract_readiness_checks_required_xyzin_sections(tmp_path):
     assert thermo.missing_required_sections == ()
     assert not gf.ready
     assert gf.missing_required_sections == ("GIC", "CARTESIAN_HESSIAN")
+
+
+def test_shared_diagonalizer_solves_symmetric_matrices_and_subsets():
+    import numpy as np
+
+    matrix = np.array([[2.0, 0.25], [0.25, 3.0]], dtype=float)
+
+    result = diagonalize_hermitian(matrix, backend="numpy")
+    values, vectors = eigh_arrays(matrix, backend="numpy")
+    subset = eigvalsh_array(matrix, backend="numpy", subset_by_index=(0, 0))
+
+    expected_values, _expected_vectors = np.linalg.eigh(matrix)
+    assert result.backend == "numpy"
+    assert result.device == "cpu"
+    assert np.allclose(result.eigenvalues, expected_values)
+    assert np.allclose(values, expected_values)
+    assert np.allclose(matrix @ vectors, vectors @ np.diag(values))
+    assert np.allclose(subset, expected_values[:1])
+    assert any(
+        backend.name == "numpy" and backend.available
+        for backend in available_diagonalizer_backends()
+    )
+
+
+def test_diagonalizer_auto_avoids_gpu_probe_for_small_matrices(monkeypatch):
+    from oracle_core import diagonalizer
+
+    seen = []
+
+    def fake_backend_by_name(name):
+        seen.append(name)
+        available = name in {"scipy", "numpy"}
+        return diagonalizer.DiagonalizerBackend(name, available, device="cpu")
+
+    monkeypatch.delenv("ORACLE_DIAGONALIZER_BACKEND", raising=False)
+    monkeypatch.setenv("ORACLE_DIAGONALIZER_GPU_MIN_SIZE", "128")
+    monkeypatch.setattr(diagonalizer, "_backend_by_name", fake_backend_by_name)
+
+    backend = diagonalizer.best_diagonalizer_backend((2, 2))
+
+    assert backend.name == "scipy"
+    assert seen == ["scipy"]
 
 
 def test_basic_section_accepts_merlino_aligned_key_values():

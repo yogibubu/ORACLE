@@ -45,6 +45,20 @@ ORACLE_RUNTIME_DEPS="numpy scipy matplotlib pandas sympy pytest rdkit"
 ORACLE_GUI_DEPS="PySide6 pytest-qt"
 ```
 
+Dense Hermitian diagonalization is routed through
+`oracle_core.diagonalizer`. The default policy uses SciPy/NumPy on CPU and can
+use CuPy or PyTorch GPU backends when they are already installed in the active
+environment. GPU packages are not installed by `oracle-set` because the correct
+wheel depends on the local hardware and driver stack.
+
+Useful controls:
+
+```bash
+ORACLE_DIAGONALIZER_BACKEND=auto
+ORACLE_DIAGONALIZER_GPU_MIN_SIZE=128
+ORACLE_DIAGONALIZER_STRICT_GPU=0
+```
+
 Molden is an optional external viewer for the Electronic Spectroscopy GUI. On
 macOS it needs a Molden executable in `PATH` and XQuartz for the X11 display.
 `oracle-run-check` reports both conditions, but it does not install XQuartz

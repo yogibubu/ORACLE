@@ -46,6 +46,22 @@ def test_wilson_gf_solver_matches_diagonal_reference():
     assert result.frequencies_cm.tolist() == [2.0, 3.0]
 
 
+def test_wilson_gf_solver_routes_dense_diagonalization_through_oracle_core(monkeypatch):
+    from oracle_gf import harmonic
+
+    calls = []
+
+    def fake_eigh(matrix):
+        calls.append(matrix.shape)
+        return np.linalg.eigh(matrix)
+
+    monkeypatch.setattr(harmonic, "eigh_arrays", fake_eigh)
+
+    solve_wilson_gf(np.diag([4.0, 9.0]), np.eye(2), scale_to_cm=False)
+
+    assert calls == [(2, 2), (2, 2)]
+
+
 def test_gf_can_solve_separated_symmetry_blocks():
     result = gf_from_cartesian_hessian_and_gic_b_matrix(
         np.asarray(

@@ -5,6 +5,8 @@ from itertools import combinations_with_replacement, product
 
 import numpy as np
 
+from oracle_core import eigh_arrays
+
 from .davidson import DavidsonResult, davidson_lowest
 from .models import AnharmonicInput
 
@@ -353,7 +355,7 @@ def solve_vci(
         infos = []
         for label, indices in _symmetry_blocks(basis, selected_symmetries):
             sub_h = sym_hamiltonian[np.ix_(indices, indices)]
-            sub_e, sub_v = np.linalg.eigh(sub_h)
+            sub_e, sub_v = eigh_arrays(sub_h)
             for col, energy in enumerate(sub_e):
                 full = np.zeros(len(basis), dtype=float)
                 full[list(indices)] = sub_v[:, col]
@@ -365,7 +367,7 @@ def solve_vci(
         davidson = None
         block_infos = tuple(infos)
     elif method == "dense":
-        eig, vec = np.linalg.eigh(sym_hamiltonian)
+        eig, vec = eigh_arrays(sym_hamiltonian)
         davidson = None
     elif method == "davidson":
         roots = n_roots or min(10, sym_hamiltonian.shape[0])

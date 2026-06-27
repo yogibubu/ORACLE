@@ -12,6 +12,17 @@ from functools import lru_cache
 # keep one Hamiltonian implementation that stays close to the operative
 # SPCAT/SPFIT raw-card semantics used for prediction and fitting.
 
+try:
+    from oracle_core import eigh_arrays as _oracle_eigh_arrays
+except Exception:
+    _oracle_eigh_arrays = None
+
+
+def _oracle_eigh(matrix):
+    if _oracle_eigh_arrays is None:
+        return np.linalg.eigh(matrix)
+    return _oracle_eigh_arrays(matrix)
+
 @lru_cache(maxsize=None)
 def W3J(j1_2, j2_2, j3_2, m1_2, m2_2, m3_2) -> float:
     """Cached 3-j symbol helper using doubled quantum numbers as integers."""
@@ -568,7 +579,7 @@ def _fix_degenerate_evecs_by_K2(E, U_w, J, W, tol=1e-6):
         if j - i > 1:
             U_sub = U_w[:, i:j]
             K2_sub = U_sub.T @ K2_w @ U_sub
-            vals, vecs = np.linalg.eigh(K2_sub)
+            vals, vecs = _oracle_eigh(K2_sub)
             order = np.argsort(vals)
             U_w[:, i:j] = U_sub @ vecs[:, order]
         i = j
@@ -684,7 +695,7 @@ def H_rot_watson_A(
         42000: h3,
     }
     H = H_from_ids(params, J, rep=rep)
-    E, U = np.linalg.eigh(H)
+    E, U = _oracle_eigh(H)
     idx = np.argsort(E.real)
     return E.real[idx], U[:, idx]
 
@@ -721,7 +732,7 @@ def H_rot_watson_S(
         60000: h3,
     }
     H = H_from_ids(params, J, rep=rep)
-    E, U = np.linalg.eigh(H)
+    E, U = _oracle_eigh(H)
     idx = np.argsort(E.real)
     return E.real[idx], U[:, idx]
 #----------------------------------------------------------------------
@@ -2598,7 +2609,7 @@ def build_and_diag_HF_fullF(
         if not used_hyperfine:
             continue
         H = 0.5 * (H + H.conjugate().T)
-        Ew, C = np.linalg.eigh(H)
+        Ew, C = _oracle_eigh(H)
         idx = np.argsort(Ew.real)
         Ew = Ew.real[idx]
         C = C[:, idx]
@@ -2833,11 +2844,11 @@ def _build_asymmetric_structure(
                 H_w = H_w_full
                 W = W_full
                 full_basis_indices = list(range(H_w.shape[0]))
-            E, U_w = np.linalg.eigh(H_w)
+            E, U_w = _oracle_eigh(H_w)
         else:
             H_w = H
             W = None
-            E, U_w = np.linalg.eigh(H_w)
+            E, U_w = _oracle_eigh(H_w)
 
         idx = np.argsort(E.real)
         E = E.real[idx]

@@ -8,7 +8,7 @@ import numpy as np
 
 from oracle_chem import preprocess_to_enriched_xyz, write_validation_section
 from oracle_chem.topology.elements import atomic_symbol
-from oracle_core import read_sectioned_lines, section_content
+from oracle_core import eigh_arrays, read_sectioned_lines, section_content
 from oracle_gicforge import (
     FrozenGIC,
     GICDefinition,
@@ -211,7 +211,7 @@ def gf_from_cartesian_hessian_and_gic_b_matrix(
     )
     if block_labels:
         matrix_model = f"{matrix_model}+IRREP_BLOCKS"
-    g_eval, g_vec = np.linalg.eigh(0.5 * (g_matrix + g_matrix.T))
+    g_eval, g_vec = eigh_arrays(0.5 * (g_matrix + g_matrix.T))
     g_inv_half = (g_vec * (1.0 / np.sqrt(np.clip(g_eval, 1.0e-14, None)))) @ g_vec.T
     modes_internal = g_inv_half @ gf.normal_modes
     ped = _ped(force_constants, modes_internal, gf.eigenvalues)

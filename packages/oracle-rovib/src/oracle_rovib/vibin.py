@@ -7,7 +7,7 @@ import numpy as np
 
 from oracle_chem import Phy, Structure, get_physical_constants, read_enriched_xyz
 from oracle_chem.rotational import rotational_info
-from oracle_core import has_section
+from oracle_core import eigh_arrays, has_section
 from oracle_rovib.contracts import VibrationalSection, write_vibrational_section
 
 
@@ -275,7 +275,7 @@ def modes_from_hessian(
         P = np.eye(nd) - Q @ Q.T
         Hmw = P @ Hmw @ P
 
-    eigvals, eigvecs = np.linalg.eigh(Hmw)
+    eigvals, eigvecs = eigh_arrays(Hmw)
     nzero = Q.shape[1] if Q.shape[1] > 0 else (5 if linear else 6)
     if nzero >= len(eigvals):
         raise ValueError("not enough modes to drop translation/rotation")

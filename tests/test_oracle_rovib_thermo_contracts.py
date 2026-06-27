@@ -177,6 +177,26 @@ def test_wmsrot_simulation_wrapper_calls_vendored_engine_with_deltabvib():
     assert call[-1] == 1
 
 
+def test_wmsrot_vendor_engine_routes_eigh_through_oracle_diagonalizer(monkeypatch):
+    import numpy as np
+
+    from oracle_rovib.vendor import wmsrot_engine
+
+    calls = []
+
+    def fake_eigh(matrix):
+        calls.append(matrix.shape)
+        return np.linalg.eigh(matrix)
+
+    monkeypatch.setattr(wmsrot_engine, "_oracle_eigh_arrays", fake_eigh)
+
+    values, vectors = wmsrot_engine._oracle_eigh(np.diag([2.0, 1.0]))
+
+    assert calls == [(2, 2)]
+    assert np.allclose(values, [1.0, 2.0])
+    assert vectors.shape == (2, 2)
+
+
 def test_vibrational_section_reads_frequencies_and_chi_block():
     section = parse_vibrational_section(
         [

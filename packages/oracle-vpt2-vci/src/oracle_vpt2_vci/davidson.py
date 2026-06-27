@@ -5,6 +5,8 @@ from typing import Callable
 
 import numpy as np
 
+from oracle_core import eigh_arrays
+
 
 MatVec = Callable[[np.ndarray], np.ndarray]
 
@@ -73,7 +75,7 @@ def davidson_lowest(
 
     for iteration in range(1, max_iter + 1):
         projected = v.T @ av
-        evals, evecs = np.linalg.eigh((projected + projected.T) * 0.5)
+        evals, evecs = eigh_arrays((projected + projected.T) * 0.5)
         theta = evals[:n_roots]
         coeff = evecs[:, :n_roots]
         ritz = v @ coeff

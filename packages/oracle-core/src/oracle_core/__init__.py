@@ -1,6 +1,15 @@
 """Core ORACLE infrastructure."""
 
 from .errors import BackendError, InputError, OracleError, ParseError, ScientificValidationError
+from .diagonalizer import (
+    DiagonalizerBackend,
+    EighResult,
+    available_diagonalizer_backends,
+    best_diagonalizer_backend,
+    diagonalize_hermitian,
+    eigh_arrays,
+    eigvalsh_array,
+)
 from .manifest import (
     ORACLE_MANIFEST_SCHEMA,
     RunManifest,
@@ -83,6 +92,8 @@ from .xyzin_geometry import XyzinGeometry, read_xyzin_geometry, replace_xyzin_ge
 __all__ = [
     "BackendError",
     "BasicSection",
+    "DiagonalizerBackend",
+    "EighResult",
     "InputError",
     "MERLINO_XYZIN_ISOTOPOLOGUES_SCHEMA",
     "MERLINO_XYZIN_BASIC_SCHEMA",
@@ -109,8 +120,13 @@ __all__ = [
     "XyzinIsotopologueRecord",
     "XyzinIsotopologueValidationIssue",
     "basic_section_lines",
+    "available_diagonalizer_backends",
+    "best_diagonalizer_backend",
     "build_run_manifest",
     "damped_normal_step",
+    "diagonalize_hermitian",
+    "eigh_arrays",
+    "eigvalsh_array",
     "ensure_workspace",
     "file_checksums",
     "format_substitutions",

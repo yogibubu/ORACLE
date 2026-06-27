@@ -54,6 +54,30 @@ oracle-install-gui-deps
 
 This installs the declared GUI stack, including `PySide6`.
 
+## Shared Diagonalizer And GPU Acceleration
+
+GF, VCI/Davidson, vibro-rotational normal-mode extraction and the local
+WMS-Rot rotational engine use the shared ORACLE diagonalizer in
+`oracle_core.diagonalizer`. By default it chooses GPU acceleration only when a
+supported GPU backend is already available and the matrix is large enough to
+justify transfer overhead. Otherwise it uses SciPy/NumPy LAPACK on CPU.
+
+The main controls are:
+
+```bash
+export ORACLE_DIAGONALIZER_BACKEND=auto
+export ORACLE_DIAGONALIZER_GPU_MIN_SIZE=128
+export ORACLE_DIAGONALIZER_STRICT_GPU=0
+```
+
+Use `ORACLE_DIAGONALIZER_BACKEND=gpu` only when a GPU package is installed.
+Install CuPy or PyTorch manually in the active ORACLE environment because the
+right package depends on the workstation:
+
+- NVIDIA/CUDA: install the CuPy or PyTorch build matching the CUDA driver.
+- Apple Silicon: install PyTorch with MPS support.
+- CPU workstations: no extra package is needed.
+
 ## Visualization Programs
 
 MATRIX/ORACLE delegates visualization to external programs. The GUI must not

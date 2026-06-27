@@ -47,6 +47,23 @@ def test_vci_harmonic_basis_and_energies_are_deterministic():
     assert np.allclose(result.energies_cm, [150.0, 250.0, 350.0])
 
 
+def test_vci_dense_solver_routes_diagonalization_through_oracle_core(monkeypatch):
+    from oracle_vpt2_vci import vci
+
+    calls = []
+
+    def fake_eigh(matrix):
+        calls.append(matrix.shape)
+        return np.linalg.eigh(matrix)
+
+    monkeypatch.setattr(vci, "eigh_arrays", fake_eigh)
+
+    qff = zero_anharmonic_force_field(np.array([100.0, 200.0]))
+    solve_vci(qff, max_quanta=1)
+
+    assert calls == [(3, 3)]
+
+
 def test_vci_quartic_term_shifts_oscillator_ground_state():
     qff = QuarticForceField(
         harmonic_frequencies_cm=np.array([100.0]),
