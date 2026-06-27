@@ -98,3 +98,22 @@ oracle-gui [molecule.xyzin]
 
 Qt is optional and loaded only when the GUI process starts. Headless tests cover
 the controllers without requiring a display server.
+
+## Dashboard Runtime
+
+The dashboard runtime is split in two layers:
+
+- `oracle_gui.dashboard.OracleDashboardController` is headless and testable. It
+  loads the current project state, builds the available action list, checks
+  required `xyzin` sections, assigns the repository working directory for
+  `python -m oracle` commands and records process logs.
+- `oracle_gui.app` is the optional Qt layer. It displays project state,
+  sections, actions and logs, then launches selected commands through
+  `QProcess` so long-running calculations do not block the desktop window.
+
+The first operational dashboard actions are intentionally conservative:
+validation, Avogadro launch, fragment build, GICForge build/report/B-matrix,
+rovibrational summary, Thermo, VPT2/VCI collection and DVR collection. Actions
+that need additional file choices, such as ORACLE-Babel import or FCHK
+promotion, remain command specifications until their dedicated windows provide
+the required file selectors.

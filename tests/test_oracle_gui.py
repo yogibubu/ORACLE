@@ -7,7 +7,10 @@ import sys
 
 from oracle_dvr import DVRRequest, dvr_section_from_request, write_dvr_section
 from oracle_gui import (
+    DashboardActionTemplate,
     ORACLE_GUI_WINDOWS,
+    OracleDashboardController,
+    OracleGuiCommand,
     WorkflowStatus,
     all_known_sections,
     avogadro_command,
@@ -176,6 +179,85 @@ def test_gui_project_state_missing_file_is_reported_without_crashing(tmp_path):
     assert not state.exists
     assert state.validation_status == "MISSING"
     assert state.workflow("dashboard").status == WorkflowStatus.MISSING
+
+
+def test_dashboard_controller_builds_ready_actions_from_xyzin_sections(tmp_path):
+    xyzin = tmp_path / "molecule.xyzin"
+    xyzin.write_text(
+        "\n".join(
+            [
+                "3",
+                "water",
+                "O 0.0 0.0 0.0",
+                "H 0.0 0.0 0.9",
+                "H 0.0 0.8 -0.2",
+                "",
+                "#BASIC",
+                "SCHEMA oracle.xyz.basic.v1",
+                "",
+                "#SYMMETRY",
+                "SCHEMA oracle.xyz.symmetry.v1",
+                "",
+                "#TOPOLOGY",
+                "SCHEMA oracle.xyz.topology.v1",
+                "",
+                "#SYNTHONS",
+                "SCHEMA oracle.xyz.synthons.v1",
+                "",
+                "#GIC",
+                "SCHEMA oracle.xyz.gic.v1",
+                "STATUS BUILT",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    controller = OracleDashboardController(xyzin, repo_root=ROOT)
+    state = controller.state()
+
+    actions = {action.key: action for action in controller.actions(state)}
+
+    assert actions["validate"].enabled
+    assert actions["gicforge_build"].enabled
+    assert actions["gicforge_report"].enabled
+    assert actions["rovib_summary"].enabled is False
+    assert actions["rovib_summary"].reason == "missing ROTATIONAL"
+    assert actions["gicforge_build"].command.cwd == ROOT
+    assert actions["avogadro"].command.cwd is None
+
+
+def test_dashboard_controller_runs_action_and_records_log(tmp_path, monkeypatch):
+    xyzin = tmp_path / "molecule.xyzin"
+    xyzin.write_text("1\nh\nH 0.0 0.0 0.0\n", encoding="utf-8")
+    command = OracleGuiCommand("Fake action", (sys.executable, "-c", "print('ok')"))
+    controller = OracleDashboardController(
+        xyzin,
+        actions=(
+            DashboardActionTemplate(
+                "fake",
+                "dashboard",
+                "Fake action",
+                lambda _xyzin: command,
+            ),
+        ),
+        repo_root=ROOT,
+    )
+
+    def fake_run(argv, **kwargs):
+        assert argv == command.argv
+        assert kwargs["cwd"] is None
+        return subprocess.CompletedProcess(argv, 0, stdout="stdout\n", stderr="stderr\n")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    result = controller.run_action("fake")
+
+    assert result.ok
+    assert result.stdout == "stdout\n"
+    assert controller.log_lines[0].startswith("$ ")
+    assert "stdout" in controller.log_lines
+    assert "stderr" in controller.log_lines
+    assert controller.log_lines[-1] == "[exit 0] Fake action"
 
 
 def test_gui_window_specs_cover_primary_oracle_workflows():

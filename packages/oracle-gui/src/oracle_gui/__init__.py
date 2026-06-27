@@ -28,6 +28,13 @@ from .commands import (
     vpt2_vci_collect_command,
     vpt2_vci_command,
 )
+from .dashboard import (
+    DashboardAction,
+    DashboardActionTemplate,
+    DashboardRunResult,
+    OracleDashboardController,
+    default_dashboard_action_templates,
+)
 from .project import (
     OracleProjectState,
     SectionState,
@@ -54,7 +61,11 @@ __all__ = [
     "ORACLE_GUI_WINDOWS",
     "WINDOWS_BY_KEY",
     "DVRGuiState",
+    "DashboardAction",
+    "DashboardActionTemplate",
+    "DashboardRunResult",
     "OracleGuiCommand",
+    "OracleDashboardController",
     "OracleProjectState",
     "SectionState",
     "VPT2VCIGuiState",
@@ -67,6 +78,7 @@ __all__ = [
     "dvr_collect_command",
     "dvr_gui_state_lines",
     "dvr_run_command",
+    "default_dashboard_action_templates",
     "external_viewer_command",
     "fragments_command",
     "gaussian_promote_fchk_command",
