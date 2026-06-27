@@ -8,9 +8,12 @@ Create a clean ORACLE repository from the legacy workspace without losing the
 working scientific code, manuals, regression fixtures or GUI workflows.
 
 ORACLE means **Operational Recognition of Atomistic Connectivity and Local
-Environments**. It should be the suite-level project. Existing legacy module
-names remain compatibility aliases until the package boundaries are stable and
-covered by tests.
+Environments**. During the active refactory it remains the suite-level project
+and GUI/application name. After the refactory is stable, the framework/package
+family should be renamed **MATRIX**, GICForge should become **NEO**, and ORACLE
+should remain the GUI/user-facing application. Existing module names remain
+compatibility aliases until the package boundaries are stable and covered by
+tests. See `ADR-0009-MATRIX-NAMING-TRANSITION.md`.
 
 ## Current Situation
 
@@ -149,6 +152,12 @@ plain XYZ block and is progressively enriched by named uppercase sections. Each
 tool owns only its own section, replaces only that section and preserves all
 others. External formats are import/export adapters; downstream ORACLE modules
 consume the enriched XYZ container.
+
+The implemented standalone tool contracts are recorded in
+`oracle_core.tool_contracts`. That registry is intentionally small and
+machine-readable: it lists current package names, future names where decided,
+required/optional sections, produced sections and the canonical standalone CLI
+entry point for each tool.
 
 This constraint is formalized in
 `ADR-0001-SHARED-LIBRARIES-AND-XYZ-CONTAINER.md` and

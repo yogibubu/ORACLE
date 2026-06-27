@@ -47,6 +47,16 @@ def build_parser(*, repo_root: Path | None = None) -> argparse.ArgumentParser:
     validate.add_argument("xyzin", type=Path)
     validate.add_argument("--require-fragments", action="store_true")
 
+    contracts = sub.add_parser("contracts", help="List standalone xyzin tool contracts")
+    contracts.add_argument("--tool", help="Show one tool contract by key or planned name")
+    contracts.add_argument(
+        "--format",
+        choices=("text", "json", "markdown"),
+        default="text",
+        help="Output format",
+    )
+    contracts.add_argument("--no-gui", action="store_true", help="Omit the GUI orchestrator")
+
     babel = sub.add_parser("babel", help="Run ORACLE-Babel preprocessing")
     babel_sub = babel.add_subparsers(dest="babel_command")
     preprocess = babel_sub.add_parser("preprocess", help="Import a source into enriched XYZ")
@@ -559,6 +569,23 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
 
         result = write_validation_section(args.xyzin, require_fragments=args.require_fragments)
         print(f"Validated ORACLE molecule: {args.xyzin} ({result.status})")
+        return 0
+    if args.command == "contracts":
+        from oracle_core import (
+            tool_contract,
+            tool_contract_lines,
+            tool_contract_markdown_table,
+            tool_contracts,
+            tool_contracts_json,
+        )
+
+        rows = (tool_contract(args.tool),) if args.tool else tool_contracts(include_gui=not args.no_gui)
+        if args.format == "json":
+            print(tool_contracts_json(rows))
+        elif args.format == "markdown":
+            print(tool_contract_markdown_table(rows))
+        else:
+            print("\n".join(tool_contract_lines(rows)))
         return 0
     if args.command == "babel" and args.babel_command == "preprocess":
         from oracle_chem import SymmetryThresholds, preprocess_to_enriched_xyz

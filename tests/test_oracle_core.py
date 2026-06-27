@@ -14,6 +14,9 @@ from oracle_core import (
     replace_section,
     replace_xyz_block,
     section_content,
+    tool_contract,
+    tool_contract_markdown_table,
+    tool_contracts,
     validate_xyzin_isotopologue_records,
     write_basic_section,
     xyzin_isotopologue_section_lines,
@@ -30,6 +33,18 @@ def test_manifest_schema(tmp_path):
     manifest = build_run_manifest(workflow="smoke", status="completed", run_dir=tmp_path)
     assert manifest.schema_version == ORACLE_MANIFEST_SCHEMA
     assert manifest.to_dict()["workflow"] == "smoke"
+
+
+def test_tool_contract_registry_records_standalone_sections_and_future_names():
+    contracts = {contract.key: contract for contract in tool_contracts()}
+
+    assert contracts["gicforge"].planned_name == "NEO"
+    assert contracts["gicforge"].produced_sections == ("GIC", "SYCART")
+    assert contracts["gui"].planned_name == "ORACLE"
+    assert contracts["trinity"].status == "prepare-only"
+    assert contracts["trinity"].produced_sections == ("TRINITY",)
+    assert tool_contract("NEO").key == "gicforge"
+    assert "TRINITY" in tool_contract_markdown_table()
 
 
 def test_basic_section_accepts_merlino_aligned_key_values():

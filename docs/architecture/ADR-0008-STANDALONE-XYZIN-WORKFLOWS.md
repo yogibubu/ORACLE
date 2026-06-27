@@ -20,6 +20,15 @@ it must not become a hard runtime dependency for every scientific tool.
 Every scientific ORACLE package must expose a standalone service and CLI path
 that accepts an enriched XYZ/`xyzin` file directly.
 
+The current standalone surface is recorded in `oracle_core.tool_contracts` and
+is visible with:
+
+```bash
+python -m oracle contracts
+python -m oracle contracts --format markdown
+python -m oracle contracts --tool NEO
+```
+
 Standalone tools must:
 
 - use `oracle-core` section APIs;

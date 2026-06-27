@@ -59,6 +59,15 @@ from .sections import (
     read_basic_section,
     write_basic_section,
 )
+from .tool_contracts import (
+    TOOL_CONTRACTS,
+    ToolContract,
+    tool_contract,
+    tool_contract_lines,
+    tool_contract_markdown_table,
+    tool_contracts,
+    tool_contracts_json,
+)
 from .workspace import WORKSPACE_DIRS, WorkspaceLayout, ensure_workspace
 from .xyzin_geometry import XyzinGeometry, read_xyzin_geometry, replace_xyzin_geometry
 
@@ -78,6 +87,8 @@ __all__ = [
     "ScientificValidationError",
     "SUPPORTED_BASIC_SCHEMAS",
     "SUPPORTED_XYZIN_ISOTOPOLOGUES_SCHEMAS",
+    "TOOL_CONTRACTS",
+    "ToolContract",
     "WORKSPACE_DIRS",
     "WorkspaceLayout",
     "XyzinGeometry",
@@ -119,6 +130,11 @@ __all__ = [
     "section_content",
     "section_header",
     "sha256_file",
+    "tool_contract",
+    "tool_contract_lines",
+    "tool_contract_markdown_table",
+    "tool_contracts",
+    "tool_contracts_json",
     "validate_xyzin_isotopologue_file",
     "validate_xyzin_isotopologue_records",
     "write_sectioned_lines",

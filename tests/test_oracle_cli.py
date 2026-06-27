@@ -93,6 +93,26 @@ def test_lcb25_fetch_cli_calls_sync(tmp_path, monkeypatch, capsys):
     assert "Synced LCB25 library" in capsys.readouterr().out
 
 
+def test_contracts_cli_lists_standalone_tool_registry(capsys):
+    rc = oracle_run.main(["contracts", "--tool", "NEO"])
+    out = capsys.readouterr().out
+
+    assert rc == 0
+    assert "gicforge: GICForge" in out
+    assert "planned_name: NEO" in out
+    assert "produced: GIC, SYCART" in out
+
+
+def test_contracts_cli_json_can_omit_gui(capsys):
+    rc = oracle_run.main(["contracts", "--format", "json", "--no-gui"])
+    out = capsys.readouterr().out
+
+    assert rc == 0
+    assert '"key": "gicforge"' in out
+    assert '"planned_name": "NEO"' in out
+    assert '"key": "gui"' not in out
+
+
 def test_babel_preprocess_cli_calls_shared_pipeline(tmp_path, monkeypatch, capsys):
     calls = {}
     source = tmp_path / "source.inp"
