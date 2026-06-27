@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 from pathlib import Path
@@ -20,6 +21,7 @@ from matrix_engines import (
 )
 from matrix_fragments import write_fragment_build_section
 from matrix_neo import (
+    DEFAULT_FORTRAN_AUDIT_MOLECULES,
     GICForgeFortranAudit,
     GICForgeFortranAuditResult,
     audit_gicforge_fortran_corpus,
@@ -48,6 +50,9 @@ def _skip_if_smiles_requires_rdkit(path: Path) -> None:
 
 
 ORIGINAL_MERLINO_GICFORGE = Path("/Users/vincenzobarone/merlino3.0/bin/gicforge.x")
+GOLDEN_CORPUS = (
+    Path(__file__).resolve().parent / "fixtures" / "golden_corpus" / "neo_gic_golden.json"
+)
 
 
 def _row_space_basis(matrix: np.ndarray) -> tuple[np.ndarray, int]:
@@ -95,6 +100,8 @@ def test_fortran_audit_report_includes_projector_diagnostics(tmp_path):
                 special_symmetry_group_count=1,
                 mixed_symmetry_group_count=0,
                 total_symmetric_gic_count=2,
+                salc_coefficient_gic_count=3,
+                salc_coefficient_max_norm_error=2.0e-16,
             ),
         ),
     )
@@ -103,10 +110,48 @@ def test_fortran_audit_report_includes_projector_diagnostics(tmp_path):
     cases = "\n".join(format_gicforge_fortran_audit_cases(audit))
 
     assert "MIXED_SYMMETRY_GROUPS 0" in summary
+    assert "SALC_COEFFICIENT_GICS 3" in summary
+    assert "MAX_SALC_COEFFICIENT_NORM_ERROR 2e-16" in summary
     assert "projector_status=POINT_GROUP_PROJECTOR" in cases
     assert "symmetry_groups=4" in cases
     assert "special_symmetry_groups=1" in cases
     assert "total_symmetric_gics=2" in cases
+    assert "salc_coefficient_gics=3" in cases
+    assert "salc_norm_error=2e-16" in cases
+
+
+def test_default_fortran_audit_covers_official_golden_parity_roles():
+    registry = json.loads(GOLDEN_CORPUS.read_text(encoding="utf-8"))
+    by_role = {
+        role: {Path(entry["path"]).name for entry in registry["entries"] if role in entry["roles"]}
+        for role in {
+            "ring",
+            "fused_ring",
+            "bridged_ring",
+            "spiro_ring",
+            "python_fortran_parity",
+        }
+    }
+    default = set(DEFAULT_FORTRAN_AUDIT_MOLECULES)
+
+    assert by_role["python_fortran_parity"] <= default
+    assert by_role["fused_ring"] <= default
+    assert by_role["bridged_ring"] <= default
+    assert by_role["spiro_ring"] <= default
+    assert {"benzene.inp", "pyrrole.inp"} <= default
+    assert {
+        "azulene.inp",
+        "pyrene.inp",
+        "norbornane.inp",
+        "norbornene.inp",
+        "norbornadiene.inp",
+        "norcamphor.inp",
+        "thujone.inp",
+        "ribose.inp",
+        "cubane.inp",
+        "spiro.inp",
+        "cyclottane.inp",
+    } <= default
 
 
 def test_legacy_merlino_group_dispatch_includes_ih_and_dnd_extensions():

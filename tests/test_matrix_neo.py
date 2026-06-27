@@ -590,10 +590,20 @@ def test_gicforge_build_writes_frozen_gics_and_sycart(tmp_path):
     report_lines = gic_report_from_xyzin(xyzin)
     assert "Method: POINT_GROUP_PROJECTOR" in report_lines
     assert "Total irrep: A1" in report_lines
+    assert "Target rank rationale: 3N-6 non-linear vibrational rank for N=3" in report_lines
+    assert "Mode: NONE" in report_lines
+    assert "Policy: no built fragments were consumed by this GIC definition." in report_lines
     assert (
         "STRETCH OPS=E,sigma_yz,sigma_xy,C2y^1: "
         "Stre0001,Stre0002 -> A1Str001,B2Str001"
     ) in report_lines
+    assert "Selected by family: BEND:1, STRETCH:2" in report_lines
+    assert any(
+        line.startswith("A1Str001 irrep=A1 family=STRETCH")
+        and "P001:+0.707106781187" in line
+        and "P002:+0.707106781187" in line
+        for line in report_lines
+    )
     assert sycart[0] == "SCHEMA oracle.xyz.sycart.v1"
     assert "STATUS BUILT" in sycart
     assert "COORD_COUNT 3" in sycart
@@ -961,6 +971,13 @@ def test_gicforge_build_uses_built_fragments_for_relative_coordinates(tmp_path):
     assert any("ExF002F001" in line for line in gaussian_lines)
     assert any("1.0D-24" in line and line.startswith("KnF002F001") for line in gaussian_lines)
     assert any(" = ExF002F001" in line for line in gaussian_lines)
+    report_lines = gic_report_from_xyzin(xyzin)
+    assert "Mode: SPECIAL_COORDINATES" in report_lines
+    assert (
+        "Policy: automatic weak-complex default; keep fragments as protected bodies."
+        in report_lines
+    )
+    assert any("family=FRAG_DISTANCE" in line for line in report_lines)
 
 
 def test_gicforge_pseudo_bond_fragment_mode_uses_standard_internal_coordinates(tmp_path):
@@ -1009,6 +1026,13 @@ def test_gicforge_pseudo_bond_fragment_mode_uses_standard_internal_coordinates(t
     assert "PSEUDO_BOND_COUNT 1" in gic
     assert "[PSEUDO_BONDS]" in gic
     assert "1 5 6 KIND=HBOND" in gic
+    report_lines = gic_report_from_xyzin(xyzin)
+    assert "Mode: PSEUDO_BONDS" in report_lines
+    assert (
+        "Policy: explicit graph-joining mode; do not build protected fragment coordinates."
+        in report_lines
+    )
+    assert "Pseudo-bonds: 5-6:HBOND" in report_lines
 
 
 def test_gicforge_non_covalent_probe_runs_fragment_and_hbond_coordinate_models(tmp_path):

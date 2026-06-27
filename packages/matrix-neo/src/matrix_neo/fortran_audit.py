@@ -66,6 +66,8 @@ class GICForgeFortranAuditResult:
     special_symmetry_group_count: int = 0
     mixed_symmetry_group_count: int = 0
     total_symmetric_gic_count: int = 0
+    salc_coefficient_gic_count: int = 0
+    salc_coefficient_max_norm_error: float | None = None
     message: str = ""
     workdir: Path | None = None
 
@@ -115,6 +117,20 @@ class GICForgeFortranAudit:
     @property
     def mixed_symmetry_groups(self) -> int:
         return sum(result.mixed_symmetry_group_count for result in self.results)
+
+    @property
+    def salc_coefficient_gics(self) -> int:
+        return sum(result.salc_coefficient_gic_count for result in self.results)
+
+    @property
+    def max_salc_coefficient_norm_error(self) -> float | None:
+        values = [
+            float(result.salc_coefficient_max_norm_error)
+            for result in self.results
+            if result.salc_coefficient_max_norm_error is not None
+            and np.isfinite(result.salc_coefficient_max_norm_error)
+        ]
+        return max(values) if values else None
 
 
 def audit_gicforge_fortran_corpus(
@@ -194,6 +210,13 @@ def format_gicforge_fortran_audit_summary(audit: GICForgeFortranAudit) -> list[s
         "MAX_ROW_SPACE_RESIDUAL "
         + ("NONE" if max_residual is None else f"{max_residual:.12g}"),
         f"MIXED_SYMMETRY_GROUPS {audit.mixed_symmetry_groups}",
+        f"SALC_COEFFICIENT_GICS {audit.salc_coefficient_gics}",
+        "MAX_SALC_COEFFICIENT_NORM_ERROR "
+        + (
+            "NONE"
+            if audit.max_salc_coefficient_norm_error is None
+            else f"{audit.max_salc_coefficient_norm_error:.12g}"
+        ),
     ]
     lines.extend(format_gicforge_fortran_audit_cases(audit))
     return lines
@@ -227,6 +250,13 @@ def format_gicforge_fortran_audit_cases(
             f"special_symmetry_groups={result.special_symmetry_group_count} "
             f"mixed_symmetry_groups={result.mixed_symmetry_group_count} "
             f"total_symmetric_gics={result.total_symmetric_gic_count}"
+            f" salc_coefficient_gics={result.salc_coefficient_gic_count}"
+            " salc_norm_error="
+            + (
+                "NONE"
+                if result.salc_coefficient_max_norm_error is None
+                else f"{result.salc_coefficient_max_norm_error:.12g}"
+            )
             + (f" message={result.message}" if result.message else "")
         )
     return lines
@@ -327,6 +357,10 @@ def _audit_one(
             special_symmetry_group_count=int(projector["special_symmetry_group_count"]),
             mixed_symmetry_group_count=int(projector["mixed_symmetry_group_count"]),
             total_symmetric_gic_count=int(projector["total_symmetric_gic_count"]),
+            salc_coefficient_gic_count=int(projector["salc_coefficient_gic_count"]),
+            salc_coefficient_max_norm_error=float(
+                projector["salc_coefficient_max_norm_error"]
+            ),
             message=""
             if passed
             else _failure_message(
@@ -359,6 +393,8 @@ def _projector_audit(
             "special_symmetry_group_count": 0,
             "mixed_symmetry_group_count": 0,
             "total_symmetric_gic_count": 0,
+            "salc_coefficient_gic_count": 0,
+            "salc_coefficient_max_norm_error": 0.0,
         }
     source_family_by_name = {gic.name: gic.family for gic in source_definition.gics}
     mixed_groups = 0
@@ -379,7 +415,25 @@ def _projector_audit(
         "special_symmetry_group_count": special_groups,
         "mixed_symmetry_group_count": mixed_groups,
         "total_symmetric_gic_count": len(diagnostics.total_symmetric_gics),
+        "salc_coefficient_gic_count": _salc_coefficient_gic_count(symmetrized_definition),
+        "salc_coefficient_max_norm_error": _salc_coefficient_max_norm_error(
+            symmetrized_definition
+        ),
     }
+
+
+def _salc_coefficient_gic_count(definition: GICDefinition) -> int:
+    return sum(1 for gic in definition.gics if len(gic.coefficients) > 1)
+
+
+def _salc_coefficient_max_norm_error(definition: GICDefinition) -> float:
+    errors = []
+    for gic in definition.gics:
+        if len(gic.coefficients) <= 1:
+            continue
+        norm2 = sum(float(coefficient) ** 2 for _primitive_id, coefficient in gic.coefficients)
+        errors.append(abs(norm2 - 1.0))
+    return max(errors) if errors else 0.0
 
 
 def _failure_message(

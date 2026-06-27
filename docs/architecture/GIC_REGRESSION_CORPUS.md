@@ -74,10 +74,20 @@ Current required gate:
   phenanthrene, anthracene, pyrene, fluorene, azulene, norbornane, norbornene,
   norbornadiene, norcamphor, spiro, acetylene, linear C4S, thujone, ribose,
   cubane and cyclottane.
+- The default audit is tied to the golden registry roles. Every entry tagged
+  `fused_ring`, `bridged_ring`, `spiro_ring` or `python_fortran_parity` must
+  remain in `DEFAULT_FORTRAN_AUDIT_MOLECULES` unless the registry is explicitly
+  reviewed.
 - This gate must pass with matching final rank, matching row-space rank and
   Wilson-B row-space residual below the audit tolerance. The finite
   point-group projector must be active for every non-`C1`, non-linear molecule
   in the gate.
+- The audit summary reports projector status, symmetry block counts, mixed
+  symmetry-family counts, total-symmetric GIC counts, nontrivial SALC
+  coefficient counts and the largest SALC coefficient normalization residual.
+  Exact coefficient-vector comparison with executable Merlino is still a TODO
+  until the strict Fortran backend emits projector coefficients in a stable
+  machine-readable form.
 - Pyrrole is an explicit regression: point group `C2v`, rank 24, retained ring
   coordinates, and symmetrized `A1RPck001`/`B2RPck001`.
 - Fused PAHs are explicit regressions: naphthalene, phenanthrene, anthracene,

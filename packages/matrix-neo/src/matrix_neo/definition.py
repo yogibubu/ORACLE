@@ -100,6 +100,9 @@ class GICReductionDiagnostics:
     selected: tuple[str, ...] = ()
     skipped_singular: tuple[str, ...] = ()
     skipped_dependent: tuple[str, ...] = ()
+    selected_by_family: tuple[str, ...] = ()
+    skipped_singular_details: tuple[str, ...] = ()
+    skipped_dependent_details: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -1372,6 +1375,8 @@ def _select_ranked_primitives_with_diagnostics(
 ) -> tuple[tuple[GICPrimitive, ...], int, GICReductionDiagnostics]:
     skipped_singular: list[str] = []
     skipped_dependent: list[str] = []
+    skipped_singular_details: list[str] = []
+    skipped_dependent_details: list[str] = []
     if target_rank == 0:
         return (
             (),
@@ -1393,15 +1398,19 @@ def _select_ranked_primitives_with_diagnostics(
     ]
     for index, primitive in enumerate(special_candidates):
         if rank == target_rank:
-            singular, dependent = _raise_if_remaining_special_independent(
-                tuple(special_candidates[index:]),
-                coords,
-                basis,
-                rank,
-                rank_tolerance=rank_tolerance,
+            singular, dependent, singular_details, dependent_details = (
+                _raise_if_remaining_special_independent(
+                    tuple(special_candidates[index:]),
+                    coords,
+                    basis,
+                    rank,
+                    rank_tolerance=rank_tolerance,
+                )
             )
             skipped_singular.extend(singular)
             skipped_dependent.extend(dependent)
+            skipped_singular_details.extend(singular_details)
+            skipped_dependent_details.extend(dependent_details)
             return (
                 tuple(selected),
                 rank,
@@ -1409,6 +1418,8 @@ def _select_ranked_primitives_with_diagnostics(
                     selected,
                     skipped_singular=skipped_singular,
                     skipped_dependent=skipped_dependent,
+                    skipped_singular_details=skipped_singular_details,
+                    skipped_dependent_details=skipped_dependent_details,
                 ),
             )
         rank, status = _try_select_ranked_primitive(
@@ -1419,7 +1430,14 @@ def _select_ranked_primitives_with_diagnostics(
             rank,
             rank_tolerance=rank_tolerance,
         )
-        _record_skip(primitive, status, skipped_singular, skipped_dependent)
+        _record_skip(
+            primitive,
+            status,
+            skipped_singular,
+            skipped_dependent,
+            skipped_singular_details,
+            skipped_dependent_details,
+        )
 
     for primitive in ordinary_candidates:
         if rank == target_rank:
@@ -1432,7 +1450,14 @@ def _select_ranked_primitives_with_diagnostics(
             rank,
             rank_tolerance=rank_tolerance,
         )
-        _record_skip(primitive, status, skipped_singular, skipped_dependent)
+        _record_skip(
+            primitive,
+            status,
+            skipped_singular,
+            skipped_dependent,
+            skipped_singular_details,
+            skipped_dependent_details,
+        )
     return (
         tuple(selected),
         rank,
@@ -1440,6 +1465,8 @@ def _select_ranked_primitives_with_diagnostics(
             selected,
             skipped_singular=skipped_singular,
             skipped_dependent=skipped_dependent,
+            skipped_singular_details=skipped_singular_details,
+            skipped_dependent_details=skipped_dependent_details,
         ),
     )
 
@@ -1474,8 +1501,11 @@ def _reduction_diagnostics_lines(definition: GICDefinition) -> list[str]:
         f"RANK_METHOD {diagnostics.rank_method}",
         f"REDUCTION_POLICY {diagnostics.reduction_policy}",
         f"SELECTED {_csv_or_none(diagnostics.selected)}",
+        f"SELECTED_BY_FAMILY {_csv_or_none(diagnostics.selected_by_family)}",
         f"SKIPPED_SINGULAR {_csv_or_none(diagnostics.skipped_singular)}",
         f"SKIPPED_DEPENDENT {_csv_or_none(diagnostics.skipped_dependent)}",
+        f"SKIPPED_SINGULAR_DETAILS {_csv_or_none(diagnostics.skipped_singular_details)}",
+        f"SKIPPED_DEPENDENT_DETAILS {_csv_or_none(diagnostics.skipped_dependent_details)}",
     ]
 
 
@@ -1530,6 +1560,8 @@ def _make_reduction_diagnostics(
     *,
     skipped_singular: list[str],
     skipped_dependent: list[str],
+    skipped_singular_details: list[str] | None = None,
+    skipped_dependent_details: list[str] | None = None,
 ) -> GICReductionDiagnostics:
     return GICReductionDiagnostics(
         rank_method=RANK_METHOD,
@@ -1537,6 +1569,9 @@ def _make_reduction_diagnostics(
         selected=tuple(primitive.identifier for primitive in selected),
         skipped_singular=tuple(skipped_singular),
         skipped_dependent=tuple(skipped_dependent),
+        selected_by_family=_family_count_tokens(selected),
+        skipped_singular_details=tuple(skipped_singular_details or ()),
+        skipped_dependent_details=tuple(skipped_dependent_details or ()),
     )
 
 
@@ -1545,11 +1580,26 @@ def _record_skip(
     status: str,
     skipped_singular: list[str],
     skipped_dependent: list[str],
+    skipped_singular_details: list[str],
+    skipped_dependent_details: list[str],
 ) -> None:
     if status == "singular":
         skipped_singular.append(primitive.identifier)
+        skipped_singular_details.append(_primitive_diagnostic_token(primitive))
     elif status == "dependent":
         skipped_dependent.append(primitive.identifier)
+        skipped_dependent_details.append(_primitive_diagnostic_token(primitive))
+
+
+def _family_count_tokens(primitives: list[GICPrimitive]) -> tuple[str, ...]:
+    counts: dict[str, int] = {}
+    for primitive in primitives:
+        counts[primitive.family] = counts.get(primitive.family, 0) + 1
+    return tuple(f"{family}:{count}" for family, count in sorted(counts.items()))
+
+
+def _primitive_diagnostic_token(primitive: GICPrimitive) -> str:
+    return f"{primitive.identifier}:{primitive.family}:{primitive.name}"
 
 
 def _apply_local_symmetrization(
@@ -3143,9 +3193,11 @@ def _raise_if_remaining_special_independent(
     rank: int,
     *,
     rank_tolerance: float,
-) -> tuple[tuple[str, ...], tuple[str, ...]]:
+) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
     skipped_singular: list[str] = []
     skipped_dependent: list[str] = []
+    skipped_singular_details: list[str] = []
+    skipped_dependent_details: list[str] = []
     for primitive in primitives:
         normalized = _normalized_b_row_or_none(
             primitive,
@@ -3154,6 +3206,7 @@ def _raise_if_remaining_special_independent(
         )
         if normalized is None:
             skipped_singular.append(primitive.identifier)
+            skipped_singular_details.append(_primitive_diagnostic_token(primitive))
             continue
         if _orthonormal_residual_or_none(
             basis,
@@ -3166,7 +3219,13 @@ def _raise_if_remaining_special_independent(
                 "row after the target rank was reached"
             )
         skipped_dependent.append(primitive.identifier)
-    return tuple(skipped_singular), tuple(skipped_dependent)
+        skipped_dependent_details.append(_primitive_diagnostic_token(primitive))
+    return (
+        tuple(skipped_singular),
+        tuple(skipped_dependent),
+        tuple(skipped_singular_details),
+        tuple(skipped_dependent_details),
+    )
 
 
 def _normalized_b_row_or_none(
@@ -4507,8 +4566,15 @@ def _parse_reduction_diagnostics(
         rank_method=_section_value(lines, "RANK_METHOD") or RANK_METHOD,
         reduction_policy=_section_value(lines, "REDUCTION_POLICY") or REDUCTION_POLICY,
         selected=_parse_text_list(_section_value(lines, "SELECTED") or "") or selected,
+        selected_by_family=_parse_text_list(_section_value(lines, "SELECTED_BY_FAMILY") or ""),
         skipped_singular=_parse_text_list(_section_value(lines, "SKIPPED_SINGULAR") or ""),
         skipped_dependent=_parse_text_list(_section_value(lines, "SKIPPED_DEPENDENT") or ""),
+        skipped_singular_details=_parse_text_list(
+            _section_value(lines, "SKIPPED_SINGULAR_DETAILS") or ""
+        ),
+        skipped_dependent_details=_parse_text_list(
+            _section_value(lines, "SKIPPED_DEPENDENT_DETAILS") or ""
+        ),
     )
 
 

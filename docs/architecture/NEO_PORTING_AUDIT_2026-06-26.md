@@ -27,7 +27,7 @@ regression test and noted in the method documentation.
 | Ring bend/torsion blocks | `survibfit/transforms.py`, `mkcyc.f`, `mksalc.f`, Overleaf GICForge manual | Present: `CYCLIC_BEND`, `RING_PUCKER_COMPONENT`/`RPck`, `CONDENSED_RING_TORSION`, `BUTTERFLY`; Gaussian export derives `QPck`/`PhiP` from selected `RPck` pairs with the Merlino `PrtPckQP` rule; projector golden tests cover `RPck` SALCs and derived `QPck`/`PhiP` labels | Next: add more chemically diverse corpus molecules, not new core machinery. |
 | Butterfly coordinates | `mksalc.f:BtFly`, `survibfit/transforms.py:ring_butterfly_u` | Present: fused-ring shared-bond torsions are classified as `BUTTERFLY`; corpus tests keep fused ring rank with RPck enabled | Next: compare coefficient vectors with executable Merlino output if the legacy backend later emits machine-readable ring-block coefficients. |
 | Non-redundant reduction | `gicprune.f`, `locsvd.f`, `transforms.py` | Present: analytic B-row MGS, protected special-first policy, ring families not mixed with ordinary blocks; fused corpus tests cover selected `RPck` value and B rows | Next: extend golden cases to bridged saturated rings where bend rank can saturate before puckering rows. |
-| Symmetrization | `gic_symmetry.py`, `symmetry_global.py`, `gic_type_symmetry.f`, `symm.f` | Present: Merlino label-only parity plus matrix projectors; no type mixing; total-symmetric subset stored; Fortran audit summaries now expose projector status, symmetry-group counts, special-coordinate groups, mixed-family groups and total-symmetric GIC counts | Next: compare coefficient vectors with executable Merlino output if the legacy backend later emits machine-readable projector coefficients. |
+| Symmetrization | `gic_symmetry.py`, `symmetry_global.py`, `gic_type_symmetry.f`, `symm.f` | Present: Merlino label-only parity plus matrix projectors; no type mixing; total-symmetric subset stored; Fortran audit summaries now expose projector status, symmetry-group counts, special-coordinate groups, mixed-family groups, total-symmetric GIC counts, SALC coefficient counts and coefficient-normalization residuals | Next: compare coefficient vectors with executable Merlino output if the legacy backend later emits machine-readable projector coefficients. |
 | Fragment/TRIC coordinates | Merlino TRIC roadmap, Overleaf manual, geomeTRIC reference model | Present: fragment center distance, fragment center-atom distance, translations, orientations, analytic B rows, Gaussian symbolic export | Next: add atom-frame angle/torsion and center-frame tilt/orientation modes. |
 | Ring/bond/interaction centers | Fragment roadmap, topology ring docs | Present: bond centers, ring centers, atom-center distance candidates, analytic chain-rule B row | Next: add center-angle, center-torsion and hapticity/coordination center scoring. |
 | Python/Fortran parity | `doc/GIC_PYTHON_FORTRAN_COMPARISON.md`, Fortran GICForge sources | Present for core GICForge: legacy source vendored and compiled; `frag_tric_bmat.f` mirrors special-coordinate B rows; executable harness runs Merlino on fused corpus cases and compares final rank, GIC labels and B-row subspaces while reporting projector no-mixing diagnostics | Next: keep extending the corpus; do not add new core machinery unless a regression exposes a real gap. |
@@ -54,6 +54,13 @@ regression test and noted in the method documentation.
 - `tests/test_matrix_fortran_neo.py::test_legacy_merlino_executable_bmatrix_span_matches_oracle_corpus`
   runs the vendored Merlino executable on naphthalene, phenanthrene and pyrene,
   then compares final rank and the Wilson-B row space with ORACLE.
+- `tests/test_matrix_fortran_neo.py::test_default_fortran_audit_covers_official_golden_parity_roles`
+  binds the machine-readable golden registry to the default Python/Fortran audit
+  set so fused, bridged, spiro and parity-designated cases cannot silently drop
+  out of the periodic gate.
+- GIC reports and Fortran audit summaries now expose selected families,
+  protected coordinates, skipped singular/dependent primitive details, symmetry
+  source blocks and nontrivial SALC coefficient normalizations.
 
 ## Known Merlino Fragilities To Correct In ORACLE
 
@@ -73,5 +80,6 @@ regression test and noted in the method documentation.
    norcamphor/testosterone-like bridged systems.
 2. Add center-angle, center-torsion and atom-frame coordinates for
    ring/metal/H-bond cases after the topology-center records are finalized.
-3. Expose full strict-Fortran projector diagnostics if downstream debugging
-   needs operation-by-operation projector traces.
+3. Expose full strict-Fortran projector diagnostics and coefficient traces if
+   downstream debugging needs operation-by-operation comparison with executable
+   Merlino output.

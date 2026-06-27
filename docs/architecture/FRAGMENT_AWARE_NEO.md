@@ -48,6 +48,29 @@ an inter-fragment or atom-center coordinate that was explicitly requested by
 fragment/topology state. Redundancy among special coordinates is still tested by
 analytic B-matrix rank.
 
+## Weak-Complex Policy
+
+NEO supports two explicit models for weakly connected complexes. The choice is
+recorded in `#GIC` and printed by `matrix neo report`.
+
+- `SPECIAL_COORDINATES` is the automatic fragment-aware default when
+  `#FRAGMENTS` has been built and no graph-joining mode is requested. Each
+  fragment keeps its own internal coordinates; inter-fragment motion is
+  described by protected center distances, center-atom distances, translations
+  and relative orientations. These coordinates are selected before ordinary
+  primitives and cannot be displaced by valence stretches/bends/torsions during
+  nonredundant reduction.
+- `PSEUDO_BONDS` is an explicit graph-joining mode. The contact is selected by
+  the Merlino/BDPCS3 H-bond rule first and by the closest inter-fragment pair as
+  a fallback. NEO then builds ordinary stretch/bend/torsion primitives on the
+  augmented construction graph. This mode does not build protected fragment
+  coordinates and does not create artificial rings from the added contacts.
+
+Use `SPECIAL_COORDINATES` when fragment identity and relative rotations must be
+kept visible, for example molecular clusters or metal/ring-center descriptions.
+Use `PSEUDO_BONDS` when the desired model is a local valence-coordinate
+description around a specific H-bond/contact.
+
 `[GAUSSIAN_GIC]` exports them as Gaussian symbolic GIC expressions using
 `Fragment(...)`, `XCntr/YCntr/ZCntr(...)`, Cartesian `X/Y/Z`, and the
 fragment-frame `P/Q/S` plus quaternion/exponential-map construction documented
