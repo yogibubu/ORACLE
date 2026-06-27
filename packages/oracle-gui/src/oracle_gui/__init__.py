@@ -42,6 +42,13 @@ from .project import (
     load_oracle_project_state,
     project_state_lines,
 )
+from .structure import (
+    OracleStructureController,
+    StructureGuiState,
+    StructureTable,
+    default_preprocess_output,
+    load_structure_gui_state,
+)
 from .vpt2_vci_state import (
     VPT2VCIGuiState,
     load_vpt2_vci_gui_state,
@@ -67,7 +74,10 @@ __all__ = [
     "OracleGuiCommand",
     "OracleDashboardController",
     "OracleProjectState",
+    "OracleStructureController",
     "SectionState",
+    "StructureGuiState",
+    "StructureTable",
     "VPT2VCIGuiState",
     "WindowSpec",
     "WorkflowActionSpec",
@@ -79,6 +89,7 @@ __all__ = [
     "dvr_gui_state_lines",
     "dvr_run_command",
     "default_dashboard_action_templates",
+    "default_preprocess_output",
     "external_viewer_command",
     "fragments_command",
     "gaussian_promote_fchk_command",
@@ -91,6 +102,7 @@ __all__ = [
     "gicforge_report_command",
     "load_dvr_gui_state",
     "load_oracle_project_state",
+    "load_structure_gui_state",
     "load_vpt2_vci_gui_state",
     "molden_command",
     "preprocess_command",

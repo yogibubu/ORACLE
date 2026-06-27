@@ -3,8 +3,15 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from .commands import OracleGuiCommand
 from .dashboard import DashboardAction, OracleDashboardController
 from .project import load_oracle_project_state
+from .structure import (
+    OracleStructureController,
+    StructureTable,
+    default_preprocess_output,
+    load_structure_gui_state,
+)
 from .workflows import ORACLE_GUI_WINDOWS
 
 
@@ -35,6 +42,8 @@ def _run_qt(initial_xyzin: Path | None) -> int:
         QFileDialog,
         QHBoxLayout,
         QLabel,
+        QComboBox,
+        QLineEdit,
         QListWidget,
         QMainWindow,
         QMessageBox,
@@ -51,8 +60,10 @@ def _run_qt(initial_xyzin: Path | None) -> int:
         def __init__(self, xyzin: Path | None = None) -> None:
             super().__init__()
             self.controller = OracleDashboardController(xyzin)
+            self.structure_controller = OracleStructureController(xyzin)
             self.process: QProcess | None = None
             self.current_actions: tuple[DashboardAction, ...] = ()
+            self.pending_xyzin_after_run: Path | None = None
             self.setWindowTitle("ORACLE Project Dashboard")
             self.resize(1280, 780)
 
@@ -93,6 +104,8 @@ def _run_qt(initial_xyzin: Path | None) -> int:
             self.action_table.itemDoubleClicked.connect(self.run_selected_action)
             actions_layout.addWidget(self.action_table)
             tabs.addTab(actions_tab, "Actions")
+            structure_tab = self._build_structure_tab()
+            tabs.addTab(structure_tab, "Structure")
             layout.addWidget(tabs, stretch=2)
 
             self.details = QTextEdit()
@@ -116,12 +129,14 @@ def _run_qt(initial_xyzin: Path | None) -> int:
             )
             if path:
                 self.controller.set_xyzin(Path(path))
+                self.structure_controller.set_xyzin(Path(path))
                 self.refresh()
 
         def refresh(self) -> None:
             self.workflow_list.clear()
             self.section_table.setRowCount(0)
             self.action_table.setRowCount(0)
+            self._clear_structure_tables()
             if self.controller.xyzin is None:
                 self.path_label.setText("No ORACLE project loaded")
                 self.details.setPlainText(
@@ -134,6 +149,8 @@ def _run_qt(initial_xyzin: Path | None) -> int:
                 return
 
             state = load_oracle_project_state(self.controller.xyzin)
+            self.structure_controller.set_xyzin(state.xyzin)
+            self.structure_output_path.setText(str(state.xyzin))
             self.path_label.setText(str(state.xyzin))
             for workflow in state.workflows:
                 self.workflow_list.addItem(
@@ -163,6 +180,7 @@ def _run_qt(initial_xyzin: Path | None) -> int:
             self.run_button.setEnabled(
                 self.process is None and any(action.enabled for action in self.current_actions)
             )
+            self._populate_structure_tables(state.xyzin)
 
         def show_workflow_details(self, _item=None) -> None:
             if self.controller.xyzin is None:
@@ -239,17 +257,21 @@ def _run_qt(initial_xyzin: Path | None) -> int:
             self._start_process(action)
 
         def _start_process(self, action: DashboardAction) -> None:
-            self.controller.log(f"$ {action.shell_line}")
+            self._start_command(action.command, action.label)
+
+        def _start_command(self, command: OracleGuiCommand, label: str) -> None:
+            prepared = self.controller.prepare_command(command)
+            self.controller.log(f"$ {prepared.shell_line()}")
             self.log_output.setPlainText("\n".join(self.controller.log_lines))
             process = QProcess(self)
-            if action.command.cwd is not None:
-                process.setWorkingDirectory(str(action.command.cwd))
-            process.setProgram(action.command.argv[0])
-            process.setArguments(list(action.command.argv[1:]))
+            if prepared.cwd is not None:
+                process.setWorkingDirectory(str(prepared.cwd))
+            process.setProgram(prepared.argv[0])
+            process.setArguments(list(prepared.argv[1:]))
             process.readyReadStandardOutput.connect(self._read_process_stdout)
             process.readyReadStandardError.connect(self._read_process_stderr)
-            process.errorOccurred.connect(lambda error: self._process_error(action, error))
-            process.finished.connect(lambda code, _status: self._process_finished(action, code))
+            process.errorOccurred.connect(lambda error: self._process_error(label, error))
+            process.finished.connect(lambda code, _status: self._process_finished(label, code))
             self.process = process
             self.run_button.setEnabled(False)
             process.start()
@@ -268,16 +290,161 @@ def _run_qt(initial_xyzin: Path | None) -> int:
             self.controller.log(text.rstrip())
             self.log_output.setPlainText("\n".join(self.controller.log_lines))
 
-        def _process_finished(self, action: DashboardAction, code: int) -> None:
-            self.controller.log(f"[exit {int(code)}] {action.label}")
+        def _process_finished(self, label: str, code: int) -> None:
+            self.controller.log(f"[exit {int(code)}] {label}")
             self.process = None
+            if self.pending_xyzin_after_run is not None and self.pending_xyzin_after_run.exists():
+                self.controller.set_xyzin(self.pending_xyzin_after_run)
+                self.structure_controller.set_xyzin(self.pending_xyzin_after_run)
+            self.pending_xyzin_after_run = None
             self.refresh()
 
-        def _process_error(self, action: DashboardAction, error) -> None:
-            self.controller.log(f"[process error {int(error)}] {action.label}")
+        def _process_error(self, label: str, error) -> None:
+            self.controller.log(f"[process error {int(error)}] {label}")
             if self.process is not None and self.process.state() == QProcess.NotRunning:
                 self.process = None
                 self.refresh()
+
+        def _build_structure_tab(self) -> QWidget:
+            tab = QWidget()
+            layout = QVBoxLayout(tab)
+
+            source_row = QHBoxLayout()
+            source_row.addWidget(QLabel("Source"))
+            self.structure_source_path = QLineEdit()
+            browse_source = QPushButton("Browse")
+            browse_source.clicked.connect(self.browse_structure_source)
+            source_row.addWidget(self.structure_source_path, stretch=1)
+            source_row.addWidget(browse_source)
+            layout.addLayout(source_row)
+
+            output_row = QHBoxLayout()
+            output_row.addWidget(QLabel("Output xyzin"))
+            self.structure_output_path = QLineEdit()
+            browse_output = QPushButton("Save As")
+            browse_output.clicked.connect(self.browse_structure_output)
+            output_row.addWidget(self.structure_output_path, stretch=1)
+            output_row.addWidget(browse_output)
+            layout.addLayout(output_row)
+
+            controls = QHBoxLayout()
+            self.structure_source_kind = QComboBox()
+            self.structure_source_kind.addItems(("auto", "xyz", "enriched_xyz", "gaussian", "molpro", "mrcc"))
+            preprocess_button = QPushButton("Preprocess")
+            preprocess_button.clicked.connect(self.run_structure_preprocess)
+            avogadro_button = QPushButton("Avogadro")
+            avogadro_button.clicked.connect(self.run_structure_avogadro)
+            fragments_button = QPushButton("Build Fragments")
+            fragments_button.clicked.connect(self.run_structure_fragments)
+            controls.addWidget(QLabel("Kind"))
+            controls.addWidget(self.structure_source_kind)
+            controls.addWidget(preprocess_button)
+            controls.addWidget(avogadro_button)
+            controls.addWidget(fragments_button)
+            controls.addStretch(1)
+            layout.addLayout(controls)
+
+            self.structure_table_tabs = QTabWidget()
+            self.structure_bond_table = QTableWidget(0, 2)
+            self.structure_ring_table = QTableWidget(0, 3)
+            self.structure_synthon_table = QTableWidget(0, 8)
+            self.structure_fragment_table = QTableWidget(0, 5)
+            self.structure_table_tabs.addTab(self.structure_bond_table, "Bonds")
+            self.structure_table_tabs.addTab(self.structure_ring_table, "Rings")
+            self.structure_table_tabs.addTab(self.structure_synthon_table, "Synthons")
+            self.structure_table_tabs.addTab(self.structure_fragment_table, "Fragments")
+            layout.addWidget(self.structure_table_tabs, stretch=1)
+            return tab
+
+        def browse_structure_source(self) -> None:
+            path, _selected = QFileDialog.getOpenFileName(
+                self,
+                "Import molecule source",
+                str(Path.cwd()),
+                "Molecule sources (*.xyz *.xyzin *.gjf *.gau *.com *.inp *.log *.out *.zmat *.zmt);;All files (*)",
+            )
+            if not path:
+                return
+            source = Path(path)
+            self.structure_source_path.setText(str(source))
+            if not self.structure_output_path.text().strip():
+                self.structure_output_path.setText(str(default_preprocess_output(source)))
+
+        def browse_structure_output(self) -> None:
+            path, _selected = QFileDialog.getSaveFileName(
+                self,
+                "Write ORACLE xyzin",
+                self.structure_output_path.text().strip() or str(Path.cwd() / "molecule.xyzin"),
+                "ORACLE xyzin (*.xyzin *.xyz);;All files (*)",
+            )
+            if path:
+                self.structure_output_path.setText(path)
+
+        def run_structure_preprocess(self) -> None:
+            source_text = self.structure_source_path.text().strip()
+            output_text = self.structure_output_path.text().strip()
+            if not source_text or not output_text:
+                QMessageBox.warning(self, "ORACLE-Babel", "Select source and output files first.")
+                return
+            if self.process is not None:
+                QMessageBox.information(self, "ORACLE", "A command is already running.")
+                return
+            output = Path(output_text)
+            command = self.structure_controller.preprocess_command(
+                Path(source_text),
+                output,
+                source_kind=self.structure_source_kind.currentText(),
+            )
+            self.pending_xyzin_after_run = output
+            self._start_command(command, command.label)
+
+        def run_structure_avogadro(self) -> None:
+            if self.controller.xyzin is None:
+                QMessageBox.warning(self, "Avogadro", "Open or preprocess an ORACLE xyzin first.")
+                return
+            if self.process is not None:
+                QMessageBox.information(self, "ORACLE", "A command is already running.")
+                return
+            self.structure_controller.set_xyzin(self.controller.xyzin)
+            command = self.structure_controller.avogadro_command()
+            self._start_command(command, command.label)
+
+        def run_structure_fragments(self) -> None:
+            if self.controller.xyzin is None:
+                QMessageBox.warning(self, "Fragments", "Open or preprocess an ORACLE xyzin first.")
+                return
+            if self.process is not None:
+                QMessageBox.information(self, "ORACLE", "A command is already running.")
+                return
+            self.structure_controller.set_xyzin(self.controller.xyzin)
+            command = self.structure_controller.fragments_command("build")
+            self._start_command(command, command.label)
+
+        def _populate_structure_tables(self, xyzin: Path) -> None:
+            state = load_structure_gui_state(xyzin)
+            self._fill_table(self.structure_bond_table, state.topology_bonds)
+            self._fill_table(self.structure_ring_table, state.topology_rings)
+            self._fill_table(self.structure_synthon_table, state.synthons)
+            self._fill_table(self.structure_fragment_table, state.fragments)
+
+        def _clear_structure_tables(self) -> None:
+            for table in (
+                getattr(self, "structure_bond_table", None),
+                getattr(self, "structure_ring_table", None),
+                getattr(self, "structure_synthon_table", None),
+                getattr(self, "structure_fragment_table", None),
+            ):
+                if table is not None:
+                    table.setRowCount(0)
+
+        def _fill_table(self, widget: QTableWidget, table: StructureTable) -> None:
+            widget.setColumnCount(len(table.columns))
+            widget.setHorizontalHeaderLabels(table.columns)
+            widget.setRowCount(len(table.rows))
+            for row_index, row in enumerate(table.rows):
+                for column_index, value in enumerate(row):
+                    widget.setItem(row_index, column_index, QTableWidgetItem(str(value)))
+            widget.resizeColumnsToContents()
 
     app = QApplication([])
     window = OracleDashboardWindow(initial_xyzin)

@@ -11,6 +11,7 @@ from oracle_gui import (
     ORACLE_GUI_WINDOWS,
     OracleDashboardController,
     OracleGuiCommand,
+    OracleStructureController,
     WorkflowStatus,
     all_known_sections,
     avogadro_command,
@@ -20,6 +21,7 @@ from oracle_gui import (
     gicforge_build_command,
     load_dvr_gui_state,
     load_oracle_project_state,
+    load_structure_gui_state,
     load_vpt2_vci_gui_state,
     molden_command,
     preprocess_command,
@@ -258,6 +260,70 @@ def test_dashboard_controller_runs_action_and_records_log(tmp_path, monkeypatch)
     assert "stdout" in controller.log_lines
     assert "stderr" in controller.log_lines
     assert controller.log_lines[-1] == "[exit 0] Fake action"
+
+
+def test_structure_gui_state_reads_topology_synthons_and_fragments(tmp_path):
+    xyzin = tmp_path / "dimer.xyzin"
+    xyzin.write_text(
+        "\n".join(
+            [
+                "3",
+                "fragmented",
+                "O 0.0 0.0 0.0",
+                "H 0.0 0.0 0.9",
+                "Na 3.0 0.0 0.0",
+                "",
+                "#TOPOLOGY",
+                "SCHEMA oracle.xyz.topology.v1",
+                "INDEXING ATOMS=ONE_BASED",
+                "[BONDS]",
+                "1 2",
+                "[RINGS]",
+                "1 SIZE=3 ATOMS=1 2 3",
+                "",
+                "#SYNTHONS",
+                "SCHEMA oracle.xyz.synthons.v1",
+                "INDEXING ATOMS=ONE_BASED",
+                "COLUMNS ATOM Z ZEFF CHARGE COVALENCY DELOCALIZATION STRAIN SIGNATURE",
+                "1 O 7.5 -0.4 2.0 0.1 0.0 O,water",
+                "2 H 1.1 0.2 1.0 0.0 0.0 H,water",
+                "",
+                "#FRAGMENTS",
+                "SCHEMA oracle.xyz.fragments.v1",
+                "STATUS BUILT",
+                "INDEXING ATOMS=ONE_BASED",
+                "[FRAGMENTS]",
+                "F001 LABEL=component_1 SIZE=2 ATOMS=1,2",
+                "[CENTERS]",
+                "F001 X=0.0 Y=0.0 Z=0.45",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    state = load_structure_gui_state(xyzin)
+
+    assert state.exists
+    assert state.topology_bonds.rows == (("1", "2"),)
+    assert state.topology_rings.rows == (("1", "3", "1 2 3"),)
+    assert state.synthons.rows[0] == ("1", "O", "7.5", "-0.4", "2.0", "0.1", "0.0", "O,water")
+    assert state.fragments.rows == (("F001", "component_1", "2", "1,2", "0.0, 0.0, 0.45"),)
+
+
+def test_structure_controller_builds_babel_and_fragment_commands(tmp_path):
+    source = tmp_path / "water.xyz"
+    xyzin = tmp_path / "water.xyzin"
+    controller = OracleStructureController(xyzin)
+
+    preprocess = controller.preprocess_command(source, source_kind="xyz")
+    fragments = controller.fragments_command("build")
+
+    assert preprocess.argv[-2:] == ("--source-kind", "xyz")
+    assert preprocess.argv[3:6] == ("babel", "preprocess", str(source))
+    assert preprocess.argv[6] == str(source.with_suffix(".xyzin"))
+    assert fragments.argv[-3:] == ("fragments", "build", str(xyzin))
+    assert fragments.required_sections == ("TOPOLOGY", "SYNTHONS")
 
 
 def test_gui_window_specs_cover_primary_oracle_workflows():

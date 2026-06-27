@@ -216,6 +216,9 @@ class OracleDashboardController:
     def clear_log(self) -> None:
         self.log_lines.clear()
 
+    def prepare_command(self, command: OracleGuiCommand) -> OracleGuiCommand:
+        return self._with_default_cwd(command)
+
     def _with_default_cwd(self, command: OracleGuiCommand) -> OracleGuiCommand:
         if command.cwd is not None:
             return command

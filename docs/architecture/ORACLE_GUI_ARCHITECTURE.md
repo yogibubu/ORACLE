@@ -117,3 +117,19 @@ rovibrational summary, Thermo, VPT2/VCI collection and DVR collection. Actions
 that need additional file choices, such as ORACLE-Babel import or FCHK
 promotion, remain command specifications until their dedicated windows provide
 the required file selectors.
+
+## Structure And ORACLE-Babel Tab
+
+The first dedicated workflow tab is the Structure tab inside the dashboard. It
+uses `oracle_gui.structure` and provides:
+
+- source and output file selectors for ORACLE-Babel preprocessing;
+- source-kind selection passed directly to `oracle babel preprocess`;
+- Avogadro launch for the active `xyzin`;
+- fragment build through the shared `oracle fragments build` CLI;
+- read-only tables for saved `#TOPOLOGY` bonds/rings, `#SYNTHONS` rows and
+  built `#FRAGMENTS`.
+
+The Structure tab only displays saved ORACLE sections. It must not rediscover
+bonds, rings, synthons or fragments in GUI code. Any refresh of molecular
+state must go through `oracle-chem`, `oracle-babel` or `oracle-fragments`.
