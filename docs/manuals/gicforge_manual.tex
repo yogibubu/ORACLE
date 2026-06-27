@@ -1,6 +1,7 @@
 \documentclass[11pt]{article}
 
 \usepackage[margin=1in]{geometry}
+\usepackage{cmap}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{booktabs}
@@ -14,7 +15,7 @@
 
 \hypersetup{
   hidelinks,
-  pdftitle={GICForge Manual},
+  pdftitle={NEO / GICForge Manual},
   pdfauthor={ORACLE Development Team}
 }
 
@@ -45,8 +46,8 @@
 \newcommand{\gicsym}{\texttt{gicsym}}
 \newcommand{\angstrom}{\text{\AA}}
 
-\title{\textbf{GICForge Manual}\\
-\large Non-redundant generalized internal coordinates and symmetry-adapted coordinate bases in ORACLE}
+\title{\textbf{NEO / GICForge Manual}\\
+\large Non-redundant generalized internal coordinates and symmetry-adapted coordinate bases in MATRIX}
 \author{ORACLE Development Notes}
 \date{\today}
 
@@ -54,7 +55,8 @@
 \maketitle
 
 \begin{abstract}
-\program{} is the \oracle{} geometry backend that converts Cartesian molecular
+NEO, currently exposed through the compatible \program{} command name, is the
+\oracle{} geometry backend that converts Cartesian molecular
 structures into non-redundant generalized internal coordinates (GICs), optional
 symmetry-adapted GICs, and symmetry-adapted Cartesian coordinates.  It is used
 as a library service by MORPHEUS, SEfit and future geometry optimizers, and can
@@ -68,7 +70,7 @@ files, Python/Fortran identity checks and recommended regression tests.
 
 \section{Purpose}
 
-\program{} has one responsibility: starting from a Cartesian molecular
+NEO/GICForge has one responsibility: starting from a Cartesian molecular
 structure, it constructs a chemically interpretable, rank-complete coordinate
 basis.  The basis can be used directly as a Gaussian ReadGIC block, frozen as a
 machine-readable \oracle{} schema, evaluated analytically on later Cartesian

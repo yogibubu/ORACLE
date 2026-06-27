@@ -1,17 +1,13 @@
 # MATRIX TODO
 
-## Current Release Completion
+## Current Release Maintenance
 
-- Finish user-facing manuals for the implemented tools before calling MATRIX
-  complete at this release level.
-- Keep the manuals focused on the tools that already have tested command-line
-  and GUI workflows: ORACLE-Babel/preprocessing, NEO/GICForge, GF/PED,
-  MORPHEUS/SEFit, rotational spectroscopy/WMS-Rot, vibrational spectroscopy,
-  thermo/kinetics tables, VPT2/VCI, DVR, QM adapters and the ORACLE GUI.
-- Each manual must document the shared xyzin sections consumed and produced by
-  the tool, standalone command usage, GUI workflow usage, publication exports,
-  required external programs and the regression fixtures that define expected
-  behavior.
+- The first release is documented in `docs/architecture/MATRIX_FIRST_RELEASE_CLOSURE.md`.
+- Keep the user-facing manuals aligned with implemented command-line and GUI
+  workflows: ORACLE-Babel/preprocessing, NEO/GICForge, GF/PED, MORPHEUS/SEFit,
+  rotational spectroscopy/WMS-Rot, vibrational spectroscopy, thermo tables,
+  VPT2/VCI, DVR, QM adapters and the ORACLE GUI.
+- When code changes, update the relevant manual in the same commit as tests.
 - Do not move parsing, topology, diagonalization or plotting logic into manual
   examples. Examples must use the public MATRIX commands and shared libraries.
 
@@ -30,6 +26,35 @@
 - Any next-release fragment/nano-LEGO/TRINITY implementation must consume the
   existing topology, synthon, GIC and xyzin contracts instead of introducing
   private parsers or molecular graph logic.
+
+## Post-First-Release Scientific Roadmap
+
+- Add PySCF as an optional electronic-structure backend with MATRIX-managed
+  installation notes, job launcher, result normalization and analysis adapters.
+  PySCF outputs must be promoted into the same shared QM/electronic sections
+  used by Gaussian, Molpro and MRCC.
+- Add VSCF for harmonically coupled anharmonic oscillators in local modes. The
+  implementation should reuse existing GF/GIC force constants, QFF/DVR
+  contracts and the shared diagonalizer instead of introducing private
+  vibrational data structures.
+- Add vibronic spectroscopy workflows, including electronic-transition,
+  normal-mode and Franck-Condon/Herzberg-Teller data contracts, with plotting
+  and publication exports in the electronic/vibrational workbenches.
+- Add ionization-potential and electron-affinity workflows. Supported modes
+  should include vertical and adiabatic IP/EA, spin/state bookkeeping,
+  provenance of charge states and connection to electronic spectra.
+- Add online help and in-program manuals for the most important tools. At
+  minimum, `oracle <tool> --help`, GUI help panels and manual links should be
+  generated from the same tool contract metadata used by the CLI and docs.
+- Add run manifests for every multi-step workflow so each publication figure or
+  table can be traced back to input sections, command-line options, external
+  executables and MATRIX version.
+- Add a release-quality benchmark corpus for end-to-end workflows, including
+  small fast fixtures for CI and larger demanding molecules for periodic
+  numerical audits.
+- Add packaging/versioning policy for the MATRIX transition, including final
+  command aliases, deprecation messages for ORACLE/Merlino names and a
+  reproducible environment lock for optional heavy dependencies.
 
 ## WMS-Rot Homologation
 

@@ -1,0 +1,410 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{cmap}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{amsmath}
+
+\hypersetup{
+  hidelinks,
+  pdftitle={MATRIX First Release Manual},
+  pdfauthor={MATRIX Development Team}
+}
+
+\definecolor{MatrixBlue}{HTML}{245C73}
+\definecolor{MatrixSlate}{HTML}{4A5561}
+\definecolor{MatrixGold}{HTML}{C88A2D}
+\definecolor{MatrixBg}{HTML}{F7F8F6}
+\emergencystretch=2em
+
+\lstdefinestyle{matrix}{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+  frame=single,
+  rulecolor=\color{MatrixSlate!45},
+  backgroundcolor=\color{MatrixBg},
+  xleftmargin=0.5em,
+  xrightmargin=0.5em
+}
+
+\newcommand{\framework}{\texttt{MATRIX}}
+\newcommand{\oracle}{\texttt{ORACLE}}
+\newcommand{\xyzin}{\texttt{xyzin}}
+\newcommand{\sectionname}[1]{\texttt{\##1}}
+
+\title{\textbf{MATRIX First Release Manual}\\
+\large Operational guide for the implemented ORACLE/MATRIX tools}
+\author{MATRIX Development Notes}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This manual defines the first release boundary of \framework{} and gives the
+operational contract for the implemented tools.  \framework{} is the framework:
+each tool reads and writes shared enriched \xyzin{} sections, uses shared
+libraries for repeated tasks, and can run independently when its required
+sections are already present.  Fragment search, nano-LEGO assembly and the
+production TRINITY optimizer are reserved for the next release; this release is
+closed by the preprocessing, GIC, GF/PED, MORPHEUS, rovibrational, anharmonic,
+DVR, QM-adapter and GUI workflows documented here.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{Release Boundary}
+
+The first \framework{} release is a refactored, documented and testable
+replacement for the corresponding implemented parts of Merlino/ORACLE.  The
+release is complete when the following conditions hold:
+
+\begin{itemize}
+  \item every implemented scientific tool can run from the command line using
+        only its declared \xyzin{} sections;
+  \item the GUI launches the same public commands and does not contain private
+        parsers or scientific algorithms;
+  \item all external file formats enter through one adapter per format;
+  \item the same libraries are used for geometry, topology, symmetry,
+        normal-mode data, diagonalization and publication exports;
+  \item manuals identify consumed sections, produced sections, standalone
+        commands, GUI placement and regression tests.
+\end{itemize}
+
+The next release owns robust fragment search, nano-LEGO fragmentation and
+assembly, LCB25 fragment indexing, the production TRINITY external
+energy/gradient optimization loop, PySCF launch/analysis adapters, VSCF for
+local anharmonic oscillators, vibronic spectroscopy, ionization potentials,
+electron affinities and online help/manual generation.  The current release
+keeps the fragment and TRINITY schemas, command skeletons and GUI entry points
+so downstream design does not need another reorganization.
+
+\section{Shared Container Contract}
+
+The central object is the enriched \xyzin{} file.  Each tool appends or updates
+sections instead of passing private scratch formats between modules.  A tool
+must not reparse Gaussian, Molpro, MRCC, SMILES or geometry data if the
+corresponding shared section is already present.
+
+\begin{longtable}{
+  >{\raggedright\arraybackslash}p{0.25\linewidth}
+  >{\raggedright\arraybackslash}p{0.33\linewidth}
+  >{\raggedright\arraybackslash}p{0.32\linewidth}}
+\toprule
+Section & Owner & Main consumers \\
+\midrule
+\sectionname{BASIC} & ORACLE-Babel / chemistry layer & all molecular tools \\
+\sectionname{SYMMETRY} & ORACLE-Babel & NEO/GICForge, GUI \\
+\sectionname{TOPOLOGY} & ORACLE-Babel & synthons, fragments, GICs \\
+\sectionname{SYNTHONS} & ORACLE-Babel & GF/PED, MORPHEUS, future fragments \\
+\sectionname{GIC}, \sectionname{SYCART} & NEO/GICForge & GF/PED, MORPHEUS, TRINITY \\
+\sectionname{CARTESIAN\_HESSIAN} & QM adapters & GF/PED, diagnostics \\
+\sectionname{NORMAL\_MODES} & QM adapters & vibrational comparison, hybrid spectra \\
+\sectionname{QFF} & QM adapters & VPT2/VCI \\
+\sectionname{ROTATIONAL} & rovib/QM adapters & WMS-Rot, thermo \\
+\sectionname{VIBRATIONAL} & rovib/QM adapters & spectra, thermo, DOS \\
+\sectionname{GF\_PED} & GF/PED & GUI, vibrational workbench \\
+\sectionname{MORPHEUS} & MORPHEUS/SEFit & GUI, reports \\
+\sectionname{THERMO} & thermo & publication exports \\
+\sectionname{VPT2\_VCI} & VPT2/VCI & vibrational workbench \\
+\sectionname{DVR} & DVR & GUI, post-run analysis \\
+\bottomrule
+\end{longtable}
+
+The practical rule is simple: if two tools need the same information, that
+information belongs in a shared section and in a shared library, not in two
+tool-local parsers.
+
+\section{ORACLE-Babel and Preprocessing}
+
+ORACLE-Babel is the preprocessing gate.  It obtains an initial Cartesian
+geometry by reading an XYZ file directly, importing from a supported QM format,
+or building from SMILES through RDKit.  It then performs symmetry detection,
+topology analysis, synthon typing and validation once, and writes the results
+back to the same \xyzin{} container.
+
+\begin{lstlisting}[style=matrix]
+oracle babel preprocess input.xyz molecule.xyzin
+oracle babel preprocess smiles.txt molecule.xyzin --source-format smiles
+oracle validate molecule.xyzin
+\end{lstlisting}
+
+The output sections are normally \sectionname{SOURCE}, \sectionname{BASIC},
+\sectionname{SYMMETRY}, \sectionname{TOPOLOGY} and \sectionname{SYNTHONS}.
+Downstream tools must consume those sections rather than re-detecting bonds,
+rings, point groups or atom classes.
+
+Avogadro remains the preferred manual 3D inspection and editing tool.  After
+the user accepts the molecular structure, the GUI displays the 2D molecular
+view and all later tasks work from the enriched \xyzin{} state.
+
+\section{QM Adapters}
+
+QM adapters are the only code allowed to understand external program outputs.
+Gaussian, Molpro and MRCC data are promoted into shared sections.  Scientific
+tools consume these sections and never scan log files privately.
+
+\begin{lstlisting}[style=matrix]
+oracle gaussian promote-fchk calc.fchk molecule.xyzin
+oracle gaussian promote-rovib calc.log molecule.xyzin
+oracle gaussian promote-electronic calc.log molecule.xyzin
+oracle molpro promote-output molpro.out molecule.xyzin
+oracle mrcc promote-output mrcc.out molecule.xyzin
+\end{lstlisting}
+
+The main promoted sections are \sectionname{CARTESIAN\_HESSIAN},
+\sectionname{NORMAL\_MODES}, \sectionname{QFF}, \sectionname{ROTATIONAL},
+\sectionname{VIBRATIONAL}, \sectionname{DELTABVIB},
+\sectionname{ELECTRONIC}, \sectionname{TRANSITIONS} and
+\sectionname{ORBITALS}.  Orbital files are passed to Molden, Avogadro or
+MOrbVis-compatible viewers through the GUI command layer.
+
+\section{NEO / GICForge}
+
+The implemented GIC tool is still exposed as \texttt{gicforge} in the command
+line, with \texttt{neo} as an alias.  The planned tool name is NEO,
+``Nonredundant Equivariant Orthogonalizer''.  The specialist manual
+\texttt{gicforge\_manual.pdf} remains the detailed reference for primitive
+construction, ring puckering, symmetry projectors, special fragment-aware
+coordinates, B-matrix construction and Python/Fortran parity.
+
+\begin{lstlisting}[style=matrix]
+oracle gicforge molecule.xyzin
+oracle neo molecule.xyzin
+oracle gic-bmatrix oracle.gic.definition.json geometry.xyz
+\end{lstlisting}
+
+NEO consumes \sectionname{VALIDATION}, \sectionname{SYMMETRY},
+\sectionname{TOPOLOGY}, \sectionname{SYNTHONS} and optional
+\sectionname{FRAGMENTS}.  It produces \sectionname{GIC} and
+\sectionname{SYCART}.  Symmetry-adapted GIC labels begin with the irrep label;
+totally symmetric blocks can therefore be selected directly in optimization or
+least-squares workflows.
+
+\section{GF/PED}
+
+GF/PED consumes a frozen GIC basis and a Cartesian Hessian.  The specialist
+manual \texttt{gf\_manual.pdf} is the detailed reference for Wilson GF theory,
+internal force constants, PEDs, local force-field approximations and
+Pulay-style scaling of force constants in GIC space.
+
+\begin{lstlisting}[style=matrix]
+oracle gf --xyzin molecule.xyzin --out gf.report
+oracle gf --xyzin molecule.xyzin --csv-dir gf_tables
+\end{lstlisting}
+
+The module writes \sectionname{GF\_PED}.  It can subtract electrostatic and van
+der Waals non-bonded terms before a local force-field model is built.  Frequency
+scaling is not a MATRIX vibrational-spectrum operation; scaling belongs here,
+at the force-constant level, where diagonal class scaling and geometric-mean
+off-diagonal scaling are chemically meaningful.
+
+\section{MORPHEUS / SEFit}
+
+MORPHEUS performs semiexperimental geometry refinement.  It includes the SEFit
+single-structure workflow and the multi-structure class-correction workflows.
+The detailed manuals are \texttt{morpheus\_manual.pdf} and
+\texttt{multistructure\_manual.pdf}.
+
+\begin{lstlisting}[style=matrix]
+oracle semiexp --xyzin molecule.xyzin --job job.toml --outdir run
+oracle semiexp-ensemble ensemble.toml --outdir ensemble_run
+oracle semiexp-benchmark snapshot.json --outdir benchmark
+\end{lstlisting}
+
+MORPHEUS consumes isotopologue data and optional \sectionname{GIC},
+\sectionname{SYCART} or \sectionname{MORPHEUS} state.  It writes
+\sectionname{MORPHEUS}, diagnostics, CSV tables and paper-oriented summaries.
+The local \texttt{se\_geometries} library is an implemented support library;
+large-scale fragment search and nano-LEGO assembly remain next-release work.
+
+\section{Rotational Spectroscopy / WMS-Rot}
+
+The rotational workbench uses the local WMS-Rot Hamiltonian engine imported
+from the group web service.  MATRIX does not reimplement the Hamiltonian.  It
+normalizes constants, dipoles and vibration-rotation corrections through
+\sectionname{ROTATIONAL}, \sectionname{VIBRATIONAL} and
+\sectionname{DELTABVIB}, then calls the local engine.
+
+\begin{lstlisting}[style=matrix]
+oracle rovib summarize molecule.xyzin
+oracle rovib wmsrot-input molecule.xyzin --out wmsrot.in
+oracle rovib wmsrot-run molecule.xyzin --out rotational_lines.csv
+\end{lstlisting}
+
+The run writes line lists suitable for plotting and publication export.  Future
+database comparison should query microwave/submillimeter catalogs through a
+shared experimental-spectrum adapter, not from GUI-local code.  The planned
+catalog targets are CDMS, JPL and Splatalogue, with molecule identifiers,
+frequency windows, isotopic species and provenance saved in export metadata.
+
+\section{Vibrational Spectroscopy}
+
+The vibrational workbench plots IR, Raman, VCD and ROA spectra when the
+corresponding harmonic or anharmonic data are present in
+\sectionname{VIBRATIONAL}.  It can compare spectra from one or two \xyzin{}
+files.  For ordinary IR and Raman comparisons, the second trace is plotted with
+negative intensity.  VCD and ROA are signed observables and are therefore not
+mirrored.
+
+\begin{lstlisting}[style=matrix]
+oracle rovib vib-spectrum molecule.xyzin --observable IR \
+  --source harmonic --csv ir.csv --plot ir.svg
+
+oracle rovib vib-compare level1.xyzin level2.xyzin \
+  --observable IR --first-source harmonic --second-source anharmonic \
+  --csv compare.csv --plot compare.svg
+\end{lstlisting}
+
+Hybrid spectra are implemented as
+\[
+  \nu_\mathrm{hybrid}
+  =
+  \nu_\mathrm{harm}(\mathrm{level1})
+  +
+  \left[
+    \nu_\mathrm{anh}(\mathrm{level2})
+    -
+    \nu_\mathrm{harm}(\mathrm{level2})
+  \right].
+\]
+Before applying the correction, MATRIX reads \sectionname{NORMAL\_MODES} from
+both files and performs a global assignment that maximizes the absolute
+normal-mode overlap.  If any assigned overlap is below the threshold, the
+hybrid spectrum is rejected.
+
+\begin{lstlisting}[style=matrix]
+oracle rovib vib-spectrum level1.xyzin --source hybrid \
+  --level2-xyzin level2.xyzin --observable IR \
+  --csv hybrid.csv --plot hybrid.svg \
+  --mode-match-csv mode_matches.csv --min-mode-overlap 0.70
+\end{lstlisting}
+
+Experimental NIST IR spectra are fetched automatically only when the NIST
+JCAMP record declares a gas-phase state.  Condensed-phase records, missing
+records and unparseable records are returned to the GUI as states requiring
+user instructions.
+
+\begin{lstlisting}[style=matrix]
+oracle rovib nist-ir 74-82-8 --out methane_nist_ir.csv
+\end{lstlisting}
+
+\section{Thermochemistry and Kinetics}
+
+The implemented thermochemistry tool consumes normalized molecular, rotational
+and vibrational sections and writes \sectionname{THERMO}.  The GUI
+Thermo/Kinetics workbench displays the generated thermochemical tables and
+rovibrational density-of-states outputs.  Production kinetics models and
+\sectionname{KINETICS} are a future extension boundary, not a blocker for this
+release.
+
+\begin{lstlisting}[style=matrix]
+oracle thermo molecule.xyzin --out thermo.report
+oracle rovib dos molecule.xyzin --out dos_vib.dat
+oracle rovib dos-rovib molecule.xyzin --out dos_rovib.dat --q-out rovib_qt.dat
+\end{lstlisting}
+
+Publication exports should keep temperature, pressure, symmetry number,
+frequency set, rotational constants and data provenance in the table metadata.
+
+\section{VPT2 / VCI}
+
+The VPT2/VCI package consumes \sectionname{QFF}.  Gaussian FCHK or QFF text is
+only an adapter input; standalone operation reads the normalized \xyzin{}
+section.  Reports and CSV tables are attached to the vibrational workbench.
+
+\begin{lstlisting}[style=matrix]
+oracle vpt2-vci --xyzin molecule.xyzin --run-dir vpt2_run
+oracle vpt2-vci --xyzin molecule.xyzin --run-dir vci_run --model vci
+\end{lstlisting}
+
+VPT2/VCI uses the shared diagonalization policy where matrix diagonalization is
+the dominant cost.  GPU acceleration is delegated to the shared
+\texttt{oracle\_core.diagonalizer} layer when supported by the local machine.
+
+\section{DVR}
+
+DVR workflows prepare and run scan/path DVR calculations and then normalize the
+post-run outputs into the GUI state.  Large Hamiltonian diagonalizations are
+routed through the same shared diagonalizer used by other MATRIX modules.
+
+\begin{lstlisting}[style=matrix]
+oracle dvr prepare molecule.xyzin --scan-log scan.log --run-dir dvr_run
+oracle dvr run --xyzin molecule.xyzin --run-dir dvr_run
+oracle dvr status molecule.xyzin
+\end{lstlisting}
+
+The implemented GUI state is \sectionname{DVR}.  New DVR engines must not add
+private diagonalization wrappers; they should call the shared diagonalizer so
+CPU/GPU policy is controlled in one place.
+
+\section{ORACLE GUI}
+
+The GUI keeps the ORACLE name in the MATRIX framework.  Its planned expansion
+is ``Operator for Routing, Analysis, Control, Launch and Exploration''.  The
+GUI owns project state, command construction, missing-section guidance, file
+selection, external viewer launches and publication export orchestration.  It
+does not own scientific parsers or algorithms.
+
+\begin{lstlisting}[style=matrix]
+python -m oracle_gui molecule.xyzin
+oracle-gui molecule.xyzin
+\end{lstlisting}
+
+The first-release GUI exposes:
+
+\begin{itemize}
+  \item project dashboard and section readiness;
+  \item structure/synthon/topology inspection and Avogadro handoff;
+  \item NEO/GICForge, GF/PED, MORPHEUS, VPT2/VCI, DVR and TRINITY panels;
+  \item rotational, vibrational, electronic and thermochemistry workbenches;
+  \item orbital viewer launch through Molden, Avogadro or MOrbVis-compatible
+        external viewers;
+  \item missing-section suggestions that point to the owning adapter or tool.
+\end{itemize}
+
+\section{Regression and Release Tests}
+
+The release gate is the full test suite plus focused smoke tests for workflows
+that cross tool boundaries.  The minimum command is:
+
+\begin{lstlisting}[style=matrix]
+source scripts/oracle_env.sh
+oracle-set
+python -m ruff check packages tests
+python -m pytest -q
+\end{lstlisting}
+
+Important cross-module checks include:
+
+\begin{itemize}
+  \item Python/Fortran NEO/GICForge primitive, GIC and B-row agreement;
+  \item GF/PED writing and reading \sectionname{GF\_PED};
+  \item MORPHEUS standalone and multi-structure runs;
+  \item WMS-Rot local line-list generation;
+  \item vibrational mirror comparison and hybrid level1+level2 normal-mode
+        matching;
+  \item VPT2/VCI and DVR diagonalizer routing;
+  \item GUI command builders matching the public CLI.
+\end{itemize}
+
+\section{First Release Closure}
+
+With this manual and the specialist manuals present, the first \framework{}
+release can be declared closed when the repository is clean, the full tests
+pass, and the manuals are generated from source.  The next release then starts
+from a clear scope: robust fragments, nano-LEGO, LCB25 fragment indexing,
+production TRINITY optimization, PySCF adapters, VSCF, vibronic spectroscopy,
+IP/EA workflows and online help/manual generation.
+
+\end{document}
