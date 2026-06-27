@@ -5,21 +5,29 @@ from pathlib import Path
 import subprocess
 import sys
 
+from oracle_chem import preprocess_to_enriched_xyz, write_validation_section
 from oracle_dvr import DVRRequest, dvr_section_from_request, write_dvr_section
+from oracle_gicforge import write_gicforge_build_sections
 from oracle_gui import (
     DashboardActionTemplate,
     ORACLE_GUI_WINDOWS,
     OracleDashboardController,
+    OracleGICForgeController,
     OracleGuiCommand,
     OracleStructureController,
     WorkflowStatus,
     all_known_sections,
     avogadro_command,
+    default_gicforge_bmatrix_output,
+    default_gicforge_gaussian_output,
+    default_gicforge_report_output,
     dvr_gui_state_lines,
     gaussian_promote_fchk_command,
     gaussian_promote_rovib_command,
+    gicforge_gui_state_lines,
     gicforge_build_command,
     load_dvr_gui_state,
+    load_gicforge_gui_state,
     load_oracle_project_state,
     load_structure_gui_state,
     load_vpt2_vci_gui_state,
@@ -324,6 +332,83 @@ def test_structure_controller_builds_babel_and_fragment_commands(tmp_path):
     assert preprocess.argv[6] == str(source.with_suffix(".xyzin"))
     assert fragments.argv[-3:] == ("fragments", "build", str(xyzin))
     assert fragments.required_sections == ("TOPOLOGY", "SYNTHONS")
+
+
+def test_gicforge_gui_state_reports_missing_gic_without_crashing(tmp_path):
+    xyzin = tmp_path / "molecule.xyzin"
+    xyzin.write_text("1\nh\nH 0.0 0.0 0.0\n", encoding="utf-8")
+
+    state = load_gicforge_gui_state(xyzin)
+    lines = gicforge_gui_state_lines(state)
+
+    assert state.exists
+    assert not state.ready
+    assert "missing #GIC section" in state.messages
+    assert "ready: 0" in lines
+
+
+def test_gicforge_gui_state_reads_frozen_definition_tables(tmp_path):
+    source = tmp_path / "water.xyz"
+    xyzin = tmp_path / "water.xyzin"
+    source.write_text(
+        "\n".join(
+            [
+                "3",
+                "water",
+                "O 0.000000 0.000000 0.000000",
+                "H 0.000000 0.757000 0.586000",
+                "H 0.000000 -0.757000 0.586000",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    preprocess_to_enriched_xyz(source, xyzin)
+    write_validation_section(xyzin)
+    definition = write_gicforge_build_sections(xyzin, symmetrize=True, sycart=True)
+
+    state = load_gicforge_gui_state(xyzin)
+    lines = gicforge_gui_state_lines(state)
+
+    assert state.ready
+    assert state.summary.point_group == definition.point_group
+    assert state.summary.rank == definition.rank
+    assert state.summary.primitive_count == len(definition.primitives)
+    assert state.summary.gic_count == len(definition.gics)
+    assert state.primitives.rows
+    assert state.frozen_gics.rows
+    assert state.diagnostics.rows
+    assert "ready: 1" in lines
+    assert any(line.startswith("total symmetric irrep:") for line in lines)
+
+
+def test_gicforge_controller_builds_dedicated_commands(tmp_path):
+    xyzin = tmp_path / "molecule.xyzin"
+    controller = OracleGICForgeController(xyzin)
+
+    build = controller.build_command(
+        symmetrize=False,
+        sycart=False,
+        improper_dihedrals=False,
+    )
+    report = controller.report_command(default_gicforge_report_output(xyzin))
+    bmatrix = controller.bmatrix_command(default_gicforge_bmatrix_output(xyzin))
+    gaussian = controller.gaussian_input_command(
+        default_gicforge_gaussian_output(xyzin),
+        route="#p b3lyp/def2svp",
+    )
+
+    assert build.argv[-1] == str(xyzin)
+    assert "--symmetrize" not in build.argv
+    assert "--sycart" not in build.argv
+    assert "--improper-dihedrals" not in build.argv
+    assert report.argv[-1].endswith(".gicforge_report.txt")
+    assert bmatrix.argv[-1].endswith(".gic_bmatrix.txt")
+    assert gaussian.argv[-3:] == (
+        str(default_gicforge_gaussian_output(xyzin)),
+        "--route",
+        "#p b3lyp/def2svp",
+    )
 
 
 def test_gui_window_specs_cover_primary_oracle_workflows():

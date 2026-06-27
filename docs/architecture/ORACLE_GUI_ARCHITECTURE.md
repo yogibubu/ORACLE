@@ -133,3 +133,21 @@ uses `oracle_gui.structure` and provides:
 The Structure tab only displays saved ORACLE sections. It must not rediscover
 bonds, rings, synthons or fragments in GUI code. Any refresh of molecular
 state must go through `oracle-chem`, `oracle-babel` or `oracle-fragments`.
+
+## GICForge Tab
+
+The GICForge tab uses `oracle_gui.gicforge` and exposes the coordinate workflow
+without duplicating GIC construction in Qt:
+
+- build GICs through `oracle gicforge build`, with explicit controls for
+  symmetrization, `#SYCART` generation and improper-dihedral out-of-plane mode;
+- write the GICForge report, evaluate the analytic B matrix and generate a
+  Gaussian input with the saved Gaussian GIC block;
+- display the frozen `#GIC` definition as read-only tables for primitives,
+  frozen GICs, symmetry projector groups and reduction/symmetry diagnostics.
+
+The tab reads `#GIC` with `oracle_gicforge.read_gic_definition_from_xyzin`.
+It must not construct primitives, symmetrize coordinates or evaluate B rows in
+GUI code. Those operations remain in `oracle-gicforge`, because the same
+utilities are required by optimizers and least-squares fitting at each geometry
+iteration.

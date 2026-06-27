@@ -5,6 +5,15 @@ from pathlib import Path
 
 from .commands import OracleGuiCommand
 from .dashboard import DashboardAction, OracleDashboardController
+from .gicforge import (
+    GICForgeTable,
+    OracleGICForgeController,
+    default_gicforge_bmatrix_output,
+    default_gicforge_gaussian_output,
+    default_gicforge_report_output,
+    gicforge_gui_state_lines,
+    load_gicforge_gui_state,
+)
 from .project import load_oracle_project_state
 from .structure import (
     OracleStructureController,
@@ -41,6 +50,7 @@ def _run_qt(initial_xyzin: Path | None) -> int:
         QApplication,
         QFileDialog,
         QHBoxLayout,
+        QCheckBox,
         QLabel,
         QComboBox,
         QLineEdit,
@@ -61,6 +71,7 @@ def _run_qt(initial_xyzin: Path | None) -> int:
             super().__init__()
             self.controller = OracleDashboardController(xyzin)
             self.structure_controller = OracleStructureController(xyzin)
+            self.gicforge_controller = OracleGICForgeController(xyzin)
             self.process: QProcess | None = None
             self.current_actions: tuple[DashboardAction, ...] = ()
             self.pending_xyzin_after_run: Path | None = None
@@ -106,6 +117,8 @@ def _run_qt(initial_xyzin: Path | None) -> int:
             tabs.addTab(actions_tab, "Actions")
             structure_tab = self._build_structure_tab()
             tabs.addTab(structure_tab, "Structure")
+            gicforge_tab = self._build_gicforge_tab()
+            tabs.addTab(gicforge_tab, "GICForge")
             layout.addWidget(tabs, stretch=2)
 
             self.details = QTextEdit()
@@ -130,6 +143,7 @@ def _run_qt(initial_xyzin: Path | None) -> int:
             if path:
                 self.controller.set_xyzin(Path(path))
                 self.structure_controller.set_xyzin(Path(path))
+                self.gicforge_controller.set_xyzin(Path(path))
                 self.refresh()
 
         def refresh(self) -> None:
@@ -137,8 +151,10 @@ def _run_qt(initial_xyzin: Path | None) -> int:
             self.section_table.setRowCount(0)
             self.action_table.setRowCount(0)
             self._clear_structure_tables()
+            self._clear_gicforge_tables()
             if self.controller.xyzin is None:
                 self.path_label.setText("No ORACLE project loaded")
+                self.gicforge_summary.setPlainText("No ORACLE project loaded")
                 self.details.setPlainText(
                     "\n".join(
                         f"{spec.title}: {spec.description}" for spec in ORACLE_GUI_WINDOWS
@@ -150,7 +166,9 @@ def _run_qt(initial_xyzin: Path | None) -> int:
 
             state = load_oracle_project_state(self.controller.xyzin)
             self.structure_controller.set_xyzin(state.xyzin)
+            self.gicforge_controller.set_xyzin(state.xyzin)
             self.structure_output_path.setText(str(state.xyzin))
+            self._set_default_gicforge_outputs(state.xyzin)
             self.path_label.setText(str(state.xyzin))
             for workflow in state.workflows:
                 self.workflow_list.addItem(
@@ -181,6 +199,7 @@ def _run_qt(initial_xyzin: Path | None) -> int:
                 self.process is None and any(action.enabled for action in self.current_actions)
             )
             self._populate_structure_tables(state.xyzin)
+            self._populate_gicforge_tables(state.xyzin)
 
         def show_workflow_details(self, _item=None) -> None:
             if self.controller.xyzin is None:
@@ -296,6 +315,7 @@ def _run_qt(initial_xyzin: Path | None) -> int:
             if self.pending_xyzin_after_run is not None and self.pending_xyzin_after_run.exists():
                 self.controller.set_xyzin(self.pending_xyzin_after_run)
                 self.structure_controller.set_xyzin(self.pending_xyzin_after_run)
+                self.gicforge_controller.set_xyzin(self.pending_xyzin_after_run)
             self.pending_xyzin_after_run = None
             self.refresh()
 
@@ -437,7 +457,221 @@ def _run_qt(initial_xyzin: Path | None) -> int:
                 if table is not None:
                     table.setRowCount(0)
 
-        def _fill_table(self, widget: QTableWidget, table: StructureTable) -> None:
+        def _build_gicforge_tab(self) -> QWidget:
+            tab = QWidget()
+            layout = QVBoxLayout(tab)
+
+            option_row = QHBoxLayout()
+            self.gicforge_symmetrize = QCheckBox("Symmetrize")
+            self.gicforge_symmetrize.setChecked(True)
+            self.gicforge_sycart = QCheckBox("SYCART")
+            self.gicforge_sycart.setChecked(True)
+            self.gicforge_improper = QCheckBox("Improper dihedrals")
+            self.gicforge_improper.setChecked(True)
+            build_button = QPushButton("Build GICs")
+            build_button.clicked.connect(self.run_gicforge_build)
+            option_row.addWidget(self.gicforge_symmetrize)
+            option_row.addWidget(self.gicforge_sycart)
+            option_row.addWidget(self.gicforge_improper)
+            option_row.addWidget(build_button)
+            option_row.addStretch(1)
+            layout.addLayout(option_row)
+
+            report_row = QHBoxLayout()
+            report_row.addWidget(QLabel("Report"))
+            self.gicforge_report_output = QLineEdit()
+            report_browse = QPushButton("Save As")
+            report_browse.clicked.connect(self.browse_gicforge_report_output)
+            report_button = QPushButton("Write Report")
+            report_button.clicked.connect(self.run_gicforge_report)
+            report_row.addWidget(self.gicforge_report_output, stretch=1)
+            report_row.addWidget(report_browse)
+            report_row.addWidget(report_button)
+            layout.addLayout(report_row)
+
+            bmatrix_row = QHBoxLayout()
+            bmatrix_row.addWidget(QLabel("B Matrix"))
+            self.gicforge_bmatrix_output = QLineEdit()
+            bmatrix_browse = QPushButton("Save As")
+            bmatrix_browse.clicked.connect(self.browse_gicforge_bmatrix_output)
+            bmatrix_button = QPushButton("Evaluate B")
+            bmatrix_button.clicked.connect(self.run_gicforge_bmatrix)
+            bmatrix_row.addWidget(self.gicforge_bmatrix_output, stretch=1)
+            bmatrix_row.addWidget(bmatrix_browse)
+            bmatrix_row.addWidget(bmatrix_button)
+            layout.addLayout(bmatrix_row)
+
+            gaussian_row = QHBoxLayout()
+            gaussian_row.addWidget(QLabel("Gaussian"))
+            self.gicforge_gaussian_output = QLineEdit()
+            gaussian_browse = QPushButton("Save As")
+            gaussian_browse.clicked.connect(self.browse_gicforge_gaussian_output)
+            self.gicforge_gaussian_route = QLineEdit("#p hf/sto-3g")
+            gaussian_button = QPushButton("Write Input")
+            gaussian_button.clicked.connect(self.run_gicforge_gaussian_input)
+            gaussian_row.addWidget(self.gicforge_gaussian_output, stretch=1)
+            gaussian_row.addWidget(gaussian_browse)
+            gaussian_row.addWidget(QLabel("Route"))
+            gaussian_row.addWidget(self.gicforge_gaussian_route)
+            gaussian_row.addWidget(gaussian_button)
+            layout.addLayout(gaussian_row)
+
+            self.gicforge_summary = QTextEdit()
+            self.gicforge_summary.setReadOnly(True)
+            self.gicforge_summary.setMaximumHeight(150)
+            layout.addWidget(self.gicforge_summary)
+
+            self.gicforge_table_tabs = QTabWidget()
+            self.gicforge_primitive_table = QTableWidget(0, 8)
+            self.gicforge_frozen_table = QTableWidget(0, 7)
+            self.gicforge_symmetry_table = QTableWidget(0, 5)
+            self.gicforge_diagnostics_table = QTableWidget(0, 2)
+            self.gicforge_table_tabs.addTab(self.gicforge_primitive_table, "Primitives")
+            self.gicforge_table_tabs.addTab(self.gicforge_frozen_table, "Frozen GICs")
+            self.gicforge_table_tabs.addTab(self.gicforge_symmetry_table, "Symmetry")
+            self.gicforge_table_tabs.addTab(self.gicforge_diagnostics_table, "Diagnostics")
+            layout.addWidget(self.gicforge_table_tabs, stretch=1)
+            return tab
+
+        def browse_gicforge_report_output(self) -> None:
+            self._browse_gicforge_output(
+                self.gicforge_report_output,
+                "Write GICForge report",
+                "Text reports (*.txt);;All files (*)",
+            )
+
+        def browse_gicforge_bmatrix_output(self) -> None:
+            self._browse_gicforge_output(
+                self.gicforge_bmatrix_output,
+                "Write GIC B matrix",
+                "Text files (*.txt);;All files (*)",
+            )
+
+        def browse_gicforge_gaussian_output(self) -> None:
+            self._browse_gicforge_output(
+                self.gicforge_gaussian_output,
+                "Write Gaussian GIC input",
+                "Gaussian input (*.gjf *.com);;All files (*)",
+            )
+
+        def _browse_gicforge_output(
+            self,
+            field: QLineEdit,
+            title: str,
+            file_filter: str,
+        ) -> None:
+            path, _selected = QFileDialog.getSaveFileName(
+                self,
+                title,
+                field.text().strip() or str(Path.cwd()),
+                file_filter,
+            )
+            if path:
+                field.setText(path)
+
+        def run_gicforge_build(self) -> None:
+            if not self._ensure_gicforge_ready_for_command("GICForge"):
+                return
+            self.gicforge_controller.set_xyzin(self.controller.xyzin)
+            command = self.gicforge_controller.build_command(
+                symmetrize=self.gicforge_symmetrize.isChecked(),
+                sycart=self.gicforge_sycart.isChecked(),
+                improper_dihedrals=self.gicforge_improper.isChecked(),
+            )
+            self._start_command(command, command.label)
+
+        def run_gicforge_report(self) -> None:
+            if not self._ensure_gicforge_ready_for_command("GICForge report"):
+                return
+            if not self._ensure_gicforge_section_ready("GICForge report"):
+                return
+            output = self._gicforge_output_path(
+                self.gicforge_report_output,
+                default_gicforge_report_output,
+            )
+            command = self.gicforge_controller.report_command(output)
+            self._start_command(command, command.label)
+
+        def run_gicforge_bmatrix(self) -> None:
+            if not self._ensure_gicforge_ready_for_command("GICForge B matrix"):
+                return
+            if not self._ensure_gicforge_section_ready("GICForge B matrix"):
+                return
+            output = self._gicforge_output_path(
+                self.gicforge_bmatrix_output,
+                default_gicforge_bmatrix_output,
+            )
+            command = self.gicforge_controller.bmatrix_command(output)
+            self._start_command(command, command.label)
+
+        def run_gicforge_gaussian_input(self) -> None:
+            if not self._ensure_gicforge_ready_for_command("Gaussian GIC input"):
+                return
+            if not self._ensure_gicforge_section_ready("Gaussian GIC input"):
+                return
+            output = self._gicforge_output_path(
+                self.gicforge_gaussian_output,
+                default_gicforge_gaussian_output,
+            )
+            route = self.gicforge_gaussian_route.text().strip() or "#p hf/sto-3g"
+            command = self.gicforge_controller.gaussian_input_command(output, route=route)
+            self._start_command(command, command.label)
+
+        def _ensure_gicforge_ready_for_command(self, title: str) -> bool:
+            if self.controller.xyzin is None:
+                QMessageBox.warning(self, title, "Open or preprocess an ORACLE xyzin first.")
+                return False
+            if self.process is not None:
+                QMessageBox.information(self, "ORACLE", "A command is already running.")
+                return False
+            self.gicforge_controller.set_xyzin(self.controller.xyzin)
+            return True
+
+        def _ensure_gicforge_section_ready(self, title: str) -> bool:
+            if self.controller.xyzin is None:
+                return False
+            state = load_gicforge_gui_state(self.controller.xyzin)
+            if state.ready:
+                return True
+            message = "\n".join(state.messages) or "Build GICs first."
+            QMessageBox.warning(self, title, message)
+            return False
+
+        def _gicforge_output_path(self, field: QLineEdit, default_factory) -> Path:
+            if self.controller.xyzin is None:
+                raise ValueError("no ORACLE xyzin project is loaded")
+            text = field.text().strip()
+            output = Path(text) if text else default_factory(self.controller.xyzin)
+            field.setText(str(output))
+            return output
+
+        def _set_default_gicforge_outputs(self, xyzin: Path) -> None:
+            self.gicforge_report_output.setText(str(default_gicforge_report_output(xyzin)))
+            self.gicforge_bmatrix_output.setText(str(default_gicforge_bmatrix_output(xyzin)))
+            self.gicforge_gaussian_output.setText(str(default_gicforge_gaussian_output(xyzin)))
+
+        def _populate_gicforge_tables(self, xyzin: Path) -> None:
+            state = load_gicforge_gui_state(xyzin)
+            self.gicforge_summary.setPlainText("\n".join(gicforge_gui_state_lines(state)))
+            self._fill_table(self.gicforge_primitive_table, state.primitives)
+            self._fill_table(self.gicforge_frozen_table, state.frozen_gics)
+            self._fill_table(self.gicforge_symmetry_table, state.symmetry_groups)
+            self._fill_table(self.gicforge_diagnostics_table, state.diagnostics)
+
+        def _clear_gicforge_tables(self) -> None:
+            summary = getattr(self, "gicforge_summary", None)
+            if summary is not None:
+                summary.clear()
+            for table in (
+                getattr(self, "gicforge_primitive_table", None),
+                getattr(self, "gicforge_frozen_table", None),
+                getattr(self, "gicforge_symmetry_table", None),
+                getattr(self, "gicforge_diagnostics_table", None),
+            ):
+                if table is not None:
+                    table.setRowCount(0)
+
+        def _fill_table(self, widget: QTableWidget, table: StructureTable | GICForgeTable) -> None:
             widget.setColumnCount(len(table.columns))
             widget.setHorizontalHeaderLabels(table.columns)
             widget.setRowCount(len(table.rows))
