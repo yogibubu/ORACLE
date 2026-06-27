@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="WMS-Wavefunctions">
+  <title>WMS-Rot Wavefunction Viewer</title>
+  <link rel="manifest" href="../manifest.webmanifest">
+  <link rel="icon" type="image/png" href="../icons/icon-192.png">
+  <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+  <link rel="stylesheet" href="../theme.css">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="../pwa-enhancements.js" defer></script>
+  <script src="./script.js" defer></script>
+</head>
+<body>
+  <section class="wms-suite-header" aria-labelledby="wms-wavefunctions-title">
+    <div class="wms-suite-brand">
+      <img class="wms-suite-logo" src="../icons/logo-full.png" alt="WMS-Rot logo">
+      <div class="wms-suite-copy">
+        <p class="wms-suite-kicker">WMS-Rot Suite</p>
+        <h1 class="wms-suite-title" id="wms-wavefunctions-title">WMS-Wavefunctions</h1>
+        <p class="wms-suite-subtitle">Inspect rotational eigenstates, level structure, and directional wavefunction maps exported by WMS-Rot.</p>
+        <p id="meta-line" class="wms-suite-meta">No data loaded.</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button type="button" id="reload-data">Reload from WMS-Rot</button>
+      <button type="button" id="open-main">Open WMS-Rot</button>
+    </div>
+  </section>
+
+  <section class="equations" id="equations">
+    <h2>Equations Used For Rotational Treatment</h2>
+    <p>$$\psi_{nJM}(\alpha,\beta,\gamma)=\sum_{K=-J}^{J} c_{JKM}^{(n)}\,D^{J*}_{MK}(\alpha,\beta,\gamma)$$</p>
+    <p>$$\psi_{J\alpha}=\sum_{K=-J}^{J}c_{JK}^{(\alpha)}\,|J,K\rangle,\qquad
+       \alpha\ \text{labels asymmetric-top eigenstates at fixed }J$$</p>
+    <p>$$\Psi_{J\alpha}^{(M)}(\theta,\phi)=\sum_{K=-J}^{J} c_{JK}^{(\alpha)}\,d^J_{MK}(\theta)e^{iK\phi}$$</p>
+    <p><strong>Wavefunction meanings (rigorous, in this viewer):</strong></p>
+    <ul>
+      <li><strong>\( \psi_{nJM}(\alpha,\beta,\gamma) \)</strong>: full rigid-rotor eigenfunction in Euler angles \((\alpha,\beta,\gamma)\), expanded on Wigner-\(D\) functions.</li>
+      <li><strong>\( \psi_{J\alpha}=\sum_K c_{JK}^{(\alpha)}|J,K\rangle \)</strong>: asymmetric-top state at fixed \(J\), written in the symmetric-top basis \(|J,K\rangle\); \(\alpha\) is the internal label after diagonalization.</li>
+      <li><strong>\( \Psi_{J\alpha}^{(M)}(\theta,\phi) \)</strong>: fixed-\(M\) directional amplitude used by this map; \((\theta,\phi)\) are polar angles of \(Z_{\text{lab}}\) in the molecule-fixed \(A/B/C\) frame.</li>
+    </ul>
+    <p>$$P_M(\theta,\phi)=\left|\Psi_{J\alpha}^{(M)}(\theta,\phi)\right|^2,\qquad
+       r(\theta,\phi)=\left[\frac{P_M(\theta,\phi)}{P_{M,\max}}\right]^\gamma$$</p>
+    <p>$$\hat{\mathbf{u}}=(\sin\theta\cos\phi,\sin\theta\sin\phi,\cos\theta),\qquad
+       \mathbf{Q}^{(\mathrm{lab})}=\frac{\int P_M(\theta,\phi)\,\hat{\mathbf{u}}\hat{\mathbf{u}}^{\mathsf T}\,d\Omega}{\int P_M(\theta,\phi)\,d\Omega},\qquad
+       [\hat{\mathbf{n}}_{X_\mathrm{lab}},\hat{\mathbf{n}}_{Y_\mathrm{lab}},\hat{\mathbf{n}}_{Z_\mathrm{lab}}]=\mathrm{eigvecs}\!\left(\mathbf{Q}^{(\mathrm{lab})}\right),\ \lambda_Z\ge\lambda_X\ge\lambda_Y$$</p>
+    <p>$$\mathbf{v}_{\mathrm{lab}}=\mathbf{R}_{\mathrm{lab}\leftarrow\mathrm{body}}\,\mathbf{v}_{\mathrm{body}},\qquad
+       \mathbf{R}_{\mathrm{lab}\leftarrow\mathrm{body}}=
+       \begin{bmatrix}
+       \hat{\mathbf{n}}_{X_\mathrm{lab}}^{\mathsf T}\\
+       \hat{\mathbf{n}}_{Y_\mathrm{lab}}^{\mathsf T}\\
+       \hat{\mathbf{n}}_{Z_\mathrm{lab}}^{\mathsf T}
+       \end{bmatrix},
+       \quad \mathbf{R}^{-1}=\mathbf{R}^{\mathsf T}$$</p>
+    <p>$$\mathbf{u}_J:\ u_{J,i}=\sqrt{\frac{\langle J_i^2\rangle}{J(J+1)}}\ (i=A,B,C),\qquad
+       \hat{\mathbf{n}}_F^{\mathrm{eff}}=\mathrm{sgn}(c_J)\,\frac{\mathbf{u}_J}{\lVert\mathbf{u}_J\rVert}$$</p>
+    <p>$$c_J=\frac{\langle\mathbf{J}\!\cdot\!\mathbf{F}\rangle}{F(F+1)}=\frac{F(F+1)+J(J+1)-I(I+1)}{2F(F+1)},\qquad
+       c_{I_\mathrm{eff}}=\frac{\langle\mathbf{I}_{\mathrm{eff}}\!\cdot\!\mathbf{F}\rangle}{F(F+1)}=\frac{F(F+1)+I_{\mathrm{eff}}(I_{\mathrm{eff}}+1)-J(J+1)}{2F(F+1)}$$</p>
+    <p>$$I_\mathrm{eff}=I\ \text{(one quadrupolar nucleus)},\qquad
+       I_\mathrm{eff}=I_{12}\ \text{(two quadrupolar nuclei, dominant coupled-spin label of the selected }F\text{ level)}$$</p>
+    <p>$$\mathbf{I}_{12}=\mathbf{I}_1+\mathbf{I}_2,\qquad
+       F=J+I_\mathrm{eff},\qquad
+       \cos\theta_{JF}=\frac{F(F+1)+J(J+1)-I_\mathrm{eff}(I_\mathrm{eff}+1)}{2\sqrt{F(F+1)J(J+1)}}$$</p>
+    <p>$$\cos\theta_{I_\mathrm{eff}F}=\frac{F(F+1)+I_\mathrm{eff}(I_\mathrm{eff}+1)-J(J+1)}{2\sqrt{F(F+1)I_\mathrm{eff}(I_\mathrm{eff}+1)}}$$</p>
+    <p>$$\begin{aligned}
+       \hat{\mathbf{n}}_J(\varphi)&=\cos\theta_{JF}\,\hat{\mathbf{n}}_F^{\mathrm{eff}}+\sin\theta_{JF}\,(\cos\varphi\,\hat{\mathbf{e}}_1+\sin\varphi\,\hat{\mathbf{e}}_2),\\
+       \hat{\mathbf{n}}_{I_\mathrm{eff}}(\varphi)&=\cos\theta_{I_\mathrm{eff}F}\,\hat{\mathbf{n}}_F^{\mathrm{eff}}-\sin\theta_{I_\mathrm{eff}F}\,(\cos\varphi\,\hat{\mathbf{e}}_1+\sin\varphi\,\hat{\mathbf{e}}_2),\quad
+       \{\hat{\mathbf{e}}_1,\hat{\mathbf{e}}_2\}\perp\hat{\mathbf{n}}_F^{\mathrm{eff}}
+       \end{aligned}$$</p>
+    <p>Viewer quantity: direction-probability map of \(Z_{\text{lab}}\) expressed in the molecule-fixed \(A/B/C\) frame, using the selected \(M\) component (default \(M=0\)).</p>
+    <p>If hyperfine levels are present, labels include \(F\).
+      The 3D shape is drawn from the dominant parent rotational component \((J,\alpha)\), with reported purity.</p>
+    <p><strong>Quantum-mechanical caveat (rigorous):</strong> the plotted \(J/I/F\) lines and cones are expectation-value/semi-classical constructions. They summarize operator-coupling geometry and become directly intuitive in the semiclassical (large-angular-momentum) limit; they are not simultaneous sharp vector observables of one exact stationary eigenstate.</p>
+  </section>
+  <section class="guide">
+    <h2>How To Read The Viewer</h2>
+    <ol>
+      <li>Left panel: each horizontal segment is one energy level. If hyperfine is active, labels include \(F\).</li>
+      <li>Right panel: this is an angular map, not atomic/electronic density in Cartesian space.</li>
+      <li>It shows where \(Z_{\text{lab}}\) points in the molecule-fixed \(A/B/C\) frame, for the selected \(M\) component.</li>
+      <li>The frame toggle changes only plotting coordinates: Body frame draws directly in \(A/B/C\); Lab frame applies the orthonormal rotation \(R_{\text{lab}\leftarrow\text{body}}\).</li>
+      <li>Surface radius and color follow normalized \( |\Psi|^2 \). Teal line = active \(K\)-axis. Orange line = \(\mathbf{u}_J\) from \(\langle J_i^2\rangle\). Black/gray lines = principal \(X_{\text{lab}},Y_{\text{lab}},Z_{\text{lab}}\) from eigvecs\((\mathbf{Q}^{(\mathrm{lab})})\).</li>
+      <li>If \(F\) is available, dark-blue line is the effective \(F\)-axis and translucent cones are the semiclassical \(J\)- and \(I_\mathrm{eff}\)-precession cones; with two nuclei \(I_\mathrm{eff}=I_{12}\).</li>
+      <li>A longer lobe along A (or B/C) means \(Z_{\text{lab}}\) is more probable near \(\pm\)A (or \(\pm\)B/\(\pm\)C).</li>
+      <li>Changing \(M\) changes nodal pattern and anisotropy because \(M\) is the projection of \(J\) on \(Z_{\text{lab}}\).</li>
+    </ol>
+  </section>
+
+  <main class="layout">
+    <section class="panel left-panel">
+      <h3>Energy Levels</h3>
+      <div id="levels-plot"></div>
+      <div class="plot-download-row">
+        <button type="button" id="download-levels-png" class="plot-download-button" disabled>Download PNG (high-res)</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>State</th>
+              <th>F</th>
+              <th id="levels-spin-header">I / I12</th>
+              <th>Energy (cm^-1)</th>
+            </tr>
+          </thead>
+          <tbody id="levels-table-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel right-panel">
+      <h3>Wavefunction Map (Selected M, Z_lab direction)</h3>
+      <div class="controls">
+        <label for="m-select">M component:</label>
+        <select id="m-select"></select>
+        <span id="m-help">M = projection of J on Z_lab</span>
+      </div>
+      <div class="controls">
+        <label for="gamma-slider">Exponent \(\gamma\):</label>
+        <input id="gamma-slider" type="range" min="0.35" max="1.60" step="0.05" value="0.75">
+        <span id="gamma-value">0.75</span>
+      </div>
+      <div class="controls">
+        <span>Frame:</span>
+        <label><input id="frame-body" type="radio" name="frame-mode" value="body" checked> Body frame</label>
+        <label><input id="frame-lab" type="radio" name="frame-mode" value="lab"> Lab frame</label>
+      </div>
+      <div class="controls">
+        <label><input id="toggle-f-axis" type="checkbox" checked> Show F-axis (hyperfine model)</label>
+        <label><input id="toggle-i-cone" type="checkbox" checked> Show I / I12 cone (hyperfine model)</label>
+      </div>
+      <div id="selected-level"></div>
+      <div id="wave-3d"></div>
+      <div class="plot-download-row">
+        <button type="button" id="download-wave-png" class="plot-download-button" disabled>Download PNG (high-res)</button>
+      </div>
+      <p class="note">
+        Body frame: colored axes are molecule-fixed A/B/C and black/gray lines are lab principal axes from \(Q^{(\mathrm{lab})}\). Lab frame: colored axes are \(X_\mathrm{lab}/Y_\mathrm{lab}/Z_\mathrm{lab}\) and black/gray lines are the rotated body A/B/C axes. Teal line = active K-axis. Orange line = \(\mathbf{u}_J\). Dark-blue line = effective \(F\)-axis; cones are semiclassical \(J/I_\mathrm{eff}\) precession around \(F\), with \(I_\mathrm{eff}=I_{12}\) when two nuclei are active.
+      </p>
+    </section>
+  </main>
+</body>
+</html>

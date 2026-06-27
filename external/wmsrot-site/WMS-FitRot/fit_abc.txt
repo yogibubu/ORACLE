@@ -1,0 +1,816 @@
+#!/usr/bin/env python3
+"""
+Fit A, B, C rotational constants to target spectral lines using vmsrot.
+Targets are matched to the nearest predicted lines and the sum of squared
+distances is minimized with a robust local strategy.
+"""
+from __future__ import annotations
+
+import argparse
+import math
+import os
+import sys
+from dataclasses import dataclass
+from typing import Iterable, Tuple, List, Dict, Optional
+
+import numpy as np
+
+try:
+    from scipy.optimize import minimize, least_squares
+except Exception as exc:  # pragma: no cover - runtime dependency check
+    raise SystemExit(
+        "scipy is required for this script. Install with: pip install scipy"
+    ) from exc
+
+# Ensure local import of vmsrot from project root
+HERE = os.path.abspath(os.path.dirname(__file__))
+ROOT = os.path.abspath(os.path.join(HERE, ".."))
+sys.path.insert(0, ROOT)
+import vmsrot  # noqa: E402
+
+
+@dataclass
+class FixedParams:
+    """
+    Simulation inputs kept fixed while only A, B, C are optimized.
+
+    The autofit workflow repeatedly calls the same prediction engine with the
+    same reduction, representation, dipoles, distortion constants, and UI
+    options. Grouping them in one dataclass keeps the objective function small
+    and makes it explicit which quantities are part of the fit and which are
+    merely simulation context.
+    """
+    T: float = 300.0
+    DJ: float = 0.0
+    DJK: float = 0.0
+    DK: float = 0.0
+    dJ: float = 0.0
+    dK: float = 0.0
+    HJ: float = 0.0
+    HJK: float = 0.0
+    HKJ: float = 0.0
+    HK: float = 0.0
+    h1: float = 0.0
+    h2: float = 0.0
+    h3: float = 0.0
+    mu_a: float = 1.0
+    mu_b: float = 0.0
+    mu_c: float = 0.0
+    J_max: int = 10
+    intensity_cut: float = 1e-9
+    groupSymmetry: str = "C1"
+    rotorType: str = "asymmetric"
+    a_checked: bool = True
+    b_checked: bool = True
+    c_checked: bool = True
+    wang_symmetry: bool = True
+
+
+DISTORTION_PARAM_NAMES: Tuple[str, ...] = (
+    "DJ", "DJK", "DK", "dJ", "dK",
+    "HJ", "HJK", "HKJ", "HK", "h1", "h2", "h3",
+)
+QUARTIC_PARAM_NAMES: Tuple[str, ...] = ("DJ", "DJK", "DK", "dJ", "dK")
+SEXTIC_PARAM_NAMES: Tuple[str, ...] = ("HJ", "HJK", "HKJ", "HK", "h1", "h2", "h3")
+MODEL_PARAM_NAMES: Tuple[str, ...] = ("A", "B", "C") + DISTORTION_PARAM_NAMES
+QUAD_CART_KEYS: Tuple[str, ...] = ("chi_aa", "chi_bb", "chi_cc", "chi_ab", "chi_ac", "chi_bc")
+DEFAULT_HFS_INTENSITY_MODE = "recoupled"
+DEFAULT_S_D2_ID = "auto"
+
+
+def _parse_rotational_section(text: str) -> Dict[str, str]:
+    lines = text.splitlines()
+    in_section = False
+    data: Dict[str, str] = {}
+    for line in lines:
+        if not in_section:
+            if line.strip().startswith("#ROTATIONAL"):
+                in_section = True
+            continue
+        if line.strip().startswith("#"):
+            break
+        if not line.strip():
+            continue
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        data[key.strip()] = value.strip()
+    if not in_section:
+        raise ValueError("Sezione #ROTATIONAL non trovata nel file.")
+    return data
+
+
+def _build_file_data(raw: Dict[str, str]) -> Dict[str, object]:
+    def read_raw(key: str, alternates: Iterable[str] = ()) -> Optional[str]:
+        if key in raw:
+            return raw[key]
+        for alt in alternates:
+            if alt in raw:
+                return raw[alt]
+        return None
+
+    def read_num(key: str, alternates: Iterable[str] = ()) -> Optional[float]:
+        val = read_raw(key, alternates)
+        if val is None:
+            return None
+        try:
+            return float(val)
+        except Exception:
+            return None
+
+    rotor_raw = read_raw("rotor_type")
+    rotor_type = None
+    if rotor_raw:
+        rotor_lower = rotor_raw.lower()
+        if "asymmetric" in rotor_lower:
+            rotor_type = "asymmetric"
+        elif "linear" in rotor_lower:
+            rotor_type = "linear"
+        elif "spherical" in rotor_lower:
+            rotor_type = "spherical"
+        elif "oblate" in rotor_lower:
+            rotor_type = "oblate"
+        elif "prolate" in rotor_lower:
+            rotor_type = "prolate"
+
+    reduction_raw = read_raw("Watson Reduction")
+    reduction = None
+    if reduction_raw:
+        r = reduction_raw.strip().upper()
+        if r.startswith("S"):
+            reduction = "S"
+        elif r.startswith("A"):
+            reduction = "A"
+
+    return {
+        "raw": raw,
+        "rotorType": rotor_type,
+        "representation": read_raw("representation"),
+        "reduction": reduction,
+        "pointGroup": read_raw("Point Group"),
+        "freqUnit": read_raw("FREQ_UNIT", ["freq_unit", "Frequency unit"]),
+        "T": read_num("T_K"),
+        "A": read_num("A_MHz"),
+        "B": read_num("B_MHz"),
+        "C": read_num("C_MHz"),
+        "DVibA": read_num("DVibA_MHz"),
+        "DVibB": read_num("DVibB_MHz"),
+        "DVibC": read_num("DVibC_MHz"),
+        "mu_a": read_num("Dipole_a_D"),
+        "mu_b": read_num("Dipole_b_D"),
+        "mu_c": read_num("Dipole_c_D"),
+        "qrot": read_num("Q_rot"),
+        "sD2Id": read_num("S_D2_ID", ["s_d2_id", "S_d2_ID"]),
+        "distortion": {
+            "A": {
+                "DJ": read_num("DELTA J_MHz", ["DELTA_J_MHz"]),
+                "DJK": read_num("DELTA JK_MHz", ["DELTA_JK_MHz"]),
+                "DK": read_num("DELTA K_MHz", ["DELTA_K_MHz"]),
+                "dJ": read_num("delta J_MHz", ["delta_J_MHz"]),
+                "dK": read_num("delta K_MHz", ["delta_K_MHz"]),
+                "HJ": read_num("PHI N_MHz", ["PHI_N_MHz"]),
+                "HJK": read_num("PHI NK_MHz", ["PHI_NK_MHz"]),
+                "HKJ": read_num("PHI KN_MHz", ["PHI_KN_MHz"]),
+                "HK": read_num("PHI K_MHz", ["PHI_K_MHz"]),
+                "h1": read_num("phi N_MHz", ["phi_N_MHz"]),
+                "h2": read_num("phi NK_MHz", ["phi_NK_MHz"]),
+                "h3": read_num("phi K_MHz", ["phi_K_MHz"]),
+            },
+            "S": {
+                "DJ": read_num("DJ_MHz"),
+                "DJK": read_num("DJK_MHz"),
+                "DK": read_num("DK_MHz"),
+                "dJ": read_num("d1_MHz", ["D1_MHz"]),
+                "dK": read_num("d2_MHz", ["D2_MHz"]),
+                "HJ": read_num("H N_MHz", ["H_N_MHz"]),
+                "HJK": read_num("H NK_MHz", ["H_NK_MHz"]),
+                "HKJ": read_num("H KN_MHz", ["H_KN_MHz"]),
+                "HK": read_num("H K_MHz", ["H_K_MHz"]),
+                "h1": read_num("h1_MHz"),
+                "h2": read_num("h2_MHz"),
+                "h3": read_num("h3_MHz"),
+            },
+        },
+    }
+
+
+def _raw_read(
+    raw: Optional[Dict[str, str]],
+    key: str,
+    alternates: Iterable[str] = (),
+) -> Optional[str]:
+    if not raw:
+        return None
+    if key in raw:
+        return raw[key]
+    for alt in alternates:
+        if alt in raw:
+            return raw[alt]
+    return None
+
+
+def _raw_read_num(
+    raw: Optional[Dict[str, str]],
+    key: str,
+    alternates: Iterable[str] = (),
+) -> Optional[float]:
+    value = _raw_read(raw, key, alternates)
+    if value is None:
+        return None
+    try:
+        parsed = float(value)
+    except Exception:
+        return None
+    return parsed if np.isfinite(parsed) else None
+
+
+def _apply_file_simulation_globals(
+    file_data: Optional[Dict[str, object]],
+    qrot_override: Optional[float] = None,
+) -> None:
+    """
+    Mirror the imported WMS-Rot input file into the vmsrot module globals.
+
+    The simulator still reads several controls from module-level globals
+    because the same engine is shared with the Pyodide UI. This helper makes
+    the CLI/local-fit path deterministic by copying representation, reduction,
+    S_D2_ID, quadrupole constants, and related knobs from the parsed input
+    file before any spectrum is generated.
+    """
+    raw = (file_data or {}).get("raw") or {}
+
+    reduction = (file_data or {}).get("reduction")
+    if reduction:
+        vmsrot.REDUCTION = reduction
+
+    representation = (file_data or {}).get("representation")
+    if representation:
+        vmsrot.REPRESENTATION = representation
+
+    qrot_value = qrot_override if qrot_override is not None else (file_data or {}).get("qrot")
+    vmsrot.QROT_OVERRIDE = qrot_value if qrot_value is not None else None
+    freq_unit = (file_data or {}).get("freqUnit")
+    vmsrot.FREQ_UNIT = str(freq_unit).strip() if freq_unit is not None and str(freq_unit).strip() else "auto"
+
+    s_d2_id = (file_data or {}).get("sD2Id")
+    vmsrot.S_D2_ID = DEFAULT_S_D2_ID
+    if s_d2_id is not None:
+        try:
+            s_d2_id_int = int(round(float(s_d2_id)))
+            if s_d2_id_int in (41000, 50000):
+                vmsrot.S_D2_ID = s_d2_id_int
+        except Exception:
+            pass
+
+    i_nuc_1 = _raw_read_num(raw, "I_NUC_1", ["I_NUC"])
+    i_nuc_2 = _raw_read_num(raw, "I_NUC_2")
+    i_nuc_1_value = float(i_nuc_1) if i_nuc_1 is not None else 0.0
+    i_nuc_2_value = float(i_nuc_2) if i_nuc_2 is not None else 0.0
+    vmsrot.I_NUC = i_nuc_1_value
+    vmsrot.I_NUC_1 = i_nuc_1_value
+    vmsrot.I_NUC_2 = i_nuc_2_value
+
+    for key in QUAD_CART_KEYS:
+        nucleus_1_value = _raw_read_num(raw, f"{key}_1", [key])
+        nucleus_2_value = _raw_read_num(raw, f"{key}_2")
+        nucleus_1_float = float(nucleus_1_value) if nucleus_1_value is not None else 0.0
+        nucleus_2_float = float(nucleus_2_value) if nucleus_2_value is not None else 0.0
+        setattr(vmsrot, key, nucleus_1_float)
+        setattr(vmsrot, f"{key}_1", nucleus_1_float)
+        setattr(vmsrot, f"{key}_2", nucleus_2_float)
+
+    f_max = _raw_read_num(raw, "F_MAX")
+    vmsrot.F_MAX = None if f_max is None else float(f_max)
+
+    hfs_intensity_mode = _raw_read(raw, "HFS_INTENSITY_MODE")
+    vmsrot.HFS_INTENSITY_MODE = (
+        str(hfs_intensity_mode).strip()
+        if hfs_intensity_mode is not None and str(hfs_intensity_mode).strip()
+        else DEFAULT_HFS_INTENSITY_MODE
+    )
+
+
+def _load_input_file(path: str) -> Dict[str, object]:
+    with open(path, "r", encoding="utf-8") as fh:
+        text = fh.read()
+    raw = _parse_rotational_section(text)
+    return _build_file_data(raw)
+
+
+def _select_distortion(file_data: Dict[str, object], reduction: str) -> Dict[str, Optional[float]]:
+    dist = file_data.get("distortion") or {}
+    base = dist.get(reduction) or {}
+    keys = DISTORTION_PARAM_NAMES
+
+    def _take(primary: Optional[float], fallback: Optional[float]) -> Optional[float]:
+        return primary if primary is not None else fallback
+
+    if file_data.get("rotorType") and file_data.get("rotorType") != "asymmetric":
+        other = dist.get("S" if reduction == "A" else "A") or {}
+        return {k: _take(base.get(k), other.get(k)) for k in keys}
+    return {k: base.get(k) for k in keys}
+
+
+def _build_model_state(
+    file_data: Optional[Dict[str, object]],
+    overrides: Optional[Dict[str, Optional[float]]] = None,
+) -> Dict[str, Optional[float]]:
+    """
+    Merge defaults, imported file values, and explicit overrides.
+
+    The returned dictionary is the model actually sent to vmsrot. DVib
+    corrections are folded into A/B/C here so downstream code only sees one
+    effective set of rotational constants.
+    """
+    defaults = FixedParams()
+    state: Dict[str, Optional[float]] = {name: getattr(defaults, name, None) for name in MODEL_PARAM_NAMES}
+    if file_data:
+        reduction = file_data.get("reduction") or vmsrot.REDUCTION
+        distortion = _select_distortion(file_data, reduction)
+
+        file_A = file_data.get("A")
+        file_B = file_data.get("B")
+        file_C = file_data.get("C")
+        dvibA = file_data.get("DVibA")
+        dvibB = file_data.get("DVibB")
+        dvibC = file_data.get("DVibC")
+        if file_A is not None and dvibA is not None:
+            file_A = file_A + dvibA
+        if file_B is not None and dvibB is not None:
+            file_B = file_B + dvibB
+        if file_C is not None and dvibC is not None:
+            file_C = file_C + dvibC
+
+        state["A"] = file_A
+        state["B"] = file_B
+        state["C"] = file_C
+        for name in DISTORTION_PARAM_NAMES:
+            value = distortion.get(name)
+            if value is not None:
+                state[name] = value
+
+    for name, value in (overrides or {}).items():
+        if name in state and value is not None:
+            state[name] = float(value)
+
+    return state
+
+
+def _normalize_quartic_scale(scale: Optional[float], default: float = 1.0) -> float:
+    try:
+        value = float(scale)
+    except Exception:
+        return float(default)
+    if not np.isfinite(value) or value <= 0:
+        return float(default)
+    return value
+
+
+def _extract_quartic_params(
+    source: Optional[Dict[str, Optional[float]]],
+) -> Dict[str, float]:
+    out: Dict[str, float] = {name: 0.0 for name in QUARTIC_PARAM_NAMES}
+    if not source:
+        return out
+    for name in QUARTIC_PARAM_NAMES:
+        value = source.get(name)
+        try:
+            parsed = float(value)  # type: ignore[arg-type]
+        except Exception:
+            parsed = 0.0
+        out[name] = parsed if np.isfinite(parsed) else 0.0
+    return out
+
+
+def _scale_quartic_params_via_tau(
+    quartic_reference: Optional[Dict[str, Optional[float]]],
+    A: float,
+    B: float,
+    C: float,
+    reduction: Optional[str],
+    scale: Optional[float],
+) -> Dict[str, float]:
+    scale_value = _normalize_quartic_scale(scale)
+    quartic = _extract_quartic_params(quartic_reference)
+    if abs(scale_value - 1.0) < 1.0e-15:
+        return quartic
+
+    reduction_value = reduction or getattr(vmsrot, "REDUCTION", "A")
+    quartic_vec = np.array([quartic[name] for name in QUARTIC_PARAM_NAMES], dtype=float)
+    M4 = vmsrot._ceditt_M4(A, B, C, reduction_value)
+    tau = np.linalg.pinv(M4) @ quartic_vec
+    tau_scaled = tau / (scale_value * scale_value)
+    quartic_scaled = M4 @ tau_scaled
+    return {
+        name: float(value)
+        for name, value in zip(QUARTIC_PARAM_NAMES, quartic_scaled.tolist())
+    }
+
+
+def _apply_quartic_scale_to_model_state(
+    model_state: Dict[str, float],
+    quartic_reference: Optional[Dict[str, Optional[float]]],
+    reduction: Optional[str],
+    scale: Optional[float],
+) -> Dict[str, float]:
+    state = dict(model_state)
+    state.update(
+        _scale_quartic_params_via_tau(
+            quartic_reference=quartic_reference,
+            A=float(state["A"]),
+            B=float(state["B"]),
+            C=float(state["C"]),
+            reduction=reduction,
+            scale=scale,
+        )
+    )
+    return state
+
+
+def _parse_targets(tokens: Iterable[str]) -> np.ndarray:
+    vals: List[float] = []
+    for tok in tokens:
+        for part in tok.replace(",", " ").split():
+            if not part:
+                continue
+            vals.append(float(part))
+    if len(vals) < 3:
+        raise ValueError("Provide at least 3 target lines (MHz).")
+    return np.array(vals, dtype=float)
+
+
+def _load_targets_from_file(path: str) -> np.ndarray:
+    vals: List[float] = []
+    with open(path, "r", encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            for part in line.replace(",", " ").split():
+                if part:
+                    vals.append(float(part))
+    if len(vals) < 3:
+        raise ValueError("Provide at least 3 target lines (MHz).")
+    return np.array(vals, dtype=float)
+
+
+def _nearest_residuals(targets: np.ndarray, freqs: np.ndarray) -> np.ndarray:
+    if freqs.size == 0:
+        return np.full_like(targets, 1e9, dtype=float)
+    freqs = np.sort(freqs.astype(float))
+    idx = np.searchsorted(freqs, targets)
+    left = np.clip(idx - 1, 0, freqs.size - 1)
+    right = np.clip(idx, 0, freqs.size - 1)
+    dl = freqs[left] - targets
+    dr = freqs[right] - targets
+    return np.where(np.abs(dl) <= np.abs(dr), dl, dr)
+
+
+def _simulate_freqs(
+    A: float, B: float, C: float, fixed: FixedParams
+) -> np.ndarray:
+    model_state = {
+        "A": float(A),
+        "B": float(B),
+        "C": float(C),
+        "DJ": float(fixed.DJ),
+        "DJK": float(fixed.DJK),
+        "DK": float(fixed.DK),
+        "dJ": float(fixed.dJ),
+        "dK": float(fixed.dK),
+        "HJ": float(fixed.HJ),
+        "HJK": float(fixed.HJK),
+        "HKJ": float(fixed.HKJ),
+        "HK": float(fixed.HK),
+        "h1": float(fixed.h1),
+        "h2": float(fixed.h2),
+        "h3": float(fixed.h3),
+    }
+    df = _simulate_catalog_dataframe(model_state, fixed)
+    return df["Frequency (MHz)"].to_numpy(dtype=float)
+
+
+def _simulate_catalog_dataframe(
+    model_state: Dict[str, float],
+    fixed: FixedParams,
+):
+    """
+    Run one catalog prediction with the current raw Pickett semantics.
+
+    WMS-FitRot now treats the selected representation exactly as the simulator
+    does during normal prediction. It does not attempt any hidden
+    representation rewrite before evaluating the residuals.
+    """
+    return vmsrot.simulate_rigid_spectrum(
+        T=fixed.T,
+        A=float(model_state["A"]),
+        B=float(model_state["B"]),
+        C=float(model_state["C"]),
+        DJ=float(model_state["DJ"]),
+        DJK=float(model_state["DJK"]),
+        DK=float(model_state["DK"]),
+        dJ=float(model_state["dJ"]),
+        dK=float(model_state["dK"]),
+        HJ=float(model_state["HJ"]),
+        HJK=float(model_state["HJK"]),
+        HKJ=float(model_state["HKJ"]),
+        HK=float(model_state["HK"]),
+        h1=float(model_state["h1"]),
+        h2=float(model_state["h2"]),
+        h3=float(model_state["h3"]),
+        mu_a=fixed.mu_a,
+        mu_b=fixed.mu_b,
+        mu_c=fixed.mu_c,
+        J_max=fixed.J_max,
+        intensity_cut=fixed.intensity_cut,
+        groupSymmetry=fixed.groupSymmetry,
+        rotorType=fixed.rotorType,
+        a_checked=fixed.a_checked,
+        b_checked=fixed.b_checked,
+        c_checked=fixed.c_checked,
+        wang_symmetry=fixed.wang_symmetry,
+    )
+
+
+def _make_objective(
+    targets: np.ndarray,
+    fixed: FixedParams,
+    order_penalty: float = 1e10,
+    empty_penalty: float = 1e12,
+    cache_round: int = 6,
+) -> Tuple:
+    """
+    Build the scalar objective and residual vector used by the optimizer.
+
+    The fit is deliberately simple: predicted lines are matched to the nearest
+    target lines, and only A/B/C move. A small rounded cache avoids
+    recalculating identical catalogs during Powell/least-squares iterations.
+    """
+    cache: Dict[Tuple[float, float, float], np.ndarray] = {}
+
+    def cached_freqs(A: float, B: float, C: float) -> np.ndarray:
+        key = (round(A, cache_round), round(B, cache_round), round(C, cache_round))
+        if key in cache:
+            return cache[key]
+        try:
+            freqs = _simulate_freqs(A, B, C, fixed)
+        except Exception:
+            freqs = np.array([], dtype=float)
+        cache[key] = freqs
+        return freqs
+
+    def _order_ok(A: float, B: float, C: float) -> bool:
+        if fixed.rotorType == "asymmetric":
+            return A > B and B > C
+        return A >= B and B >= C
+
+    def objective(x: np.ndarray) -> float:
+        A, B, C = float(x[0]), float(x[1]), float(x[2])
+        if not _order_ok(A, B, C):
+            return order_penalty + (B - A) ** 2 + (C - B) ** 2
+        freqs = cached_freqs(A, B, C)
+        if freqs.size == 0:
+            return empty_penalty
+        res = _nearest_residuals(targets, freqs)
+        return float(np.sum(res * res))
+
+    def residuals(x: np.ndarray) -> np.ndarray:
+        A, B, C = float(x[0]), float(x[1]), float(x[2])
+        if not _order_ok(A, B, C):
+            return np.full_like(targets, math.sqrt(order_penalty), dtype=float)
+        freqs = cached_freqs(A, B, C)
+        if freqs.size == 0:
+            return np.full_like(targets, math.sqrt(empty_penalty), dtype=float)
+        return _nearest_residuals(targets, freqs)
+
+    return objective, residuals
+
+
+def fit_abc(
+    targets: np.ndarray,
+    A0: float,
+    B0: float,
+    C0: float,
+    fixed: FixedParams,
+    span: float = 0.3,
+    bounds: Tuple[Tuple[float, float], Tuple[float, float], Tuple[float, float]] | None = None,
+    use_powell: bool = True,
+) -> Tuple[np.ndarray, Dict[str, float]]:
+    """
+    Fit A, B, C with a two-stage local strategy.
+
+    Powell is used first as a derivative-free coarse search inside the bounds,
+    then least_squares performs the final robust polish. The function returns
+    both the best constants and a tiny metrics dictionary consumed by the UI
+    and export helpers.
+    """
+    if bounds is None:
+        def _span_bounds(x: float) -> Tuple[float, float]:
+            lo = max(1e-6, x * (1.0 - span))
+            hi = max(lo * 1.001, x * (1.0 + span))
+            return (lo, hi)
+        bounds = (_span_bounds(A0), _span_bounds(B0), _span_bounds(C0))
+
+    objective, residuals = _make_objective(targets, fixed)
+    lo = np.array([b[0] for b in bounds], dtype=float)
+    hi = np.array([b[1] for b in bounds], dtype=float)
+    x_best = np.clip(np.array([A0, B0, C0], dtype=float), lo, hi)
+    best_val = objective(x_best)
+
+    # Stage 1: local derivative-free refinement (optional)
+    if use_powell:
+        nm_res = minimize(
+            objective,
+            x_best,
+            method="Powell",
+            options={"xtol": 1e-6, "ftol": 1e-6, "maxiter": 300},
+        )
+        if nm_res.success and objective(nm_res.x) < best_val:
+            x_best = np.array(nm_res.x, dtype=float)
+            best_val = objective(x_best)
+
+    # Stage 2: robust least-squares polish
+    ls_res = least_squares(
+        residuals,
+        x_best,
+        bounds=(lo, hi),
+        loss="soft_l1",
+        f_scale=max(1.0, np.median(np.abs(residuals(x_best)))),
+        max_nfev=200,
+    )
+    if ls_res.success and objective(ls_res.x) < best_val:
+        x_best = np.array(ls_res.x, dtype=float)
+        best_val = objective(x_best)
+
+    metrics = {
+        "objective": float(best_val),
+        "rms": float(np.sqrt(best_val / targets.size)),
+    }
+    return x_best, metrics
+
+
+def _format_report(targets: np.ndarray, A: float, B: float, C: float, fixed: FixedParams) -> str:
+    freqs = _simulate_freqs(A, B, C, fixed)
+    res = _nearest_residuals(targets, freqs)
+    matched = targets + res
+
+    lines = []
+    lines.append(f"A={A:.6f}  B={B:.6f}  C={C:.6f} (MHz)")
+    lines.append("target(MHz)  nearest(MHz)  delta(MHz)")
+    for t, m, d in zip(targets, matched, res):
+        lines.append(f"{t:11.6f}  {m:12.6f}  {d:10.6f}")
+    rms = math.sqrt(float(np.mean(res * res)))
+    max_abs = float(np.max(np.abs(res)))
+    lines.append(f"RMS={rms:.6f} MHz  max|delta|={max_abs:.6f} MHz")
+    return "\n".join(lines)
+
+
+def main() -> None:
+    """
+    Command-line wrapper around the same fit logic used by the web workflow.
+
+    The CLI path is useful for regression tests and for reproducing a fit
+    outside the browser while still reusing the exact same prediction engine.
+    """
+    p = argparse.ArgumentParser(description="Fit A,B,C to target spectral lines.")
+    tgt = p.add_mutually_exclusive_group(required=True)
+    tgt.add_argument("--targets", nargs="+", help="Target line frequencies in MHz.")
+    tgt.add_argument("--targets-file", help="Text file with target frequencies (MHz), one per line.")
+    p.add_argument("--input-file", help="WMS-Rot input file with #ROTATIONAL section.")
+
+    p.add_argument("--A", type=float, default=None, help="Initial A (MHz).")
+    p.add_argument("--B", type=float, default=None, help="Initial B (MHz).")
+    p.add_argument("--C", type=float, default=None, help="Initial C (MHz).")
+
+    p.add_argument("--T", type=float, default=None, help="Temperature (K).")
+    p.add_argument("--DJ", type=float, default=None)
+    p.add_argument("--DJK", type=float, default=None)
+    p.add_argument("--DK", type=float, default=None)
+    p.add_argument("--dJ", type=float, default=None)
+    p.add_argument("--dK", type=float, default=None)
+    p.add_argument("--HJ", type=float, default=None)
+    p.add_argument("--HJK", type=float, default=None)
+    p.add_argument("--HKJ", type=float, default=None)
+    p.add_argument("--HK", type=float, default=None)
+    p.add_argument("--h1", type=float, default=None)
+    p.add_argument("--h2", type=float, default=None)
+    p.add_argument("--h3", type=float, default=None)
+    p.add_argument("--mu-a", type=float, default=None)
+    p.add_argument("--mu-b", type=float, default=None)
+    p.add_argument("--mu-c", type=float, default=None)
+    p.add_argument("--qrot-override", type=float, default=None)
+    p.add_argument("--J-max", type=int, default=None)
+    p.add_argument("--intensity-cut", type=float, default=None)
+    p.add_argument("--group-symmetry", type=str, default=None)
+    p.add_argument("--rotor-type", type=str, default=None)
+    p.add_argument("--no-a", action="store_true")
+    p.add_argument("--no-b", action="store_true")
+    p.add_argument("--no-c", action="store_true")
+    p.add_argument("--no-wang", action="store_true")
+
+    p.add_argument("--span", type=float, default=0.3, help="Relative bounds around initial A,B,C.")
+    p.add_argument("--bounds", nargs=6, type=float, metavar=("Amin","Amax","Bmin","Bmax","Cmin","Cmax"))
+    p.add_argument("--freq-margin", type=float, default=200.0, help="Margin around targets for FREQ_MIN/MAX (MHz).")
+    p.add_argument("--skip-powell", action="store_true", help="Disable Powell local refinement and run least_squares only.")
+
+    args = p.parse_args()
+
+    if args.targets:
+        targets = _parse_targets(args.targets)
+    else:
+        targets = _load_targets_from_file(args.targets_file)
+
+    defaults = FixedParams()
+    file_data: Optional[Dict[str, object]] = None
+    if args.input_file:
+        file_data = _load_input_file(args.input_file)
+        _apply_file_simulation_globals(file_data, qrot_override=args.qrot_override)
+    elif args.qrot_override is not None:
+        vmsrot.QROT_OVERRIDE = args.qrot_override
+    else:
+        vmsrot.QROT_OVERRIDE = None
+
+    # Tighten the frequency window for speed
+    tmin = float(np.min(targets))
+    tmax = float(np.max(targets))
+    margin = float(max(0.0, args.freq_margin))
+    vmsrot.FREQ_MIN = max(0.0, tmin - margin)
+    vmsrot.FREQ_MAX = tmax + margin
+
+    file_rotor = file_data.get("rotorType") if file_data else None
+    rotor_type = args.rotor_type if args.rotor_type is not None else (file_rotor or defaults.rotorType)
+    reduction = (file_data.get("reduction") if file_data else None) or vmsrot.REDUCTION
+    distortion = _select_distortion(file_data, reduction) if file_data else {}
+
+    def pick(value, file_value, default_value):
+        return value if value is not None else (file_value if file_value is not None else default_value)
+
+    fixed = FixedParams(
+        T=pick(args.T, file_data.get("T") if file_data else None, defaults.T),
+        DJ=pick(args.DJ, distortion.get("DJ"), defaults.DJ),
+        DJK=pick(args.DJK, distortion.get("DJK"), defaults.DJK),
+        DK=pick(args.DK, distortion.get("DK"), defaults.DK),
+        dJ=pick(args.dJ, distortion.get("dJ"), defaults.dJ),
+        dK=pick(args.dK, distortion.get("dK"), defaults.dK),
+        HJ=pick(args.HJ, distortion.get("HJ"), defaults.HJ),
+        HJK=pick(args.HJK, distortion.get("HJK"), defaults.HJK),
+        HKJ=pick(args.HKJ, distortion.get("HKJ"), defaults.HKJ),
+        HK=pick(args.HK, distortion.get("HK"), defaults.HK),
+        h1=pick(args.h1, distortion.get("h1"), defaults.h1),
+        h2=pick(args.h2, distortion.get("h2"), defaults.h2),
+        h3=pick(args.h3, distortion.get("h3"), defaults.h3),
+        mu_a=pick(args.mu_a, file_data.get("mu_a") if file_data else None, defaults.mu_a),
+        mu_b=pick(args.mu_b, file_data.get("mu_b") if file_data else None, defaults.mu_b),
+        mu_c=pick(args.mu_c, file_data.get("mu_c") if file_data else None, defaults.mu_c),
+        J_max=pick(args.J_max, None, defaults.J_max),
+        intensity_cut=pick(args.intensity_cut, None, defaults.intensity_cut),
+        groupSymmetry=pick(args.group_symmetry, file_data.get("pointGroup") if file_data else None, defaults.groupSymmetry),
+        rotorType=rotor_type,
+        a_checked=not args.no_a,
+        b_checked=not args.no_b,
+        c_checked=not args.no_c,
+        wang_symmetry=not args.no_wang,
+    )
+
+    bounds = None
+    if args.bounds:
+        Amin, Amax, Bmin, Bmax, Cmin, Cmax = args.bounds
+        bounds = ((Amin, Amax), (Bmin, Bmax), (Cmin, Cmax))
+
+    file_A = file_data.get("A") if file_data else None
+    file_B = file_data.get("B") if file_data else None
+    file_C = file_data.get("C") if file_data else None
+    dvibA = file_data.get("DVibA") if file_data else None
+    dvibB = file_data.get("DVibB") if file_data else None
+    dvibC = file_data.get("DVibC") if file_data else None
+    if file_A is not None and dvibA is not None:
+        file_A = file_A + dvibA
+    if file_B is not None and dvibB is not None:
+        file_B = file_B + dvibB
+    if file_C is not None and dvibC is not None:
+        file_C = file_C + dvibC
+
+    A0 = pick(args.A, file_A, None)
+    B0 = pick(args.B, file_B, None)
+    C0 = pick(args.C, file_C, None)
+    if A0 is None or B0 is None or C0 is None:
+        raise SystemExit("Missing A/B/C. Provide --A --B --C or an --input-file with A_MHz/B_MHz/C_MHz.")
+
+    x_best, metrics = fit_abc(
+        targets=targets,
+        A0=A0,
+        B0=B0,
+        C0=C0,
+        fixed=fixed,
+        span=args.span,
+        bounds=bounds,
+        use_powell=(not args.skip_powell),
+    )
+
+    report = _format_report(targets, x_best[0], x_best[1], x_best[2], fixed)
+    print(report)
+    print(f"Objective={metrics['objective']:.6f}  RMS={metrics['rms']:.6f}")
+
+
+if __name__ == "__main__":
+    main()

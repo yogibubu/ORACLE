@@ -1,0 +1,101 @@
+"""Representation helpers used by the WMS-Prep Pyodide bridge.
+
+The frontend and the browser-side geometry tools already use the same
+representation convention.  This module keeps only the axis-order logic needed
+to rotate raw Gaussian tensor components before they are projected to Watson
+constants.
+"""
+
+from __future__ import annotations
+
+REP_MAP = {
+    "Ir": ("a", "b", "c"),
+    "IIr": ("b", "c", "a"),
+    "IIIr": ("c", "a", "b"),
+    "Il": ("a", "c", "b"),
+    "IIl": ("b", "a", "c"),
+    "IIIl": ("c", "b", "a"),
+}
+
+AXES = ("a", "b", "c")
+
+
+def normalize_representation_token(token: object, default: str = "Ir") -> str:
+    raw = str(token or "").strip()
+    if not raw:
+        return default
+    for candidate in REP_MAP:
+        if candidate.lower() == raw.lower():
+            return candidate
+    return default
+
+
+def inverse_representation_token(token: object, default: str = "Ir") -> str:
+    rep = normalize_representation_token(token, default)
+    axes = REP_MAP[rep]
+    inverse = [None, None, None]
+    for index, axis in enumerate(axes):
+        inverse[AXES.index(axis)] = AXES[index]
+    inverse_tuple = tuple(inverse)
+    for candidate, candidate_axes in REP_MAP.items():
+        if candidate_axes == inverse_tuple:
+            return candidate
+    return default
+
+
+def build_axis_remap(input_representation: object, output_representation: object) -> dict[str, object]:
+    rep_in = normalize_representation_token(input_representation)
+    rep_out = normalize_representation_token(output_representation)
+    axes_in = REP_MAP[rep_in]
+    axes_out = REP_MAP[rep_out]
+    principal_to_input_axis = {
+        axes_in[0]: "a",
+        axes_in[1]: "b",
+        axes_in[2]: "c",
+    }
+    return {
+        "inputRepresentation": rep_in,
+        "outputRepresentation": rep_out,
+        "axisOutToIn": {
+            "a": principal_to_input_axis[axes_out[0]],
+            "b": principal_to_input_axis[axes_out[1]],
+            "c": principal_to_input_axis[axes_out[2]],
+        },
+    }
+
+
+def rotate_abc_values(
+    values: object,
+    input_representation: object,
+    output_representation: object,
+) -> dict[str, object] | None:
+    if not isinstance(values, dict):
+        return None
+    rep_out = normalize_representation_token(output_representation)
+    principal = {
+        "a": values.get("A"),
+        "b": values.get("B"),
+        "c": values.get("C"),
+    }
+    axes_out = REP_MAP[rep_out]
+    return {
+        "A": principal.get(axes_out[0]),
+        "B": principal.get(axes_out[1]),
+        "C": principal.get(axes_out[2]),
+    }
+
+
+def rotate_triplet(
+    values: object,
+    input_representation: object,
+    output_representation: object,
+) -> dict[str, object] | None:
+    if not isinstance(values, dict):
+        return None
+    rep_out = normalize_representation_token(output_representation)
+    axes_out = REP_MAP[rep_out]
+    return {
+        "a": values.get(axes_out[0]),
+        "b": values.get(axes_out[1]),
+        "c": values.get(axes_out[2]),
+    }

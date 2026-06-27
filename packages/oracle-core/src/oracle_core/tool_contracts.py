@@ -130,8 +130,15 @@ TOOL_CONTRACTS: tuple[ToolContract, ...] = (
         standalone_command="oracle rovib summarize molecule.xyzin",
         required_sections=("ROTATIONAL",),
         optional_sections=("VIBRATIONAL", "DELTABVIB", "CORIOLIS", "QCENT"),
-        produced_sections=("CORIOLIS", "QCENT"),
-        owned_sections=("ROTATIONAL", "VIBRATIONAL", "DELTABVIB", "CORIOLIS", "QCENT"),
+        produced_sections=("CORIOLIS", "QCENT", "ROTATIONAL_SPECTRUM"),
+        owned_sections=(
+            "ROTATIONAL",
+            "VIBRATIONAL",
+            "DELTABVIB",
+            "CORIOLIS",
+            "QCENT",
+            "ROTATIONAL_SPECTRUM",
+        ),
     ),
     ToolContract(
         key="thermo",

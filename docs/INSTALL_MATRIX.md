@@ -38,11 +38,15 @@ when missing:
 - `numpy`
 - `scipy`
 - `matplotlib`
+- `pandas`
+- `sympy`
 - `pytest`
 - `rdkit`
 
 RDKit is part of the runtime stack because ORACLE-Babel uses it for SMILES
-imports. GUI dependencies are optional and can be installed explicitly:
+imports. Pandas and SymPy are part of the runtime stack because the vendored
+WMS-Rot Hamiltonian engine uses them for line-list tables and Wigner algebra.
+GUI dependencies are optional and can be installed explicitly:
 
 ```bash
 oracle-install-gui-deps
@@ -61,6 +65,8 @@ already owns that task.
 | Avogadro 2 | 3D structure editing, visual inspection and coordinate cleanup | Structure tab, molecular editing |
 | Molden | X11 molecular/orbital/vibration viewer for Molden, Gaussian and related files | Electronic viewer, legacy-style orbital/vibrational inspection |
 | MOrbVis browser | Browser-based WebGPU/CPU viewer for Molden and Cube files | Electronic viewer fallback or publication-quality orbital images |
+| WMS-Rot local engine | Vendored first-party rotational Hamiltonian and line-list engine | Rotational spectroscopy simulation |
+| WMS-Rot browser | Browser/Pyodide rotational spectrum reference workflow | Rotational spectroscopy comparison and WMS-Rot input bridge |
 | XQuartz | X11 display server needed by Molden on macOS | Molden GUI |
 | WebGPU-capable browser | MOrbVis acceleration; CPU fallback is available when WebGPU is absent | MOrbVis |
 
@@ -109,6 +115,49 @@ The reference paper is stored in:
 ```text
 bibliography/morbvis-browser-based-molecular-orbital-visualization-with-webgpu-accelerated-on-the-fly-evaluation.pdf
 ```
+
+### WMS-Rot Local Engine And Browser Reference
+
+MATRIX includes a first-party WMS-Rot snapshot in:
+
+```text
+external/wmsrot-site/
+```
+
+The callable Python Hamiltonian engine is vendored as:
+
+```text
+packages/oracle-rovib/src/oracle_rovib/vendor/wmsrot_engine.py
+```
+
+It requires the same scientific Python stack as the browser Pyodide engine:
+
+```bash
+python -m pip install numpy pandas sympy matplotlib
+```
+
+Run the local engine from normalized `xyzin` data with:
+
+```bash
+oracle rovib wmsrot-run molecule.xyzin --out molecule.rotational.csv
+```
+
+The Rotational Spectroscopy workbench can also open the WMS-Rot browser
+application:
+
+```text
+https://www.skies-village.it/webtools/wmsrot/
+```
+
+Generate a compatible input file from the MATRIX container with:
+
+```bash
+oracle rovib wmsrot-input molecule.xyzin --out molecule.wmsrot.txt
+```
+
+WMS-Rot browser code is treated as a reference and compatibility target.
+Production MATRIX rotational spectroscopy calls the vendored WMS-Rot Python
+engine through `oracle-rovib` over shared `xyzin` sections.
 
 ### Molden On macOS
 

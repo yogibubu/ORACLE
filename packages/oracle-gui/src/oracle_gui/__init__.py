@@ -3,6 +3,7 @@
 from .dvr_state import DVRGuiState, dvr_gui_state_lines, load_dvr_gui_state
 from .commands import (
     MORBVIS_URL,
+    WMSROT_URL,
     OracleGuiCommand,
     avogadro_command,
     dvr_collect_command,
@@ -41,6 +42,9 @@ from .commands import (
     validate_command,
     vpt2_vci_collect_command,
     vpt2_vci_command,
+    wmsrot_command,
+    wmsrot_input_command,
+    wmsrot_run_command,
 )
 from .contracts import (
     ToolContractGuiState,
@@ -168,6 +172,7 @@ from .workflows import (
 __all__ = [
     "ORACLE_GUI_WINDOWS",
     "MORBVIS_URL",
+    "WMSROT_URL",
     "WINDOWS_BY_KEY",
     "DVRGuiState",
     "DashboardAction",
@@ -301,6 +306,9 @@ __all__ = [
     "vpt2_vci_collect_command",
     "vpt2_vci_command",
     "vpt2_vci_gui_state_lines",
+    "wmsrot_command",
+    "wmsrot_input_command",
+    "wmsrot_run_command",
     "workbench_gui_state_lines",
     "window_spec",
 ]

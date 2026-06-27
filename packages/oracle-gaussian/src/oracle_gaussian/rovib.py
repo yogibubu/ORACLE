@@ -185,6 +185,7 @@ def _rotational_section_from_log(
     rot = _parse_rot_constants_mhz(lines)
     temperature = _parse_temperature_from_log(lines)
     point_group = _parse_point_group_from_log(lines) or ""
+    dipole = _parse_dipole_debye_from_log(lines)
 
     def pick(label: str) -> float | None:
         for key in (f"{label}0", f"{label}00", f"{label}e"):
@@ -198,7 +199,15 @@ def _rotational_section_from_log(
     delta = None
     if deltabvib is not None and deltabvib.available:
         delta = (deltabvib.delta_A_MHz, deltabvib.delta_B_MHz, deltabvib.delta_C_MHz)
-    if A is None and B is None and C is None and temperature is None and not point_group and delta is None:
+    if (
+        A is None
+        and B is None
+        and C is None
+        and temperature is None
+        and not point_group
+        and delta is None
+        and dipole is None
+    ):
         return None
     return RotationalSection(
         point_group=point_group,
@@ -206,6 +215,7 @@ def _rotational_section_from_log(
         A_MHz=A,
         B_MHz=B,
         C_MHz=C,
+        dipole_debye=dipole,
         delta_vib_MHz=delta,
     )
 
@@ -380,17 +390,45 @@ def _parse_point_group_from_log(lines: list[str]) -> str | None:
     return point_group
 
 
+def _parse_dipole_debye_from_log(
+    lines: list[str],
+) -> tuple[float | None, float | None, float | None] | None:
+    dipole = None
+    for idx, line in enumerate(lines[:-1]):
+        text = line.strip()
+        if text.startswith("Dipole moment (field-independent basis, Debye):"):
+            match = re.search(
+                r"X=\s*([-+]?\d*\.?\d+(?:[DEde][-+]?\d+)?)\s+"
+                r"Y=\s*([-+]?\d*\.?\d+(?:[DEde][-+]?\d+)?)\s+"
+                r"Z=\s*([-+]?\d*\.?\d+(?:[DEde][-+]?\d+)?)",
+                lines[idx + 1],
+            )
+            if match:
+                dipole = tuple(_gaussian_float(token) for token in match.groups())
+        elif text.startswith("Dipole moment (Debye):"):
+            values = _number_list(lines[idx + 1])
+            if len(values) >= 3:
+                dipole = (values[0], values[1], values[2])
+    return dipole
+
+
 def _merge_rotational_sections(existing: RotationalSection, incoming: RotationalSection) -> RotationalSection:
     return RotationalSection(
         rotor_type=incoming.rotor_type or existing.rotor_type,
         representation=incoming.representation or existing.representation,
         point_group=incoming.point_group or existing.point_group,
+        watson_reduction=incoming.watson_reduction or existing.watson_reduction,
         symmetry_number=incoming.symmetry_number if incoming.symmetry_number is not None else existing.symmetry_number,
         temperature_K=incoming.temperature_K if incoming.temperature_K is not None else existing.temperature_K,
         pressure_atm=incoming.pressure_atm if incoming.pressure_atm is not None else existing.pressure_atm,
         A_MHz=incoming.A_MHz if incoming.A_MHz is not None else existing.A_MHz,
         B_MHz=incoming.B_MHz if incoming.B_MHz is not None else existing.B_MHz,
         C_MHz=incoming.C_MHz if incoming.C_MHz is not None else existing.C_MHz,
+        dipole_debye=(
+            incoming.dipole_debye
+            if incoming.dipole_debye is not None
+            else existing.dipole_debye
+        ),
         q_rot=incoming.q_rot if incoming.q_rot is not None else existing.q_rot,
         delta_vib_MHz=(
             incoming.delta_vib_MHz

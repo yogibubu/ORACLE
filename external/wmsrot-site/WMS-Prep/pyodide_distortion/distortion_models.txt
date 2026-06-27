@@ -1,0 +1,649 @@
+"""Minimal quartic, sextic, and quadrupole models for WMS-Prep.
+
+The goal here is not to mirror the full `centrifugal` toolbox.  The browser
+already parses Gaussian logs; these helpers only rotate the raw tensor payloads
+to the requested representation and project them onto the A/S constants needed
+by `WMS-Rot`.
+"""
+
+from __future__ import annotations
+
+from math import isfinite
+
+from wms_prep_representation_utils import (
+    build_axis_remap,
+    inverse_representation_token,
+    normalize_representation_token,
+    rotate_abc_values,
+    rotate_triplet,
+)
+
+QUARTIC_TAUPRIME_KEYS = ("taaaa", "tbbaa", "tbbbb", "tccaa", "tccbb", "tcccc")
+SEXTIC_INERTIAL_KEYS = (
+    "eaaa",
+    "eaab",
+    "eaac",
+    "eabb",
+    "eabc",
+    "eacc",
+    "ebbb",
+    "ebbc",
+    "ebcc",
+    "eccc",
+)
+QUAD_CART_KEYS = ("chi_aa", "chi_bb", "chi_cc", "chi_ab", "chi_ac", "chi_bc")
+
+ISOTOPE_SPIN_LOOKUP = {
+    ("Al", 27): 2.5,
+    ("B", 10): 3.0,
+    ("B", 11): 1.5,
+    ("Br", 79): 1.5,
+    ("Br", 81): 1.5,
+    ("Cl", 35): 1.5,
+    ("Cl", 37): 1.5,
+    ("Cu", 63): 1.5,
+    ("Cu", 65): 1.5,
+    ("Cs", 133): 3.5,
+    ("H", 2): 1.0,
+    ("I", 127): 2.5,
+    ("K", 39): 1.5,
+    ("K", 41): 1.5,
+    ("Li", 6): 1.0,
+    ("Li", 7): 1.5,
+    ("N", 14): 1.0,
+    ("Na", 23): 1.5,
+    ("O", 17): 2.5,
+    ("Rb", 85): 2.5,
+    ("Rb", 87): 1.5,
+    ("S", 33): 1.5,
+}
+
+
+def _to_float(value: object) -> float | None:
+    try:
+        parsed = float(str(value).replace("D", "E").replace("d", "e"))
+    except (TypeError, ValueError):
+        return None
+    return parsed if isfinite(parsed) else None
+
+
+def format_fortran_number(value: object, fraction_digits: int = 10) -> str:
+    parsed = _to_float(value)
+    if parsed is None:
+        return ""
+    return f"{parsed:.{fraction_digits}E}".replace("E", "D")
+
+
+def format_compact_number(value: object) -> str:
+    parsed = _to_float(value)
+    if parsed is None:
+        return "0"
+    if abs(parsed) < 1.0e-15:
+        return "0"
+    return f"{parsed:.12g}"
+
+
+def _canonical_tau_prime_key(token: object) -> str | None:
+    compact = "".join(ch for ch in str(token or "").lower() if ch in "abc")
+    if len(compact) != 4:
+        return None
+    if compact[0] == compact[1] == compact[2] == compact[3]:
+        return f"t{compact}"
+    if compact[0] != compact[1] or compact[2] != compact[3]:
+        return None
+    low, high = sorted((compact[0], compact[2]))
+    return f"t{high}{high}{low}{low}"
+
+
+def _tau_prime_value_by_indices(tau_prime: object, token: str) -> float | None:
+    if not isinstance(tau_prime, dict):
+        return None
+    key = _canonical_tau_prime_key(token)
+    return _to_float(tau_prime.get(key)) if key else None
+
+
+def rotate_tau_prime(
+    tau_prime: object,
+    input_representation: object,
+    output_representation: object,
+) -> dict[str, float]:
+    remap = build_axis_remap("Ir", output_representation)
+    axis_out_to_in = remap["axisOutToIn"]
+    rotated: dict[str, float] = {}
+    for key in QUARTIC_TAUPRIME_KEYS:
+        output_index = key[1:]
+        mapped_input = "".join(axis_out_to_in[axis] for axis in output_index)
+        value = _tau_prime_value_by_indices(tau_prime, mapped_input)
+        if value is None:
+            raise ValueError(f"Missing TauP component needed for {key}.")
+        rotated[key] = value
+    return rotated
+
+def _canonical_sextic_key(token: object) -> str | None:
+    compact = "".join(ch for ch in str(token or "").lower() if ch in "abc")
+    if len(compact) != 3:
+        return None
+    return "e" + "".join(sorted(compact))
+
+
+def _sextic_value_by_indices(inertial: object, token: str) -> float | None:
+    if not isinstance(inertial, dict):
+        return None
+    key = _canonical_sextic_key(token)
+    return _to_float(inertial.get(key)) if key else None
+
+
+def rotate_sextic_inertial(
+    inertial: object,
+    input_representation: object,
+    output_representation: object,
+) -> dict[str, float]:
+    remap = build_axis_remap("Ir", inverse_representation_token(output_representation))
+    axis_out_to_in = remap["axisOutToIn"]
+    rotated: dict[str, float] = {}
+    for key in SEXTIC_INERTIAL_KEYS:
+        output_index = key[1:]
+        mapped_input = "".join(axis_out_to_in[axis] for axis in output_index)
+        value = _sextic_value_by_indices(inertial, mapped_input)
+        if value is None:
+            raise ValueError(f"Missing sextic inertial component needed for {key}.")
+        rotated[key] = value
+    return rotated
+
+
+def _compute_sigma_from_abc(rotational_constants: object) -> float | None:
+    if not isinstance(rotational_constants, dict):
+        return None
+    a = _to_float(rotational_constants.get("A"))
+    b = _to_float(rotational_constants.get("B"))
+    c = _to_float(rotational_constants.get("C"))
+    if a is None or b is None or c is None:
+        return None
+    denom = b - c
+    if abs(denom) < 1.0e-16:
+        return 0.0
+    return (2.0 * a - b - c) / denom
+
+
+def _compute_sigma_from_moments(moments: object) -> float | None:
+    if not isinstance(moments, dict):
+        return None
+    ia = _to_float(moments.get("a"))
+    ib = _to_float(moments.get("b"))
+    ic = _to_float(moments.get("c"))
+    if ia is None or ib is None or ic is None:
+        return None
+    if ia <= 0.0 or ib <= 0.0 or ic <= 0.0:
+        return None
+    inv_a = 1.0 / ia
+    inv_b = 1.0 / ib
+    inv_c = 1.0 / ic
+    denom = inv_b - inv_c
+    if abs(denom) < 1.0e-16:
+        return 0.0
+    return (2.0 * inv_a - inv_b - inv_c) / denom
+
+
+def resolve_sigma(
+    rotational_constants: object = None,
+    moments: object = None,
+    fallback_sigma: object = None,
+) -> dict[str, object]:
+    sigma = _compute_sigma_from_abc(rotational_constants)
+    if sigma is not None:
+        return {"sigma": sigma, "source": "ABC"}
+    sigma = _compute_sigma_from_moments(moments)
+    if sigma is not None:
+        return {"sigma": sigma, "source": "moments"}
+    sigma = _to_float(fallback_sigma)
+    if sigma is not None:
+        return {"sigma": sigma, "source": "sigma"}
+    return {"sigma": 0.0, "source": "default-0"}
+
+
+def quartic_from_tau_prime(tau_prime: object, sigma: object = 0.0) -> dict[str, object]:
+    """
+    Project Gaussian TauP quartic tensor onto Watson A/S constants.
+
+    This follows the tensor route in the article:
+
+        TauP  ->  tau' matrix, Eq. A2
+               -> T_ij = tau'_ij / 4, Eq. A3
+               -> cylindrical components T400, T220, ..., Eqs. A4-A9
+               -> Watson A reduction, Eqs. A10-A14
+               -> Watson S reduction, Eqs. A16-A20
+
+    Internal convention:
+      taaaa = tau_aaaa
+      tbbaa = tau_aabb
+      tbbbb = tau_bbbb
+      tccaa = tau_aacc
+      tccbb = tau_bbcc
+      tcccc = tau_cccc
+
+    The tauPrime object must already have been rotated to the target
+    representation before this function is called.
+    """
+    if not isinstance(tau_prime, dict):
+        raise ValueError("TauP payload must be a dictionary.")
+
+    taaaa = _to_float(tau_prime.get("taaaa"))
+    taabb = _to_float(tau_prime.get("tbbaa"))
+    tbbbb = _to_float(tau_prime.get("tbbbb"))
+    taacc = _to_float(tau_prime.get("tccaa"))
+    tbbcc = _to_float(tau_prime.get("tccbb"))
+    tcccc = _to_float(tau_prime.get("tcccc"))
+
+    if None in (taaaa, taabb, tbbbb, taacc, tbbcc, tcccc):
+        raise ValueError("TauP payload is incomplete.")
+
+    s_val = _to_float(sigma)
+    s_val = 0.0 if s_val is None else s_val
+
+    if abs(s_val) > 1.0e-16:
+        sigma1 = 1.0 / s_val
+    else:
+        sigma1 = 0.0
+
+    DJ = -(3.0 * tbbbb + 3.0 * tcccc + 2.0 * tbbcc) / 32.0
+    DK = DJ - 0.25 * (taaaa - taabb - taacc)
+    DJK = -DJ - DK - 0.25 * taaaa
+    dJ = -(tbbbb - tcccc) / 16.0
+    R5 = -(tbbbb - tcccc - 2.0 * taabb + 2.0 * taacc) / 32.0
+    R6 = (tbbbb + tcccc - 2.0 * tbbcc) / 64.0
+
+    Taa = taaaa / 4.0
+    Tbb = tbbbb / 4.0
+    Tcc = tcccc / 4.0
+    Tab = taabb / 8.0
+    Tac = taacc / 8.0
+    Tbc = tbbcc / 8.0
+    T400 = -DJ
+    T220 = -DJK
+    T040 = -DK
+    T202 = -dJ
+    T022 = 2.0 * R5
+    T004 = R6
+
+    # Watson A reduction, Eqs. A10-A14.
+    asym = {
+        "deltaJ": DJ - 2.0 * R6,
+        "deltaJK": DJK + 12.0 * R6,
+        "deltaK": DK - 10.0 * R6,
+        "smallDeltaJ": dJ,
+        "smallDeltaK": -2.0 * R5 - 4.0 * s_val * R6,
+    }
+
+    # Watson S reduction, Eqs. A16-A20.
+    sym = {
+        "DJ": DJ + R5 * sigma1,
+        "DJK": DJK - 6.0 * R5 * sigma1,
+        "DK": DK + 5.0 * R5 * sigma1,
+        "d1": -dJ,
+        "d2": R6 + 0.5 * R5 * sigma1,
+    }
+
+    T_payload = {
+        "Taa": Taa,
+        "Tbb": Tbb,
+        "Tcc": Tcc,
+        "Tab": Tab,
+        "Tac": Tac,
+        "Tbc": Tbc,
+        "T400": T400,
+        "T220": T220,
+        "T040": T040,
+        "T202": T202,
+        "T022": T022,
+        "T004": T004,
+        "DJ": DJ,
+        "DJK": DJK,
+        "DK": DK,
+        "dJ": dJ,
+        "R5": R5,
+        "R6": R6,
+    }
+
+    return {
+        "sigma": s_val,
+        "sigma1": sigma1,
+        "T": T_payload,
+        "asym": asym,
+        "sym": sym,
+        "asymFormatted": {key: format_fortran_number(value) for key, value in asym.items()},
+        "symFormatted": {key: format_fortran_number(value) for key, value in sym.items()},
+    }
+
+
+def _abc_value(rotational_constants: object, key: str) -> float | None:
+    if not isinstance(rotational_constants, dict):
+        return None
+    value = _to_float(rotational_constants.get(key))
+    if value is not None:
+        return value
+    return _to_float(rotational_constants.get(key.lower()))
+
+
+def _require_t_value(quartic_t: object, key: str) -> float:
+    if not isinstance(quartic_t, dict):
+        raise ValueError("Sextic projection requires quartic T coefficients from TauP.")
+    value = _to_float(quartic_t.get(key))
+    if value is None:
+        raise ValueError(f"Sextic projection requires quartic coefficient {key}.")
+    return value
+
+
+def sextic_from_inertial(
+    inertial: object,
+    sigma: object = 0.0,
+    quartic_t: object = None,
+    rotational_constants: object = None,
+) -> dict[str, object]:
+    if not isinstance(inertial, dict):
+        raise ValueError("Sextic inertial payload must be a dictionary.")
+    values = {key: _to_float(inertial.get(key)) for key in SEXTIC_INERTIAL_KEYS}
+    if any(value is None for value in values.values()):
+        raise ValueError("Sextic inertial payload is incomplete.")
+
+    eaaa = values["eaaa"]
+    eaab = values["eaab"]
+    eaac = values["eaac"]
+    eabb = values["eabb"]
+    eabc = values["eabc"]
+    eacc = values["eacc"]
+    ebbb = values["ebbb"]
+    ebbc = values["ebbc"]
+    ebcc = values["ebcc"]
+    eccc = values["eccc"]
+    s_val = _to_float(sigma)
+    s_val = 0.0 if s_val is None else s_val
+    sigma1 = 1.0 / s_val if abs(s_val) > 1.0e-16 else 0.0
+
+    a = _abc_value(rotational_constants, "A")
+    b = _abc_value(rotational_constants, "B")
+    c = _abc_value(rotational_constants, "C")
+    if None in (a, b, c):
+        raise ValueError("Sextic projection requires rotational constants A, B, and C.")
+
+    T220 = _require_t_value(quartic_t, "T220")
+    T040 = _require_t_value(quartic_t, "T040")
+    T202 = _require_t_value(quartic_t, "T202")
+    T022 = _require_t_value(quartic_t, "T022")
+    T004 = _require_t_value(quartic_t, "T004")
+
+    # Appendix C, Eqs. 120-129.
+    phi600 = (5.0 / 16.0) * (eaaa + ebbb) + (1.0 / 8.0) * (eaab + eabb)
+    phi420 = (3.0 / 4.0) * (eaac + ebbc) + (1.0 / 4.0) * eabc - 3.0 * phi600
+    phi240 = eacc + ebcc - 2.0 * phi420 - 3.0 * phi600
+    phi060 = eccc - phi240 - phi420 - phi600
+    phi402 = (15.0 / 64.0) * (eaaa - ebbb) + (1.0 / 32.0) * (eaab - eabb)
+    phi222 = 0.5 * (eaac - ebbc) - 2.0 * phi402
+    phi042 = 0.5 * (eacc - ebcc) - phi222 - phi402
+    phi204 = (3.0 / 32.0) * (eaaa + ebbb) - (1.0 / 16.0) * (eaab + eabb)
+    phi024 = 0.125 * (eaac + ebbc - eabc) - phi204
+    phi006 = (1.0 / 64.0) * (eaaa - ebbb) - (1.0 / 32.0) * (eaab - eabb)
+
+    # Appendix C, Eqs. 130-132.
+    B200 = 0.5 * (a + b) - 4.0 * T004
+    B020 = c - B200 + 6.0 * T004
+    B002 = 0.25 * (a - b)
+    if abs(B002) < 1.0e-16:
+        raise ValueError("Sextic A-reduction projection is singular because B002 is zero.")
+    if abs(B020) < 1.0e-16:
+        raise ValueError("Sextic S-reduction projection is singular because B020 is zero.")
+
+    # Watson A reduction, Eqs. 133-143.
+    PHIN = phi600 + 2.0 * phi204
+    PHINK = (
+        phi420
+        - 12.0 * phi204
+        + 2.0 * phi024
+        + 16.0 * s_val * phi006
+        + 8.0 * T022 * T004 / B002
+    )
+    PHIKN = phi240 + (10.0 / 3.0) * phi420 - 30.0 * phi204 - (10.0 / 3.0) * PHINK
+    PHIK = phi060 - (7.0 / 3.0) * phi420 + 28.0 * phi204 + (7.0 / 3.0) * PHINK
+    phiN = phi402 + phi006
+    phiK = (
+        phi042
+        + (4.0 / 3.0) * s_val * phi024
+        + ((32.0 / 3.0) * s_val * s_val + 9.0) * phi006
+        + 4.0
+        * (T040 + (s_val * T022 / 3.0) - 2.0 * (s_val * s_val - 2.0) * T004)
+        * T004
+        / B002
+    )
+    phiNK = (
+        phi222
+        + 4.0 * s_val * phi204
+        - 10.0 * phi006
+        + 2.0 * (T220 - 2.0 * s_val * T202 - 4.0 * T004) * T004 / B002
+    )
+
+    asym = {
+        "PHIN": PHIN,
+        "PHINK": PHINK,
+        "PHIKN": PHIKN,
+        "PHIK": PHIK,
+        "phiN": phiN,
+        "phiNK": phiNK,
+        "phiK": phiK,
+    }
+
+    # Watson S reduction, Eqs. 144-157.
+    rho = 0.25 * T022 * sigma1
+    mu_den = 2.0 * s_val * s_val + 27.0 / 16.0
+    mu = (
+        (s_val * phi042 - (9.0 / 8.0) * phi024) / mu_den
+        + (
+            (-2.0 * s_val * T040 + (s_val * s_val + 3.0) * T022 - 5.0 * s_val * T004)
+            * T022
+        )
+        / (B020 * mu_den)
+    )
+    nu = (3.0 / 16.0) * mu * sigma1 + 0.125 * phi024 * sigma1 + (T004 * T022 / B020)
+    lam = (
+        5.0 * nu * sigma1
+        + 0.5 * phi222 * sigma1
+        + (-0.5 * T220 * sigma1 + T202 - T022 * sigma1 * sigma1 - 2.0 * T004 * sigma1)
+        * T022
+        / B020
+    )
+
+    sym = {
+        "HN": phi600 - lam,
+        "HNK": phi420 + 6.0 * lam - 3.0 * mu,
+        "HKN": phi240 - 5.0 * lam + 10.0 * mu,
+        "HK": phi060 - 7.0 * mu,
+        "h1": phi402 - nu,
+        "h2": phi204 + 0.5 * lam,
+        "h3": phi006 + nu,
+    }
+    return {
+        "sigma": s_val,
+        "sigma1": sigma1,
+        "cylindrical": {
+            "Phi600": phi600,
+            "Phi420": phi420,
+            "Phi240": phi240,
+            "Phi060": phi060,
+            "Phi402": phi402,
+            "Phi222": phi222,
+            "Phi042": phi042,
+            "Phi204": phi204,
+            "Phi024": phi024,
+            "Phi006": phi006,
+        },
+        "B": {"B200": B200, "B020": B020, "B002": B002},
+        "SIntermediates": {"rho": rho, "mu": mu, "nu": nu, "lambda": lam},
+        "asym": asym,
+        "sym": sym,
+        "asymFormatted": {key: format_fortran_number(value) for key, value in asym.items()},
+        "symFormatted": {key: format_fortran_number(value) for key, value in sym.items()},
+    }
+
+
+def _pair_key(axis_i: str, axis_j: str) -> str:
+    low, high = sorted((axis_i, axis_j))
+    return f"chi_{low}{high}" if low != high else f"chi_{low}{low}"
+
+
+def rotate_quadrupole_tensor(
+    tensor: object,
+    input_representation: object,
+    output_representation: object,
+) -> dict[str, float]:
+    if not isinstance(tensor, dict):
+        raise ValueError("Quadrupole tensor payload must be a dictionary.")
+    remap = build_axis_remap(input_representation, output_representation)
+    axis_out_to_in = remap["axisOutToIn"]
+    rotated: dict[str, float] = {}
+    for key in QUAD_CART_KEYS:
+        out_i = key[4]
+        out_j = key[5]
+        in_i = axis_out_to_in[out_i]
+        in_j = axis_out_to_in[out_j]
+        source_key = _pair_key(in_i, in_j)
+        value = _to_float(tensor.get(source_key))
+        if value is None:
+            raise ValueError(f"Missing quadrupole component needed for {key}.")
+        rotated[key] = value
+    return rotated
+
+
+def infer_nuclear_spin(element: object, mass_number: object) -> float | None:
+    symbol = str(element or "").strip()
+    try:
+        mass = int(mass_number)
+    except (TypeError, ValueError):
+        return None
+    if not symbol:
+        return None
+    return ISOTOPE_SPIN_LOOKUP.get((symbol, mass))
+
+
+def build_empty_quadrupole_fields() -> dict[str, str]:
+    fields = {
+        "I_NUC": "0",
+        "I_NUC_1": "0",
+        "I_NUC_2": "0",
+    }
+    for suffix in ("", "_1", "_2"):
+        for key in QUAD_CART_KEYS:
+            fields[f"{key}{suffix}"] = "0"
+    return fields
+
+
+def serialize_quadrupole_wms_fields(nuclei: list[dict[str, object]]) -> dict[str, object]:
+    selected = list(nuclei[:2])
+    warnings: list[str] = []
+    if len(nuclei) > 2:
+        warnings.append(
+            f"Quadrupole export is limited to two nuclei; keeping the first two of {len(nuclei)}."
+        )
+
+    while len(selected) < 2:
+        selected.append({"spin": 0.0, "chi": {key: 0.0 for key in QUAD_CART_KEYS}})
+
+    first = selected[0]
+    second = selected[1]
+    first_spin = _to_float(first.get("spin"))
+    second_spin = _to_float(second.get("spin"))
+    first_chi = first.get("chi") if isinstance(first.get("chi"), dict) else {}
+    second_chi = second.get("chi") if isinstance(second.get("chi"), dict) else {}
+
+    fields = build_empty_quadrupole_fields()
+    fields["I_NUC"] = format_compact_number(first_spin)
+    fields["I_NUC_1"] = format_compact_number(first_spin)
+    fields["I_NUC_2"] = format_compact_number(second_spin)
+    for key in QUAD_CART_KEYS:
+        fields[key] = format_compact_number(first_chi.get(key))
+        fields[f"{key}_1"] = format_compact_number(first_chi.get(key))
+        fields[f"{key}_2"] = format_compact_number(second_chi.get(key))
+    return {"fields": fields, "warnings": warnings}
+
+
+def rotate_quadrupole_nuclei(
+    payload: object,
+    target_representation: object,
+) -> dict[str, object]:
+    result = {
+        "inputRepresentation": target_representation,
+        "nuclei": [],
+        "wmsFields": build_empty_quadrupole_fields(),
+        "warnings": [],
+    }
+    if not isinstance(payload, dict):
+        return result
+
+    rep_in = payload.get("inputRepresentation") or target_representation
+    nuclei = payload.get("nuclei")
+    if not isinstance(nuclei, list):
+        return result
+
+    rotated_nuclei = []
+    warnings: list[str] = []
+    for nucleus in nuclei:
+        if not isinstance(nucleus, dict):
+            continue
+        chi = nucleus.get("chi")
+        if not isinstance(chi, dict):
+            continue
+        rotated_chi = rotate_quadrupole_tensor(chi, rep_in, target_representation)
+        spin = _to_float(nucleus.get("spin"))
+        spin_source = "provided"
+        if spin is None:
+            spin = infer_nuclear_spin(nucleus.get("element"), nucleus.get("massNumber"))
+            spin_source = "lookup"
+        if spin is None:
+            label = nucleus.get("label") or f"{nucleus.get('element', '?')}({nucleus.get('massNumber', '?')})"
+            warnings.append(f"Unable to infer the nuclear spin for {label}; exported I_NUC=0.")
+            spin = 0.0
+            spin_source = "missing"
+        rotated_nuclei.append(
+            {
+                "centerIndex": nucleus.get("centerIndex"),
+                "label": nucleus.get("label"),
+                "element": nucleus.get("element"),
+                "massNumber": nucleus.get("massNumber"),
+                "spin": spin,
+                "spinSource": spin_source,
+                "chi": rotated_chi,
+            }
+        )
+
+    serialized = serialize_quadrupole_wms_fields(rotated_nuclei)
+    result["nuclei"] = rotated_nuclei
+    result["wmsFields"] = serialized["fields"]
+    result["warnings"] = warnings + serialized["warnings"]
+    return result
+
+
+def rotated_sigma_inputs(
+    payload: object,
+    target_representation: object,
+) -> dict[str, object]:
+    if not isinstance(payload, dict):
+        return {
+            "rotationalConstantsMHz": None,
+            "moments": None,
+            "sigma": None,
+            "sigmaSource": "default-0",
+        }
+    rep_in = payload.get("inputRepresentation") or target_representation
+    rotated_abc = rotate_abc_values(payload.get("rotationalConstantsMHz"), rep_in, target_representation)
+    rotated_moments = rotate_triplet(payload.get("moments"), rep_in, target_representation)
+    fallback_sigma = _to_float(payload.get("sigma"))
+    if (
+        normalize_representation_token(rep_in) == normalize_representation_token(target_representation)
+        and fallback_sigma is not None
+    ):
+        sigma_info = {"sigma": fallback_sigma, "source": "sigma"}
+    else:
+        sigma_info = resolve_sigma(rotated_abc, rotated_moments, payload.get("sigma"))
+    return {
+        "rotationalConstantsMHz": rotated_abc,
+        "moments": rotated_moments,
+        "sigma": sigma_info["sigma"],
+        "sigmaSource": sigma_info["source"],
+    }

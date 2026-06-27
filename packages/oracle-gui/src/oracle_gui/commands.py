@@ -9,6 +9,7 @@ from collections.abc import Sequence
 
 
 MORBVIS_URL = "https://yasuaki-ito.github.io/morbvis/"
+WMSROT_URL = "https://www.skies-village.it/webtools/wmsrot/"
 
 
 @dataclass(frozen=True)
@@ -67,6 +68,66 @@ def molden_command(
 
 def morbvis_command(*, url: str = MORBVIS_URL) -> OracleGuiCommand:
     return OracleGuiCommand("Open MOrbVis", (sys.executable, "-m", "webbrowser", "-t", url))
+
+
+def wmsrot_command(*, url: str = WMSROT_URL) -> OracleGuiCommand:
+    return OracleGuiCommand("Open WMS-Rot", (sys.executable, "-m", "webbrowser", "-t", url))
+
+
+def wmsrot_input_command(
+    xyzin: Path | str,
+    *,
+    out: Path | str | None = None,
+    j_min: int = 0,
+    j_max: int = 30,
+    reduction: str | None = None,
+    auto_estimate_j_range: bool = False,
+) -> OracleGuiCommand:
+    argv = [*_oracle(), "rovib", "wmsrot-input", str(Path(xyzin))]
+    if out is not None:
+        argv.extend(["--out", str(Path(out))])
+    argv.extend(["--j-min", str(int(j_min)), "--j-max", str(int(j_max))])
+    if reduction:
+        argv.extend(["--reduction", reduction])
+    _append_flag(argv, "--auto-estimate-j-range", auto_estimate_j_range)
+    return OracleGuiCommand(
+        "Export WMS-Rot input",
+        tuple(argv),
+        required_sections=("ROTATIONAL",),
+    )
+
+
+def wmsrot_run_command(
+    xyzin: Path | str,
+    *,
+    out: Path | str,
+    j_min: int = 0,
+    j_max: int = 30,
+    intensity_cut: float = 1.0e-20,
+    reduction: str | None = None,
+) -> OracleGuiCommand:
+    argv = [
+        *_oracle(),
+        "rovib",
+        "wmsrot-run",
+        str(Path(xyzin)),
+        "--out",
+        str(Path(out)),
+        "--j-min",
+        str(int(j_min)),
+        "--j-max",
+        str(int(j_max)),
+        "--intensity-cut",
+        str(float(intensity_cut)),
+    ]
+    if reduction:
+        argv.extend(["--reduction", reduction])
+    return OracleGuiCommand(
+        "Run local WMS-Rot",
+        tuple(argv),
+        required_sections=("ROTATIONAL",),
+        produced_sections=("ROTATIONAL_SPECTRUM",),
+    )
 
 
 def gaussian_summary_command(log: Path | str) -> OracleGuiCommand:

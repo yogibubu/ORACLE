@@ -5,13 +5,17 @@ from oracle_rovib import (
     ORACLE_XYZ_ROTATIONAL_SCHEMA,
     ORACLE_XYZ_VIBRATIONAL_SCHEMA,
     RotationalSection,
+    WMSRotInputOptions,
+    WMSRotSimulationOptions,
     VibrationalSection,
     parse_rotational_section,
     parse_vibrational_section,
     read_rotational_section,
     read_vibrational_section,
     rovib_summary_lines,
+    simulate_wmsrot_spectrum,
     summarize_xyzin,
+    wmsrot_input_text_from_xyzin,
     write_rotational_section,
     write_vibrational_section,
 )
@@ -38,10 +42,14 @@ def test_rotational_section_accepts_merlino_keys():
         [
             "rotor_type = asymmetric_top_quasi_prolate",
             "Point Group = C2v",
+            "Watson Reduction = A",
             "Symm. Number = 2",
             "A_MHz = 1000.0",
             "B_MHz = 800.0",
             "C_MHz = 600.0",
+            "Dipole_a_D = 1.1",
+            "Dipole_b_D = 2.2",
+            "Dipole_c_D = 3.3",
             "DVibA_MHz=1.0",
             "DVibB_MHz=2.0",
             "DVibC_MHz=3.0",
@@ -50,8 +58,10 @@ def test_rotational_section_accepts_merlino_keys():
     )
 
     assert section.point_group == "C2v"
+    assert section.watson_reduction == "A"
     assert section.symmetry_number == 2
     assert section.A_MHz == 1000.0
+    assert section.dipole_debye == (1.1, 2.2, 3.3)
     assert section.delta_vib_MHz == (1.0, 2.0, 3.0)
     assert section.q_rot == 10.5
 
@@ -75,6 +85,96 @@ def test_rotational_section_writer_preserves_other_sections(tmp_path):
 
     assert parsed.B_MHz == 42.0
     assert section_content(lines, "GIC")[0] == "SCHEMA oracle.xyz.gic.v1"
+
+
+def test_wmsrot_input_export_uses_normalized_rotational_sections(tmp_path):
+    path = tmp_path / "molecule.xyzin"
+    path.write_text(
+        "\n".join(
+            [
+                "1",
+                "h",
+                "H 0 0 0",
+                "",
+                "#BASIC",
+                "POINT_GROUP = C2v",
+                "WATSON_REDUCTION = A",
+                "T_K = 100.0",
+                "",
+                "#ROTATIONAL",
+                "rotor_type = asymmetric_top_quasi_prolate",
+                "representation = Ir",
+                "A_MHz = 1000.0",
+                "B_MHz = 800.0",
+                "C_MHz = 600.0",
+                "Dipole_a_D = 1.0",
+                "Dipole_b_D = 0.0",
+                "Dipole_c_D = 2.0",
+                "",
+                "#DELTABVIB",
+                "DVibA_MHz = 1.0",
+                "DVibB_MHz = 2.0",
+                "DVibC_MHz = 3.0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    text = wmsrot_input_text_from_xyzin(
+        path,
+        options=WMSRotInputOptions(j_min=1, j_max=8),
+    )
+
+    assert "rotor_type = asymmetric" in text
+    assert "Watson Reduction = A" in text
+    assert "Point Group = C2v" in text
+    assert "T_K = 100" in text
+    assert "DVibC_MHz= 3" in text
+    assert "Dipole_c_D = 2" in text
+    assert "J_MIN = 1" in text
+    assert "J_MAX = 8" in text
+    assert "DELTA J_MHz =  0" in text
+
+
+def test_wmsrot_simulation_wrapper_calls_vendored_engine_with_deltabvib():
+    class FakeEngine:
+        REDUCTION = "S"
+        REPRESENTATION = "Ir"
+        FREQ_UNIT = "MHz"
+
+        def __init__(self):
+            self.calls = []
+
+        def simulate_rigid_spectrum(self, *args):
+            self.calls.append(args)
+            return [{"Frequency (MHz)": 1.0, "Relative intensity": 2.0}]
+
+    engine = FakeEngine()
+
+    rows = simulate_wmsrot_spectrum(
+        RotationalSection(
+            rotor_type="asymmetric",
+            representation="IIIl",
+            point_group="C2v",
+            watson_reduction="A",
+            temperature_K=100.0,
+            A_MHz=1000.0,
+            B_MHz=800.0,
+            C_MHz=600.0,
+            dipole_debye=(1.0, 0.0, 2.0),
+            delta_vib_MHz=(1.0, 2.0, 3.0),
+        ),
+        options=WMSRotSimulationOptions(j_min=1, j_max=4),
+        engine=engine,
+    )
+
+    assert rows == [{"Frequency (MHz)": 1.0, "Relative intensity": 2.0}]
+    call = engine.calls[0]
+    assert call[:4] == (100.0, 1001.0, 802.0, 603.0)
+    assert call[16:19] == (1.0, 0.0, 2.0)
+    assert call[19:23] == (4, 1.0e-20, "C2v", "asymmetric")
+    assert call[-1] == 1
 
 
 def test_vibrational_section_reads_frequencies_and_chi_block():

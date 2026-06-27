@@ -54,6 +54,7 @@ def test_tool_contract_registry_records_standalone_sections_and_future_names():
     )
     assert contracts["trinity"].status == "prepare-only"
     assert contracts["trinity"].produced_sections == ("TRINITY",)
+    assert "ROTATIONAL_SPECTRUM" in contracts["rovib"].produced_sections
     assert tool_contract("NEO").key == "gicforge"
     assert "TRINITY" in tool_contract_markdown_table()
 

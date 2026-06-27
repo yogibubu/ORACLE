@@ -1,0 +1,130 @@
+"""JSON-facing API used by WMS-Prep through Pyodide."""
+
+from __future__ import annotations
+
+from wms_prep_distortion_models import (
+    quartic_from_tau_prime,
+    rotate_quadrupole_nuclei,
+    rotate_sextic_inertial,
+    rotate_tau_prime,
+    rotated_sigma_inputs,
+    sextic_from_inertial,
+)
+from wms_prep_representation_utils import (
+    inverse_representation_token,
+    normalize_representation_token,
+    rotate_abc_values,
+)
+
+
+def _sigma_label(source: object) -> str:
+    if source == "ABC":
+        return "A/B/C"
+    if source == "moments":
+        return "Ia/Ib/Ic"
+    if source == "sigma":
+        return "Gaussian Sigma"
+    return "default s=0"
+
+
+def _build_quartic_payload(component: object, target_representation: str) -> dict[str, object] | None:
+    if not isinstance(component, dict) or not isinstance(component.get("tauPrime"), dict):
+        return None
+    rep_in = component.get("inputRepresentation") or target_representation
+    rotated_tau = rotate_tau_prime(component.get("tauPrime"), rep_in, target_representation)
+    sigma_inputs = rotated_sigma_inputs(component, target_representation)
+    quartic = quartic_from_tau_prime(rotated_tau, sigma_inputs["sigma"])
+    return {
+        "contextLabel": component.get("contextLabel") or "",
+        "inputRepresentation": target_representation,
+        "tauPrime": rotated_tau,
+        "rotationalConstantsMHz": sigma_inputs["rotationalConstantsMHz"],
+        "moments": sigma_inputs["moments"],
+        "sigma": quartic["sigma"],
+        "sigma1": quartic["sigma1"],
+        "sigmaSource": sigma_inputs["sigmaSource"],
+        "sigmaLabel": _sigma_label(sigma_inputs["sigmaSource"]),
+        "T": quartic["T"],
+        "asym": quartic["asymFormatted"],
+        "sym": quartic["symFormatted"],
+    }
+
+
+def _build_sextic_payload(
+    component: object,
+    target_representation: str,
+    quartic_payload: object = None,
+) -> dict[str, object] | None:
+    if not isinstance(component, dict) or not isinstance(component.get("inertial"), dict):
+        return None
+    rep_in = component.get("inputRepresentation") or target_representation
+    rotated_inertial = rotate_sextic_inertial(
+        component.get("inertial"),
+        rep_in,
+        target_representation,
+    )
+    sigma_inputs = rotated_sigma_inputs(component, target_representation)
+    rotational_constants = rotate_abc_values(
+        component.get("rotationalConstantsMHz"),
+        "Ir",
+        inverse_representation_token(target_representation),
+    )
+    quartic_t = None
+    if isinstance(quartic_payload, dict):
+        quartic_t = quartic_payload.get("T")
+        if rotational_constants is None:
+            rotational_constants = rotate_abc_values(
+                quartic_payload.get("rotationalConstantsMHz"),
+                target_representation,
+                inverse_representation_token(target_representation),
+            )
+
+    sextic = sextic_from_inertial(
+        rotated_inertial,
+        sigma_inputs["sigma"],
+        quartic_t,
+        rotational_constants,
+    )
+    return {
+        "contextLabel": component.get("contextLabel") or "",
+        "inputRepresentation": target_representation,
+        "inertial": rotated_inertial,
+        "sigma": sextic["sigma"],
+        "sigma1": sextic["sigma1"],
+        "sigmaSource": sigma_inputs["sigmaSource"],
+        "sigmaLabel": _sigma_label(sigma_inputs["sigmaSource"]),
+        "cylindrical": sextic["cylindrical"],
+        "B": sextic["B"],
+        "SIntermediates": sextic["SIntermediates"],
+        "asymSextic": sextic["asymFormatted"],
+        "symSextic": sextic["symFormatted"],
+    }
+
+
+def process_gaussian_log_payload(payload: object) -> dict[str, object]:
+    if not isinstance(payload, dict):
+        raise ValueError("WMS-Prep Pyodide payload must be a dictionary.")
+
+    target_representation = normalize_representation_token(
+        payload.get("outputRepresentation"),
+        "Ir",
+    )
+    warnings: list[str] = []
+    result = {
+        "outputRepresentation": target_representation,
+        "warnings": warnings,
+    }
+
+    quartic = _build_quartic_payload(payload.get("quartic"), target_representation)
+    if quartic is not None:
+        result["quartic"] = quartic
+
+    sextic = _build_sextic_payload(payload.get("sextic"), target_representation, quartic)
+    if sextic is not None:
+        result["sextic"] = sextic
+
+    quadrupole = rotate_quadrupole_nuclei(payload.get("quadrupole"), target_representation)
+    warnings.extend(quadrupole.get("warnings", []))
+    result["quadrupole"] = quadrupole
+
+    return result

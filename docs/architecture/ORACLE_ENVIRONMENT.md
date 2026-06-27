@@ -41,7 +41,7 @@ ORACLE_PYTHON=python3
 ORACLE_AUTO_CREATE_VENV=1
 ORACLE_AUTO_INSTALL_RUNTIME_DEPS=1
 ORACLE_AUTO_INSTALL_GUI_DEPS=0
-ORACLE_RUNTIME_DEPS="numpy scipy matplotlib pytest rdkit"
+ORACLE_RUNTIME_DEPS="numpy scipy matplotlib pandas sympy pytest rdkit"
 ORACLE_GUI_DEPS="PySide6 pytest-qt"
 ```
 

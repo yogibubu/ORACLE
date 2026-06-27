@@ -1,0 +1,1854 @@
+#!/usr/bin/env python3
+"""
+AUTOFIT version 2 (simplified):
+Given a theoretical input file, an experimental spectrum (stick or profile),
+and a list of theoretical transition labels, it searches the best assignment
+of experimental peaks to those labels, scores against control lines, then
+performs a final local fit (optional Powell -> least_squares).
+"""
+from __future__ import annotations
+
+import argparse
+import math
+import os
+import random
+import sys
+from dataclasses import dataclass
+from itertools import product
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+
+import numpy as np
+from scipy.optimize import minimize, least_squares
+
+HERE = os.path.abspath(os.path.dirname(__file__))
+ROOT = os.path.abspath(os.path.join(HERE, ".."))
+sys.path.insert(0, HERE)
+sys.path.insert(0, ROOT)
+
+import vmsrot  # noqa: E402
+import fit_abc as fitmod  # noqa: E402
+
+BASE_FIT_PARAM_NAMES: Tuple[str, ...] = ("A", "B", "C")
+QUARTIC_PARAM_NAMES: Tuple[str, ...] = fitmod.QUARTIC_PARAM_NAMES
+DISTORTION_PARAM_NAMES: Tuple[str, ...] = fitmod.DISTORTION_PARAM_NAMES
+MODEL_PARAM_NAMES: Tuple[str, ...] = fitmod.MODEL_PARAM_NAMES
+SCALE_FIT_PARAM_NAME = "s"
+OPTIONAL_FIT_PARAM_NAMES: Tuple[str, ...] = DISTORTION_PARAM_NAMES + (SCALE_FIT_PARAM_NAME,)
+BOUND_PARAM_NAMES: Tuple[str, ...] = MODEL_PARAM_NAMES + (SCALE_FIT_PARAM_NAME,)
+DISTORTION_BOUNDS_FLOORS_MHZ: Dict[str, float] = {
+    "DJ": 0.05,
+    "DJK": 0.05,
+    "DK": 0.05,
+    "dJ": 0.01,
+    "dK": 0.01,
+    "HJ": 0.001,
+    "HJK": 0.001,
+    "HKJ": 0.001,
+    "HK": 0.001,
+    "h1": 0.001,
+    "h2": 0.001,
+    "h3": 0.001,
+}
+LAST_FIT_METRICS: Optional[Dict[str, object]] = None
+
+
+@dataclass
+class Peak:
+    freq: float
+    intensity: float
+    snr: float
+    q: float
+
+
+@dataclass(frozen=True)
+class LabelRequest:
+    label: str
+    freq_hint: Optional[float] = None
+
+
+@dataclass(frozen=True)
+class ManualAssignment:
+    label: str
+    obs_freq: float
+    theory_freq_hint: Optional[float] = None
+
+
+def _label_row(row) -> str:
+    if all(hasattr(row, name) for name in ("Fl", "Fu", "I12_l", "I12_u")):
+        return (
+            f"J={int(row.Jl)} F={float(row.Fl):g} I12={float(row.I12_l):g} "
+            f"Ka={int(row.Ka_l)} Kc={int(row.Kc_l)} -> "
+            f"J={int(row.Ju)} F={float(row.Fu):g} I12={float(row.I12_u):g} "
+            f"Ka={int(row.Ka_u)} Kc={int(row.Kc_u)} ({row.Branch})"
+        )
+    if all(hasattr(row, name) for name in ("Fl", "Fu")):
+        return (
+            f"J={int(row.Jl)} F={float(row.Fl):g} Ka={int(row.Ka_l)} Kc={int(row.Kc_l)} -> "
+            f"J={int(row.Ju)} F={float(row.Fu):g} Ka={int(row.Ka_u)} Kc={int(row.Kc_u)} ({row.Branch})"
+        )
+    return (
+        f"J={int(row.Jl)} Ka={int(row.Ka_l)} Kc={int(row.Kc_l)} -> "
+        f"J={int(row.Ju)} Ka={int(row.Ka_u)} Kc={int(row.Kc_u)} ({row.Branch})"
+    )
+
+
+def _order_ok_abc(fixed: fitmod.FixedParams, A: float, B: float, C: float) -> bool:
+    if fixed.rotorType == "asymmetric":
+        return A > B and B > C
+    return A >= B and B >= C
+
+
+def _state_from_vector(
+    x: Sequence[float],
+    fit_param_names: Sequence[str],
+    base_state: Dict[str, float],
+) -> Dict[str, float]:
+    state = dict(base_state)
+    for name, value in zip(fit_param_names, x):
+        state[name] = float(value)
+    return state
+
+
+def _vector_from_state(state: Dict[str, float], fit_param_names: Sequence[str]) -> np.ndarray:
+    return np.array([float(state[name]) for name in fit_param_names], dtype=float)
+
+
+def _resolve_effective_model_state(
+    opt_state: Dict[str, float],
+    quartic_reference: Dict[str, float],
+    reduction: Optional[str],
+    fit_param_names: Sequence[str],
+) -> Dict[str, float]:
+    model_state = {name: float(opt_state[name]) for name in MODEL_PARAM_NAMES}
+    if any(name in QUARTIC_PARAM_NAMES for name in fit_param_names):
+        return model_state
+    scale_value = fitmod._normalize_quartic_scale(opt_state.get(SCALE_FIT_PARAM_NAME, 1.0))
+    return fitmod._apply_quartic_scale_to_model_state(
+        model_state=model_state,
+        quartic_reference=quartic_reference,
+        reduction=reduction,
+        scale=scale_value,
+    )
+
+
+def _final_quartic_scale_state(
+    opt_state: Dict[str, float],
+    model_state: Dict[str, float],
+    quartic_reference: Dict[str, float],
+    fit_param_names: Sequence[str],
+) -> Tuple[float, Dict[str, float]]:
+    if any(name in QUARTIC_PARAM_NAMES for name in fit_param_names):
+        return 1.0, fitmod._extract_quartic_params(model_state)
+    scale_value = fitmod._normalize_quartic_scale(opt_state.get(SCALE_FIT_PARAM_NAME, 1.0))
+    return scale_value, fitmod._extract_quartic_params(quartic_reference)
+
+
+def _build_bounds_vector(
+    x0: np.ndarray,
+    fit_param_names: Sequence[str],
+    span: float,
+    custom_bounds: Optional[Dict[str, Tuple[Optional[float], Optional[float]]]] = None,
+) -> Tuple[np.ndarray, np.ndarray]:
+    lo = np.empty(len(fit_param_names), dtype=float)
+    hi = np.empty(len(fit_param_names), dtype=float)
+    span_abs = abs(float(span))
+    span_scale = max(0.25, span_abs / 0.3) if span_abs > 0 else 0.25
+
+    for idx, (name, value) in enumerate(zip(fit_param_names, x0)):
+        val = float(value)
+        if name in BASE_FIT_PARAM_NAMES or name == SCALE_FIT_PARAM_NAME:
+            lower = max(1e-6, val * (1.0 - span_abs))
+            upper = max(lower * 1.001, val * (1.0 + span_abs))
+        else:
+            base_floor = DISTORTION_BOUNDS_FLOORS_MHZ.get(name, 0.001)
+            window = max(abs(val) * span_abs, base_floor * span_scale)
+            if not np.isfinite(window) or window <= 0:
+                window = base_floor * span_scale
+            lower = val - window
+            upper = val + window
+            if lower == upper:
+                upper = lower + max(1e-12, base_floor * 1e-6)
+        if custom_bounds and name in custom_bounds:
+            custom_lower, custom_upper = custom_bounds[name]
+            if custom_lower is not None:
+                lower = float(custom_lower)
+            if custom_upper is not None:
+                upper = float(custom_upper)
+        if not (np.isfinite(lower) and np.isfinite(upper)):
+            raise SystemExit(f"Invalid custom bounds for {name}: min/max must be finite numbers.")
+        if upper <= lower:
+            raise SystemExit(f"Invalid custom bounds for {name}: max must be greater than min.")
+        lo[idx] = lower
+        hi[idx] = upper
+
+    return lo, hi
+
+
+def _normalize_param_name(raw: str, allowed: Sequence[str], context: str) -> str:
+    token = str(raw).strip()
+    exact = set(allowed)
+    if token in exact:
+        return token
+    lookup: Dict[str, List[str]] = {}
+    for name in allowed:
+        lookup.setdefault(name.lower(), []).append(name)
+    matches = lookup.get(token.lower(), [])
+    if len(matches) > 1:
+        raise SystemExit(
+            f"Ambiguous {context} parameter casing: {raw}. "
+            f"Use exact names among: {', '.join(allowed)}"
+        )
+    if not matches:
+        raise SystemExit(
+            f"Unsupported {context} parameter: {raw}. "
+            f"Choose among: {', '.join(allowed)}"
+        )
+    return matches[0]
+
+
+def _normalize_fit_param_names(values: Optional[Sequence[str]]) -> List[str]:
+    normalized: List[str] = []
+    seen = set()
+    for raw in values or []:
+        key = _normalize_param_name(raw, OPTIONAL_FIT_PARAM_NAMES, "fit")
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized.append(key)
+    if SCALE_FIT_PARAM_NAME in normalized and any(name in QUARTIC_PARAM_NAMES for name in normalized):
+        raise SystemExit(
+            f"{SCALE_FIT_PARAM_NAME} is mutually exclusive with direct quartic fits: "
+            f"{', '.join(QUARTIC_PARAM_NAMES)}"
+        )
+    return normalized
+
+
+def _parse_bound_side(raw: str) -> Optional[float]:
+    text = str(raw).strip()
+    if not text or text.lower() in {"nan", "none", "auto", "default"}:
+        return None
+    try:
+        value = float(text)
+    except Exception as exc:
+        raise SystemExit(f"Invalid custom bound value: {raw}") from exc
+    if not np.isfinite(value):
+        return None
+    return value
+
+
+def _parse_custom_param_bounds(
+    values: Optional[Sequence[Sequence[str]]],
+) -> Dict[str, Tuple[Optional[float], Optional[float]]]:
+    parsed: Dict[str, Tuple[Optional[float], Optional[float]]] = {}
+    for raw_entry in values or []:
+        if len(raw_entry) != 3:
+            raise SystemExit("Each --param-bound entry must provide NAME MIN MAX.")
+        name_raw, lo_raw, hi_raw = raw_entry
+        name = _normalize_param_name(name_raw, BOUND_PARAM_NAMES, "bound")
+        lower = _parse_bound_side(lo_raw)
+        upper = _parse_bound_side(hi_raw)
+        if lower is None and upper is None:
+            parsed.pop(name, None)
+            continue
+        if lower is not None and upper is not None and upper <= lower:
+            raise SystemExit(f"Invalid custom bounds for {name}: max must be greater than min.")
+        parsed[name] = (lower, upper)
+    return parsed
+
+
+def _format_model_state_line(state: Dict[str, float]) -> str:
+    return "|".join(f"{name}={float(state[name]):.12g}" for name in MODEL_PARAM_NAMES)
+
+
+def _round_sig(value: float, sig_digits: int) -> float:
+    if (not np.isfinite(value)) or value == 0.0:
+        return float(value)
+    exponent = int(math.floor(math.log10(abs(value))))
+    decimals = sig_digits - 1 - exponent
+    return round(value, decimals)
+
+
+def _format_with_parenthetical_uncertainty(value: float, sigma: Optional[float]) -> str:
+    if sigma is None:
+        return f"{float(value):.12g} [SIGMA N.D.]"
+    sigma_value = float(sigma)
+    if (not np.isfinite(sigma_value)) or sigma_value <= 0:
+        return f"{float(value):.12g} [SIGMA N.D.]"
+    exponent = int(math.floor(math.log10(abs(sigma_value))))
+    lead = abs(sigma_value) / (10 ** exponent)
+    sig_digits = 2 if lead < 3.0 else 1
+    sigma_rounded = _round_sig(abs(sigma_value), sig_digits)
+    decimals = max(0, -exponent + sig_digits - 1)
+    value_rounded = round(float(value), decimals)
+    paren = int(round(sigma_rounded * (10 ** decimals)))
+    return f"{value_rounded:.{decimals}f}({paren})"
+
+
+def _uncertainty_status(sigma: Optional[float]) -> str:
+    if sigma is None:
+        return "undetermined"
+    sigma_value = float(sigma)
+    if (not np.isfinite(sigma_value)) or sigma_value <= 0:
+        return "undetermined"
+    return "ok"
+
+
+def _uncertainty_step(name: str, value: float) -> float:
+    magnitude = abs(float(value))
+    scaled = magnitude * 1.0e-6
+    if name in BASE_FIT_PARAM_NAMES:
+        return max(scaled, 1.0e-4)
+    if name == SCALE_FIT_PARAM_NAME:
+        return max(scaled, 1.0e-6)
+    if name in QUARTIC_PARAM_NAMES:
+        return max(scaled, 1.0e-7)
+    if name in DISTORTION_PARAM_NAMES:
+        return max(scaled, 1.0e-9)
+    return max(scaled, 1.0e-6)
+
+
+def _weighted_residual_vector(
+    opt_state: Dict[str, float],
+    fit_param_names: Sequence[str],
+    labels: Sequence[str],
+    peak_idxs: Sequence[int],
+    peaks: List[Peak],
+    peak_freqs: np.ndarray,
+    fixed: fitmod.FixedParams,
+    cache: "CatalogCache",
+    quartic_reference: Dict[str, float],
+    reduction: Optional[str],
+) -> np.ndarray:
+    weights = np.array(
+        [
+            float(peaks[i].q) if (i is not None and np.isfinite(peaks[i].q)) else 1.0
+            for i in peak_idxs
+        ],
+        dtype=float,
+    )
+    weights = np.clip(weights, 0.1, 5.0)
+    w_sqrt = np.sqrt(weights)
+    state = _resolve_effective_model_state(opt_state, quartic_reference, reduction, fit_param_names)
+    if not _order_ok_abc(fixed, state["A"], state["B"], state["C"]):
+        return np.full(len(labels), 1e6, dtype=float)
+    catalog = cache.get(state, fixed)
+    freq_map = {str(lbl): float(f) for f, _, lbl in catalog}
+    res = []
+    for lbl, pidx in zip(labels, peak_idxs):
+        f_pred = freq_map.get(lbl)
+        if f_pred is None:
+            res.append(1e6)
+        else:
+            res.append(float(peak_freqs[pidx]) - f_pred)
+    return w_sqrt * np.array(res, dtype=float)
+
+
+def _estimate_formal_fit_uncertainties(
+    opt_state: Dict[str, float],
+    fit_param_names: Sequence[str],
+    labels: Sequence[str],
+    peak_idxs: Sequence[int],
+    peaks: List[Peak],
+    peak_freqs: np.ndarray,
+    fixed: fitmod.FixedParams,
+    cache: "CatalogCache",
+    quartic_reference: Dict[str, float],
+    reduction: Optional[str],
+) -> Dict[str, object]:
+    x = _vector_from_state(opt_state, fit_param_names)
+    residuals0 = _weighted_residual_vector(
+        opt_state,
+        fit_param_names,
+        labels,
+        peak_idxs,
+        peaks,
+        peak_freqs,
+        fixed,
+        cache,
+        quartic_reference,
+        reduction,
+    )
+    n_obs = residuals0.size
+    n_par = x.size
+    if n_obs <= 0:
+        return {"sigmas": {}, "covariance": None, "degrees_of_freedom": 0, "rss": float("nan"), "sigma2": float("nan")}
+
+    dof = max(1, n_obs - n_par)
+    rss = float(np.dot(residuals0, residuals0))
+    sigma2 = rss / dof
+    jac = np.empty((n_obs, n_par), dtype=float)
+
+    for idx, name in enumerate(fit_param_names):
+        step = _uncertainty_step(name, x[idx])
+        x_plus = np.array(x, dtype=float)
+        x_minus = np.array(x, dtype=float)
+        x_plus[idx] += step
+        x_minus[idx] -= step
+        state_plus = _state_from_vector(x_plus, fit_param_names, opt_state)
+        state_minus = _state_from_vector(x_minus, fit_param_names, opt_state)
+        res_plus = _weighted_residual_vector(
+            state_plus,
+            fit_param_names,
+            labels,
+            peak_idxs,
+            peaks,
+            peak_freqs,
+            fixed,
+            cache,
+            quartic_reference,
+            reduction,
+        )
+        res_minus = _weighted_residual_vector(
+            state_minus,
+            fit_param_names,
+            labels,
+            peak_idxs,
+            peaks,
+            peak_freqs,
+            fixed,
+            cache,
+            quartic_reference,
+            reduction,
+        )
+        jac[:, idx] = (res_plus - res_minus) / (2.0 * step)
+
+    cov = sigma2 * np.linalg.pinv(jac.T @ jac, rcond=1.0e-12)
+    diag = np.sqrt(np.clip(np.diag(cov), 0.0, None))
+    sigmas = {name: float(value) for name, value in zip(fit_param_names, diag.tolist())}
+    return {
+        "sigmas": sigmas,
+        "covariance": cov,
+        "degrees_of_freedom": int(dof),
+        "rss": rss,
+        "sigma2": sigma2,
+    }
+
+
+def compute_fit_sensitivity_metrics(
+    opt_state: Dict[str, float],
+    fit_param_names: Sequence[str],
+    labels: Sequence[str],
+    peak_idxs: Sequence[int],
+    peaks: List[Peak],
+    peak_freqs: np.ndarray,
+    fixed: fitmod.FixedParams,
+    cache: "CatalogCache",
+    quartic_reference: Dict[str, float],
+    reduction: Optional[str],
+    *,
+    rcond: float = 1.0e-12,
+    correlation_warning_threshold: float = 0.95,
+    weak_sensitivity_fraction: float = 0.05,
+) -> Dict[str, object]:
+    """
+    Compute local sensitivity / identifiability diagnostics around a fitted point.
+
+    Returns a dictionary with:
+      - residuals: weighted residual vector at opt_state
+      - jacobian: finite-difference Jacobian of weighted residuals
+      - rss, sigma2, dof
+      - covariance, correlation, jtj
+      - per_parameter: dict[name] -> metrics
+      - ranking_by_weighted_sensitivity
+      - high_correlation_pairs
+      - singular_values, condition_number
+
+    Notes
+    -----
+    The Jacobian is built on the *weighted residual vector*, exactly as done for
+    the formal uncertainty estimation already present in this file.
+    Therefore:
+        J_ij = d r_i(weighted) / d p_j
+
+    Large column norm  => parameter strongly affects the fitted spectrum locally.
+    Large covariance / strong correlations => parameter poorly identifiable.
+    """
+    def _safe_condition_number_from_singular_values(svals: np.ndarray) -> float:
+        if svals.size == 0:
+            return float("nan")
+        smax = float(np.max(svals))
+        smin = float(np.min(svals))
+        if (not np.isfinite(smax)) or (not np.isfinite(smin)) or smin <= 0.0:
+            return float("inf")
+        return smax / smin
+
+    def _cov_to_corr(cov: np.ndarray) -> np.ndarray:
+        d = np.sqrt(np.clip(np.diag(cov), 0.0, None))
+        outer = np.outer(d, d)
+        corr = np.zeros_like(cov, dtype=float)
+        mask = outer > 0.0
+        corr[mask] = cov[mask] / outer[mask]
+        corr[~np.isfinite(corr)] = 0.0
+        np.fill_diagonal(corr, 1.0)
+        return corr
+
+    x = _vector_from_state(opt_state, fit_param_names)
+    residuals0 = _weighted_residual_vector(
+        opt_state,
+        fit_param_names,
+        labels,
+        peak_idxs,
+        peaks,
+        peak_freqs,
+        fixed,
+        cache,
+        quartic_reference,
+        reduction,
+    )
+
+    n_obs = int(residuals0.size)
+    n_par = int(x.size)
+    dof = max(1, n_obs - n_par)
+    rss = float(np.dot(residuals0, residuals0))
+    sigma2 = float(rss / dof) if n_obs > 0 else float("nan")
+
+    if n_obs == 0 or n_par == 0:
+        return {
+            "residuals": residuals0,
+            "jacobian": np.empty((0, 0), dtype=float),
+            "rss": rss,
+            "sigma2": sigma2,
+            "dof": dof,
+            "jtj": None,
+            "covariance": None,
+            "correlation": None,
+            "per_parameter": {},
+            "ranking_by_weighted_sensitivity": [],
+            "high_correlation_pairs": [],
+            "singular_values": np.empty(0, dtype=float),
+            "condition_number": float("nan"),
+        }
+
+    jac = np.empty((n_obs, n_par), dtype=float)
+
+    for j, name in enumerate(fit_param_names):
+        step = _uncertainty_step(name, x[j])
+        x_plus = np.array(x, dtype=float)
+        x_minus = np.array(x, dtype=float)
+        x_plus[j] += step
+        x_minus[j] -= step
+
+        state_plus = _state_from_vector(x_plus, fit_param_names, opt_state)
+        state_minus = _state_from_vector(x_minus, fit_param_names, opt_state)
+
+        res_plus = _weighted_residual_vector(
+            state_plus,
+            fit_param_names,
+            labels,
+            peak_idxs,
+            peaks,
+            peak_freqs,
+            fixed,
+            cache,
+            quartic_reference,
+            reduction,
+        )
+        res_minus = _weighted_residual_vector(
+            state_minus,
+            fit_param_names,
+            labels,
+            peak_idxs,
+            peaks,
+            peak_freqs,
+            fixed,
+            cache,
+            quartic_reference,
+            reduction,
+        )
+
+        jac[:, j] = (res_plus - res_minus) / (2.0 * step)
+
+    jtj = jac.T @ jac
+    cov = sigma2 * np.linalg.pinv(jtj, rcond=rcond)
+    corr = _cov_to_corr(cov)
+
+    # SVD-based diagnostics
+    try:
+        svals = np.linalg.svd(jac, compute_uv=False)
+    except np.linalg.LinAlgError:
+        svals = np.empty(0, dtype=float)
+    condition_number = _safe_condition_number_from_singular_values(svals)
+
+    # Sensitivity metrics per parameter
+    weighted_l2 = np.linalg.norm(jac, axis=0)
+    mean_abs = np.mean(np.abs(jac), axis=0)
+    max_abs = np.max(np.abs(jac), axis=0)
+
+    # Dimensionless-ish local metric: |p_j| * ||d r / d p_j||
+    # Useful to compare parameters on different scales.
+    relative_weighted_l2 = np.abs(x) * weighted_l2
+
+    sigmas = np.sqrt(np.clip(np.diag(cov), 0.0, None))
+    max_weighted_l2 = float(np.max(weighted_l2)) if weighted_l2.size else 0.0
+    weak_cutoff = weak_sensitivity_fraction * max_weighted_l2
+
+    per_parameter: Dict[str, Dict[str, object]] = {}
+    for j, name in enumerate(fit_param_names):
+        corr_row = np.abs(corr[j, :]).copy()
+        corr_row[j] = 0.0
+        worst_corr_idx = int(np.argmax(corr_row)) if corr_row.size else 0
+        worst_corr_value = float(corr_row[worst_corr_idx]) if corr_row.size else 0.0
+        worst_corr_name = (
+            str(fit_param_names[worst_corr_idx])
+            if corr_row.size and worst_corr_value > 0.0
+            else None
+        )
+
+        per_parameter[name] = {
+            "value": float(x[j]),
+            "sigma": float(sigmas[j]),
+            "weighted_l2_sensitivity": float(weighted_l2[j]),
+            "relative_weighted_l2_sensitivity": float(relative_weighted_l2[j]),
+            "mean_abs_jacobian": float(mean_abs[j]),
+            "max_abs_jacobian": float(max_abs[j]),
+            "weakly_sensitive": bool(weighted_l2[j] <= weak_cutoff),
+            "most_correlated_with": worst_corr_name,
+            "max_abs_correlation": worst_corr_value,
+            "poorly_identifiable": bool(worst_corr_value >= correlation_warning_threshold),
+        }
+
+    ranking_by_weighted_sensitivity = sorted(
+        (
+            {
+                "name": str(name),
+                "weighted_l2_sensitivity": float(weighted_l2[j]),
+                "relative_weighted_l2_sensitivity": float(relative_weighted_l2[j]),
+                "sigma": float(sigmas[j]),
+            }
+            for j, name in enumerate(fit_param_names)
+        ),
+        key=lambda item: item["weighted_l2_sensitivity"],
+        reverse=True,
+    )
+
+    high_correlation_pairs = []
+    for i in range(n_par):
+        for j in range(i + 1, n_par):
+            cij = float(corr[i, j])
+            if abs(cij) >= correlation_warning_threshold:
+                high_correlation_pairs.append(
+                    {
+                        "param_i": str(fit_param_names[i]),
+                        "param_j": str(fit_param_names[j]),
+                        "correlation": cij,
+                    }
+                )
+    high_correlation_pairs.sort(key=lambda item: abs(item["correlation"]), reverse=True)
+
+    return {
+        "residuals": residuals0,
+        "jacobian": jac,
+        "rss": rss,
+        "sigma2": sigma2,
+        "dof": dof,
+        "jtj": jtj,
+        "covariance": cov,
+        "correlation": corr,
+        "per_parameter": per_parameter,
+        "ranking_by_weighted_sensitivity": ranking_by_weighted_sensitivity,
+        "high_correlation_pairs": high_correlation_pairs,
+        "singular_values": svals,
+        "condition_number": float(condition_number),
+    }
+
+
+def _serialize_fit_metrics_json(value):
+    if isinstance(value, dict):
+        return {str(key): _serialize_fit_metrics_json(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_serialize_fit_metrics_json(item) for item in value]
+    if isinstance(value, np.ndarray):
+        return [_serialize_fit_metrics_json(item) for item in value.tolist()]
+    if isinstance(value, np.generic):
+        return _serialize_fit_metrics_json(value.item())
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value if math.isfinite(float(value)) else None
+    return value
+
+
+def _predict_catalog(model_state: Dict[str, float], fixed: fitmod.FixedParams) -> np.ndarray:
+    df = fitmod._simulate_catalog_dataframe(model_state, fixed)
+    if df.empty:
+        return np.empty((0, 3), dtype=object)
+    labels = df.apply(_label_row, axis=1).to_numpy()
+    return np.column_stack([df["Frequency (MHz)"].to_numpy(), df["Intensity"].to_numpy(), labels])
+
+
+def _parse_freq_hint(raw: str) -> Optional[float]:
+    try:
+        value = float(str(raw).strip())
+    except Exception:
+        return None
+    return value if np.isfinite(value) else None
+
+
+class CatalogCache:
+    def __init__(self, maxsize: int = 256, round_dec: int = 6):
+        self.maxsize = maxsize
+        self.round_dec = round_dec
+        self._cache: Dict[Tuple[float, ...], np.ndarray] = {}
+        self._order: List[Tuple[float, ...]] = []
+
+    def get(self, model_state: Dict[str, float], fixed: fitmod.FixedParams) -> np.ndarray:
+        key = tuple(round(float(model_state[name]), self.round_dec) for name in MODEL_PARAM_NAMES)
+        if key in self._cache:
+            return self._cache[key]
+        val = _predict_catalog(model_state, fixed)
+        self._cache[key] = val
+        self._order.append(key)
+        if len(self._order) > self.maxsize:
+            old = self._order.pop(0)
+            self._cache.pop(old, None)
+        return val
+
+
+def _parse_label_requests(path: Optional[str], labels: Optional[List[str]]) -> List[LabelRequest]:
+    if labels:
+        return [LabelRequest(label=str(item).strip()) for item in labels if str(item).strip()]
+    if not path:
+        raise SystemExit("Provide --labels or --labels-file.")
+    out: List[LabelRequest] = []
+    with open(path, "r", encoding="utf-8") as fh:
+        for line in fh:
+            raw = line.strip()
+            if not raw or raw.startswith("#"):
+                continue
+            parts = [part.strip() for part in raw.split("|")]
+            label = parts[0]
+            freq_hint = _parse_freq_hint(parts[1]) if len(parts) > 1 else None
+            out.append(LabelRequest(label=label, freq_hint=freq_hint))
+    if not out:
+        raise SystemExit("No labels found.")
+    return out
+
+
+def _parse_optional_label_requests(path: Optional[str], labels: Optional[List[str]]) -> List[LabelRequest]:
+    if labels:
+        return [LabelRequest(label=str(item).strip()) for item in labels if str(item).strip()]
+    if not path:
+        return []
+    out: List[LabelRequest] = []
+    with open(path, "r", encoding="utf-8") as fh:
+        for line in fh:
+            raw = line.strip()
+            if not raw or raw.startswith("#"):
+                continue
+            parts = [part.strip() for part in raw.split("|")]
+            label = parts[0]
+            freq_hint = _parse_freq_hint(parts[1]) if len(parts) > 1 else None
+            out.append(LabelRequest(label=label, freq_hint=freq_hint))
+    return out
+
+
+def _parse_manual_assignments(path: Optional[str]) -> List[ManualAssignment]:
+    if not path:
+        return []
+    out: List[ManualAssignment] = []
+    seen = set()
+    with open(path, "r", encoding="utf-8") as fh:
+        for line in fh:
+            raw = line.strip()
+            if not raw or raw.startswith("#"):
+                continue
+            label: Optional[str] = None
+            freq_text: Optional[str] = None
+            theory_freq_hint: Optional[float] = None
+            if "|" in raw:
+                parts = [part.strip() for part in raw.split("|")]
+                if len(parts) >= 3:
+                    label = parts[0]
+                    theory_freq_hint = _parse_freq_hint(parts[1])
+                    freq_text = parts[2]
+                elif len(parts) == 2:
+                    label = parts[0]
+                    freq_text = parts[1]
+            else:
+                parts = raw.rsplit(None, 1)
+                if len(parts) == 2:
+                    label, freq_text = parts[0].strip(), parts[1].strip()
+            if not label or not freq_text:
+                raise SystemExit(f"Invalid manual assignment line: {raw}")
+            try:
+                freq = float(freq_text)
+            except Exception as exc:
+                raise SystemExit(f"Invalid frequency in manual assignment: {raw}") from exc
+            if not np.isfinite(freq):
+                raise SystemExit(f"Non-finite frequency in manual assignment: {raw}")
+            if label in seen:
+                raise SystemExit(f"Duplicate label in manual assignments: {label}")
+            seen.add(label)
+            out.append(ManualAssignment(label=label, obs_freq=float(freq), theory_freq_hint=theory_freq_hint))
+    return out
+
+
+def _try_parse_finite_float(raw: str) -> Optional[float]:
+    try:
+        value = float(str(raw).strip())
+    except Exception:
+        return None
+    return value if np.isfinite(value) else None
+
+
+def _strip_optional_quotes(raw: Optional[str]) -> Optional[str]:
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    if (text.startswith('"') and text.endswith('"')) or (text.startswith("'") and text.endswith("'")):
+        text = text[1:-1].strip()
+    return text or None
+
+
+def _parse_peak_rows(path: str) -> List[Dict[str, object]]:
+    rows: List[Dict[str, object]] = []
+    with open(path, "r", encoding="utf-8") as fh:
+        for line in fh:
+            raw = line.strip()
+            if not raw or raw.startswith("#") or raw.startswith("!") or raw.startswith(";"):
+                continue
+            parts = raw.split()
+            if len(parts) < 2:
+                continue
+            freq = _try_parse_finite_float(parts[0])
+            intensity = _try_parse_finite_float(parts[1])
+            if freq is None or intensity is None:
+                continue
+            idx = 2
+            snr = float("nan")
+            q = float("nan")
+            if idx < len(parts):
+                parsed = _try_parse_finite_float(parts[idx])
+                if parsed is not None:
+                    snr = float(parsed)
+                    idx += 1
+            if idx < len(parts):
+                parsed = _try_parse_finite_float(parts[idx])
+                if parsed is not None:
+                    q = float(parsed)
+                    idx += 1
+            label = _strip_optional_quotes(" ".join(parts[idx:]) if idx < len(parts) else None)
+            rows.append(
+                {
+                    "freq": float(freq),
+                    "intensity": float(intensity),
+                    "snr": float(snr),
+                    "q": float(q),
+                    "label": label,
+                }
+            )
+    rows.sort(key=lambda item: float(item["freq"]))
+    return rows
+
+
+def _parse_input_assignments_from_peaks_file(path: Optional[str]) -> List[ManualAssignment]:
+    if not path:
+        raise SystemExit("--use-input-assignments requires --peaks-file.")
+    rows = _parse_peak_rows(path)
+    out: List[ManualAssignment] = []
+    seen = set()
+    for row in rows:
+        label = _strip_optional_quotes(row.get("label"))  # type: ignore[arg-type]
+        freq = _try_parse_finite_float(row.get("freq"))  # type: ignore[arg-type]
+        if not label:
+            continue
+        if freq is None:
+            continue
+        if label in seen:
+            raise SystemExit(f"Duplicate label in peaks file input assignments: {label}")
+        seen.add(label)
+        out.append(ManualAssignment(label=label, obs_freq=float(freq), theory_freq_hint=None))
+    if not out:
+        raise SystemExit("No labeled lines were found in the peaks file. Add WMS-Rot labels in the third column.")
+    return out
+
+
+def _label_resolution_tolerance_mhz(freq_hint: float) -> float:
+    return max(1e-3, abs(float(freq_hint)) * 1e-8)
+
+
+def _resolve_label_requests(
+    requests: Sequence[LabelRequest],
+    label_map: Dict[str, float],
+    context: str,
+) -> List[str]:
+    resolved: List[str] = []
+    for request in requests:
+        label = str(request.label)
+        if label in label_map:
+            resolved.append(label)
+            continue
+        if request.freq_hint is not None and np.isfinite(request.freq_hint):
+            freq_hint = float(request.freq_hint)
+            best_label = None
+            best_diff = float("inf")
+            for candidate_label, candidate_freq in label_map.items():
+                diff = abs(float(candidate_freq) - freq_hint)
+                if diff < best_diff:
+                    best_diff = diff
+                    best_label = candidate_label
+            if best_label is not None and best_diff <= _label_resolution_tolerance_mhz(freq_hint):
+                resolved.append(best_label)
+                continue
+        raise SystemExit(f"{context} not found in catalog: {label}")
+    if len(set(resolved)) != len(resolved):
+        raise SystemExit(f"{context}s resolve to duplicate catalog entries. Pick distinct transitions.")
+    return resolved
+
+
+def _parse_peaks_file(path: str) -> List[Peak]:
+    rows = _parse_peak_rows(path)
+    if not rows:
+        raise ValueError("Peaks file must have at least 2 numeric columns: freq intensity.")
+    freqs = np.array([float(row["freq"]) for row in rows], dtype=float)
+    intens = np.array([float(row["intensity"]) for row in rows], dtype=float)
+    snr = np.array([float(row["snr"]) for row in rows], dtype=float)
+    q = np.array([float(row["q"]) for row in rows], dtype=float)
+    if np.all(np.isnan(q)):
+        med = np.median(intens)
+        mad = np.median(np.abs(intens - med))
+        scale = mad if mad > 0 else (np.std(intens) if np.std(intens) > 0 else 1.0)
+        q = np.clip((intens - med) / (5.0 * scale) + 1.0, 0.1, 5.0)
+    if np.all(np.isnan(snr)):
+        snr = q.copy()
+    order = np.argsort(freqs)
+    return [
+        Peak(float(freqs[i]), float(intens[i]), float(snr[i]), float(q[i]))
+        for i in order
+    ]
+
+
+def _read_freq_range(path: str) -> Tuple[float, float]:
+    data = np.loadtxt(path)
+    if data.ndim != 2 or data.shape[1] < 1:
+        raise ValueError("File must have at least one numeric column.")
+    freqs = data[:, 0].astype(float)
+    freqs = freqs[np.isfinite(freqs)]
+    if freqs.size == 0:
+        raise ValueError("No finite frequencies found.")
+    return float(np.min(freqs)), float(np.max(freqs))
+
+
+def _peak_pick_profile(path: str, min_height: Optional[float], min_distance: Optional[float]) -> List[Peak]:
+    data = np.loadtxt(path)
+    if data.ndim != 2 or data.shape[1] < 2:
+        raise ValueError("Spectrum file must have at least 2 columns: freq intensity.")
+    x = data[:, 0].astype(float)
+    y = data[:, 1].astype(float)
+
+    if len(y) < 3:
+        return []
+    dy = np.diff(y)
+    candidate = np.where((dy[:-1] > 0) & (dy[1:] <= 0))[0] + 1
+    if candidate.size == 0:
+        return []
+    d2 = y[candidate - 1] - 2 * y[candidate] + y[candidate + 1]
+    candidate = candidate[d2 < 0]
+    if candidate.size == 0:
+        return []
+    if min_height is None:
+        med = np.median(y)
+        mad = np.median(np.abs(y - med))
+        min_height = med + 5.0 * mad
+    candidate = candidate[y[candidate] >= float(min_height)]
+    if candidate.size == 0:
+        return []
+    if min_distance is not None and min_distance > 0 and candidate.size > 1:
+        selected = [candidate[0]]
+        for idx in candidate[1:]:
+            if x[idx] - x[selected[-1]] >= min_distance:
+                selected.append(idx)
+            elif y[idx] > y[selected[-1]]:
+                selected[-1] = idx
+        candidate = np.array(selected, dtype=int)
+    peaks = [Peak(float(x[i]), float(y[i]), float(y[i]), 1.0) for i in candidate]
+    peaks.sort(key=lambda p: p.freq)
+    return peaks
+
+
+def _nearest_peak(peak_freqs: np.ndarray, f0: float) -> Tuple[int, float]:
+    idx = int(np.searchsorted(peak_freqs, f0, side="left"))
+    if idx <= 0:
+        return 0, float(peak_freqs[0] - f0)
+    if idx >= len(peak_freqs):
+        return len(peak_freqs) - 1, float(peak_freqs[-1] - f0)
+    left = idx - 1
+    right = idx
+    dl = float(peak_freqs[left] - f0)
+    dr = float(peak_freqs[right] - f0)
+    if abs(dl) <= abs(dr):
+        return left, dl
+    return right, dr
+
+
+def _relative_tolerance_mhz(freq_mhz: float, delta_percent: float) -> float:
+    pct = abs(float(delta_percent))
+    tol = abs(float(freq_mhz)) * (pct * 0.01)
+    return max(1e-9, tol)
+
+
+def _fit_label_assignments(
+    labels: Sequence[str],
+    peak_idxs: Sequence[int],
+    peaks: List[Peak],
+    fixed: fitmod.FixedParams,
+    cache: CatalogCache,
+    base_state: Dict[str, float],
+    fit_param_names: Sequence[str],
+    span: float,
+    quartic_reference: Dict[str, float],
+    reduction: Optional[str],
+    custom_bounds: Optional[Dict[str, Tuple[Optional[float], Optional[float]]]] = None,
+) -> Tuple[Dict[str, float], float]:
+    peak_freqs = np.array([p.freq for p in peaks], dtype=float)
+    weights = np.array(
+        [
+            float(peaks[i].q) if (i is not None and np.isfinite(peaks[i].q)) else 1.0
+            for i in peak_idxs
+        ],
+        dtype=float,
+    )
+    weights = np.clip(weights, 0.1, 5.0)
+    w_sqrt = np.sqrt(weights)
+
+    def residuals(x: np.ndarray) -> np.ndarray:
+        opt_state = _state_from_vector(x, fit_param_names, base_state)
+        state = _resolve_effective_model_state(opt_state, quartic_reference, reduction, fit_param_names)
+        if not _order_ok_abc(fixed, state["A"], state["B"], state["C"]):
+            return np.full(len(labels), 1e6, dtype=float)
+        catalog = cache.get(state, fixed)
+        freq_map = {str(lbl): float(f) for f, _, lbl in catalog}
+        res = []
+        for lbl, pidx in zip(labels, peak_idxs):
+            f_pred = freq_map.get(lbl)
+            if f_pred is None:
+                res.append(1e6)
+            else:
+                res.append(peak_freqs[pidx] - f_pred)
+        return w_sqrt * np.array(res, dtype=float)
+
+    x0 = _vector_from_state(base_state, fit_param_names)
+    lo, hi = _build_bounds_vector(x0, fit_param_names, span, custom_bounds=custom_bounds)
+    x_start = np.clip(x0, lo, hi)
+    res = least_squares(residuals, x_start, bounds=(lo, hi), loss="soft_l1", f_scale=1.0, max_nfev=120)
+    x_best = np.array(x_start, dtype=float)
+    best_cost = float(np.sum(residuals(x_best) ** 2))
+    if res.success:
+        candidate_cost = float(np.sum(residuals(res.x) ** 2))
+        if candidate_cost < best_cost:
+            x_best = np.array(res.x, dtype=float)
+            best_cost = candidate_cost
+    return _state_from_vector(x_best, fit_param_names, base_state), best_cost
+
+
+def _score_assignment(
+    catalog: np.ndarray,
+    peaks: List[Peak],
+    peak_freqs: np.ndarray,
+    labels_used: set,
+    delta_match_pct: float,
+    mctrl: int,
+    lambda_rms: float,
+    lambda_bias: float,
+    kappa_col: float,
+    control_labels: Optional[Sequence[str]] = None,
+) -> Tuple[float, int, float, float, float, List[Tuple[str, float, float]]]:
+    if catalog.size == 0:
+        return -1e9, 0, float("inf"), float("inf"), float("inf"), []
+    freqs = catalog[:, 0].astype(float)
+    intens = catalog[:, 1].astype(float)
+    labels = catalog[:, 2].astype(str)
+    order = np.argsort(intens)[::-1]
+    residuals: List[float] = []
+    selected_lines: List[Tuple[str, float, float]] = []
+    used_peaks: Dict[int, int] = {}
+    n = 0
+    if control_labels:
+        freq_map = {str(lbl): float(f) for f, _, lbl in catalog}
+        for lbl in control_labels:
+            if lbl in labels_used:
+                continue
+            f0 = freq_map.get(lbl)
+            if f0 is None:
+                continue
+            j, df = _nearest_peak(peak_freqs, f0)
+            tol = _relative_tolerance_mhz(f0, delta_match_pct)
+            if abs(df) <= tol:
+                residuals.append(df)
+                selected_lines.append((str(lbl), float(peak_freqs[j]), float(df)))
+                used_peaks[j] = used_peaks.get(j, 0) + 1
+                n += 1
+    else:
+        for idx in order:
+            if n >= mctrl:
+                break
+            lbl = labels[idx]
+            if lbl in labels_used:
+                continue
+            f0 = freqs[idx]
+            j, df = _nearest_peak(peak_freqs, f0)
+            tol = _relative_tolerance_mhz(f0, delta_match_pct)
+            if abs(df) <= tol:
+                residuals.append(df)
+                selected_lines.append((str(lbl), float(peak_freqs[j]), float(df)))
+                used_peaks[j] = used_peaks.get(j, 0) + 1
+                n += 1
+    if not residuals:
+        return -1e9, 0, float("inf"), float("inf"), float("inf"), []
+    res = np.array(residuals, dtype=float)
+    rms = float(math.sqrt(np.mean(res * res)))
+    med = float(np.median(res))
+    mad = float(np.median(np.abs(res - med)))
+    bias = float(np.mean(res))
+    collisions = sum(v - 1 for v in used_peaks.values() if v > 1)
+    score = n - lambda_rms * mad - lambda_bias * abs(bias) - kappa_col * collisions
+    return score, n, rms, mad, bias, selected_lines
+
+
+def _weighted_choice(rng: random.Random, items: Sequence[int], weights: Sequence[float]) -> int:
+    total = float(sum(weights))
+    if total <= 0:
+        return items[rng.randrange(len(items))]
+    r = rng.random() * total
+    acc = 0.0
+    for item, w in zip(items, weights):
+        acc += w
+        if r <= acc:
+            return item
+    return items[-1]
+
+
+def _sample_weighted_combos(
+    rng: random.Random,
+    label_freqs: Sequence[float],
+    candidates: Sequence[Sequence[int]],
+    peaks: List[Peak],
+    max_combos: int,
+    delta_assign_pct: float,
+    temperature: float,
+) -> List[Tuple[int, ...]]:
+    if max_combos <= 0:
+        return []
+
+    cand_weights: List[List[float]] = []
+    temp = max(1e-3, float(temperature))
+    for f0, idxs in zip(label_freqs, candidates):
+        weights = []
+        for idx in idxs:
+            p = peaks[idx]
+            q = p.q if np.isfinite(p.q) else 1.0
+            dist = abs(p.freq - f0)
+            assign_window = _relative_tolerance_mhz(f0, delta_assign_pct)
+            w = float(q) * math.exp(-(dist / assign_window) / temp)
+            weights.append(max(1e-6, w))
+        cand_weights.append(weights)
+
+    combos: List[Tuple[int, ...]] = []
+    seen = set()
+    attempts = 0
+    max_attempts = max_combos * 30
+    while len(combos) < max_combos and attempts < max_attempts:
+        attempts += 1
+        combo = []
+        used = set()
+        ok = True
+        for idxs, weights in zip(candidates, cand_weights):
+            pick = _weighted_choice(rng, idxs, weights)
+            if pick in used:
+                ok = False
+                break
+            used.add(pick)
+            combo.append(pick)
+        if not ok:
+            continue
+        tup = tuple(combo)
+        if tup in seen:
+            continue
+        seen.add(tup)
+        combos.append(tup)
+    return combos
+
+
+def _beam_refine_combos(
+    base_combos: Sequence[Tuple[int, ...]],
+    candidates: Sequence[Sequence[int]],
+    beam_size: int,
+    neighbor_k: int,
+) -> List[Tuple[int, ...]]:
+    if not base_combos or beam_size <= 0:
+        return []
+    top = list(base_combos)[:beam_size]
+    neighbors = []
+    for combo in top:
+        for i, current in enumerate(combo):
+            opts = candidates[i]
+            for alt in opts[:neighbor_k]:
+                if alt == current:
+                    continue
+                if alt in combo:
+                    continue
+                new_combo = list(combo)
+                new_combo[i] = alt
+                neighbors.append(tuple(new_combo))
+    return neighbors
+
+
+def _final_global_fit(
+    labels: Sequence[str],
+    peak_idxs: Sequence[int],
+    peaks: List[Peak],
+    fixed: fitmod.FixedParams,
+    cache: CatalogCache,
+    x0_state: Dict[str, float],
+    fit_param_names: Sequence[str],
+    span: float,
+    use_powell: bool,
+    ls_loss: str,
+    ls_f_scale: str,
+    ls_max_nfev: int,
+    quartic_reference: Dict[str, float],
+    reduction: Optional[str],
+    custom_bounds: Optional[Dict[str, Tuple[Optional[float], Optional[float]]]] = None,
+) -> Tuple[Dict[str, float], Dict[str, float | int | bool]]:
+    peak_freqs = np.array([p.freq for p in peaks], dtype=float)
+    weights = np.array(
+        [
+            float(peaks[i].q) if (i is not None and np.isfinite(peaks[i].q)) else 1.0
+            for i in peak_idxs
+        ],
+        dtype=float,
+    )
+    weights = np.clip(weights, 0.1, 5.0)
+    w_sqrt = np.sqrt(weights)
+
+    def residuals(x: np.ndarray) -> np.ndarray:
+        opt_state = _state_from_vector(x, fit_param_names, x0_state)
+        state = _resolve_effective_model_state(opt_state, quartic_reference, reduction, fit_param_names)
+        if not _order_ok_abc(fixed, state["A"], state["B"], state["C"]):
+            return np.full(len(labels), 1e6, dtype=float)
+        catalog = cache.get(state, fixed)
+        freq_map = {str(lbl): float(f) for f, _, lbl in catalog}
+        res = []
+        for lbl, pidx in zip(labels, peak_idxs):
+            f_pred = freq_map.get(lbl)
+            if f_pred is None:
+                res.append(1e6)
+            else:
+                res.append(peak_freqs[pidx] - f_pred)
+        return w_sqrt * np.array(res, dtype=float)
+
+    def objective(x: np.ndarray) -> float:
+        r = residuals(x)
+        return float(np.sum(r * r))
+
+    x0 = _vector_from_state(x0_state, fit_param_names)
+    lo, hi = _build_bounds_vector(x0, fit_param_names, span, custom_bounds=custom_bounds)
+    x_best = np.array(x0, dtype=float)
+    diagnostics: Dict[str, float | int | bool] = {
+        "powell_success": False,
+        "powell_nit": -1,
+        "powell_nfev": -1,
+        "powell_fun": float("nan"),
+        "powell_used": bool(use_powell),
+        "ls_success": False,
+        "ls_nfev": -1,
+        "ls_cost": float("nan"),
+        "ls_optimality": float("nan"),
+    }
+
+    if use_powell:
+        nm_res = minimize(
+            objective,
+            x_best,
+            method="Powell",
+            options={"xtol": 1e-6, "ftol": 1e-6, "maxiter": 300},
+        )
+        diagnostics["powell_success"] = bool(getattr(nm_res, "success", False))
+        diagnostics["powell_nit"] = int(getattr(nm_res, "nit", -1))
+        diagnostics["powell_nfev"] = int(getattr(nm_res, "nfev", -1))
+        diagnostics["powell_fun"] = float(getattr(nm_res, "fun", float("nan")))
+        if nm_res.success and objective(nm_res.x) < objective(x_best):
+            x_best = np.array(nm_res.x, dtype=float)
+
+    x_ls0 = np.clip(x_best, lo, hi)
+    allowed_losses = {"linear", "soft_l1", "huber", "cauchy", "arctan"}
+    loss_name = str(ls_loss or "soft_l1").strip()
+    if loss_name not in allowed_losses:
+        loss_name = "soft_l1"
+    f_scale_raw = str(ls_f_scale or "auto").strip().lower()
+    auto_f_scale = max(1.0, np.median(np.abs(residuals(x_ls0))))
+    if f_scale_raw in {"", "auto"}:
+        f_scale_value = auto_f_scale
+    else:
+        try:
+            parsed = float(f_scale_raw)
+        except Exception:
+            parsed = auto_f_scale
+        f_scale_value = parsed if np.isfinite(parsed) and parsed > 0 else auto_f_scale
+    max_nfev_value = max(1, int(ls_max_nfev))
+    ls_res = least_squares(
+        residuals,
+        x_ls0,
+        bounds=(lo, hi),
+        loss=loss_name,
+        f_scale=f_scale_value,
+        max_nfev=max_nfev_value,
+    )
+    diagnostics["ls_success"] = bool(getattr(ls_res, "success", False))
+    diagnostics["ls_nfev"] = int(getattr(ls_res, "nfev", -1))
+    diagnostics["ls_cost"] = float(getattr(ls_res, "cost", float("nan")))
+    diagnostics["ls_optimality"] = float(getattr(ls_res, "optimality", float("nan")))
+    if ls_res.success and objective(ls_res.x) < objective(x_best):
+        x_best = np.array(ls_res.x, dtype=float)
+    return _state_from_vector(x_best, fit_param_names, x0_state), diagnostics
+
+
+def _build_fixed_params(args, file_data: Dict[str, object], model_state: Dict[str, float]) -> fitmod.FixedParams:
+    defaults = fitmod.FixedParams()
+
+    def pick(value, file_value, default_value):
+        return value if value is not None else (file_value if file_value is not None else default_value)
+
+    rotor_type = args.rotor_type if args.rotor_type is not None else (
+        file_data.get("rotorType") if file_data else defaults.rotorType
+    )
+
+    return fitmod.FixedParams(
+        T=pick(args.T, file_data.get("T") if file_data else None, defaults.T),
+        DJ=float(model_state["DJ"]),
+        DJK=float(model_state["DJK"]),
+        DK=float(model_state["DK"]),
+        dJ=float(model_state["dJ"]),
+        dK=float(model_state["dK"]),
+        HJ=float(model_state["HJ"]),
+        HJK=float(model_state["HJK"]),
+        HKJ=float(model_state["HKJ"]),
+        HK=float(model_state["HK"]),
+        h1=float(model_state["h1"]),
+        h2=float(model_state["h2"]),
+        h3=float(model_state["h3"]),
+        mu_a=pick(args.mu_a, file_data.get("mu_a") if file_data else None, defaults.mu_a),
+        mu_b=pick(args.mu_b, file_data.get("mu_b") if file_data else None, defaults.mu_b),
+        mu_c=pick(args.mu_c, file_data.get("mu_c") if file_data else None, defaults.mu_c),
+        J_max=pick(args.J_max, None, defaults.J_max),
+        intensity_cut=pick(args.intensity_cut, None, defaults.intensity_cut),
+        groupSymmetry=pick(args.group_symmetry, file_data.get("pointGroup") if file_data else None, defaults.groupSymmetry),
+        rotorType=rotor_type,
+        a_checked=True,
+        b_checked=True,
+        c_checked=True,
+        wang_symmetry=True,
+    )
+
+
+def main() -> None:
+    global LAST_FIT_METRICS
+    LAST_FIT_METRICS = None
+    p = argparse.ArgumentParser(description="AUTOFIT version 2 (label-driven).")
+    src = p.add_mutually_exclusive_group(required=True)
+    src.add_argument("--peaks-file", help="Stick list: freq intensity [snr q].")
+    src.add_argument("--spectrum-file", help="Profile spectrum: freq intensity.")
+
+    p.add_argument("--input-file", required=True, help="WMS-Rot input file with #ROTATIONAL.")
+    p.add_argument("--labels-file", help="File with theoretical labels, one per line.")
+    p.add_argument("--labels", nargs="+", help="Theoretical labels list.")
+    p.add_argument("--manual-assignments-file", help="File with manual pairs: label | observed_freq_MHz.")
+    p.add_argument(
+        "--use-input-assignments",
+        action="store_true",
+        help="Read WMS-Rot labels from the peaks-file third column and use them as explicit assignments.",
+    )
+    p.add_argument("--control-labels-file", help="File with control-line labels, one per line.")
+    p.add_argument("--control-labels", nargs="+", help="Control-line labels list.")
+
+    p.add_argument("--delta-assign", type=float, default=0.1, help="Relative window around each theoretical line (%%).")
+    p.add_argument("--delta-match", type=float, default=0.1, help="Relative control-line match tolerance (%%).")
+    p.add_argument("--kmax", type=int, default=6, help="Max candidates per label.")
+    p.add_argument("--max-combos", type=int, default=5000, help="Max combinations to evaluate.")
+    p.add_argument("--seed", type=int, default=0)
+
+    p.add_argument("--J-max", type=int, default=None)
+    p.add_argument("--intensity-cut", type=float, default=None)
+    p.add_argument("--T", type=float, default=None)
+    p.add_argument("--DJ", type=float, default=None)
+    p.add_argument("--DJK", type=float, default=None)
+    p.add_argument("--DK", type=float, default=None)
+    p.add_argument("--dJ", type=float, default=None)
+    p.add_argument("--dK", type=float, default=None)
+    p.add_argument("--HJ", type=float, default=None)
+    p.add_argument("--HJK", type=float, default=None)
+    p.add_argument("--HKJ", type=float, default=None)
+    p.add_argument("--HK", type=float, default=None)
+    p.add_argument("--h1", type=float, default=None)
+    p.add_argument("--h2", type=float, default=None)
+    p.add_argument("--h3", type=float, default=None)
+    p.add_argument("--mu-a", type=float, default=None)
+    p.add_argument("--mu-b", type=float, default=None)
+    p.add_argument("--mu-c", type=float, default=None)
+    p.add_argument("--group-symmetry", type=str, default=None)
+    p.add_argument("--rotor-type", type=str, default=None)
+    p.add_argument("--qrot-override", type=float, default=None)
+    p.add_argument("--A", type=float, default=None, help="Optional initial A (MHz) override.")
+    p.add_argument("--B", type=float, default=None, help="Optional initial B (MHz) override.")
+    p.add_argument("--C", type=float, default=None, help="Optional initial C (MHz) override.")
+    p.add_argument("--quartic-scale", type=float, default=1.0, help="Quartic tau scaling parameter s.")
+    for name in QUARTIC_PARAM_NAMES:
+        p.add_argument(
+            f"--quartic-ref-{name}",
+            type=float,
+            default=None,
+            help=f"Reference quartic parameter {name} before applying quartic-scale.",
+        )
+    p.add_argument(
+        "--fit-params",
+        nargs="+",
+        default=None,
+        help=(
+            "Optional quartic/sextic parameters to fit in addition to A/B/C, "
+            "or s for quartic tau scaling. "
+            f"Choices: {', '.join(OPTIONAL_FIT_PARAM_NAMES)}"
+        ),
+    )
+    p.add_argument(
+        "--param-bound",
+        nargs=3,
+        action="append",
+        metavar=("NAME", "MIN", "MAX"),
+        default=None,
+        help=(
+            "Optional absolute least-squares bounds for one parameter. "
+            "Use 'nan' for an unspecified side. Can be repeated."
+        ),
+    )
+
+    p.add_argument("--min-height", type=float, default=None)
+    p.add_argument("--min-distance", type=float, default=None)
+
+    p.add_argument("--span", type=float, default=0.3, help="Initial fit bounds relative span.")
+    p.add_argument("--final-span", type=float, default=0.1, help="Final fit bounds relative span.")
+    p.add_argument("--mctrl", type=int, default=50)
+    p.add_argument("--lambda-rms", type=float, default=1.0, help="Weight for control-line MAD penalty.")
+    p.add_argument("--lambda-bias", type=float, default=0.3, help="Weight for control-line bias penalty.")
+    p.add_argument("--kappa-col", type=float, default=0.5)
+    p.add_argument("--skip-powell", action="store_true", help="Disable Powell local refinement and run least_squares only.")
+    p.add_argument("--sample-temp", type=float, default=1.0)
+    p.add_argument("--beam-size", type=int, default=200)
+    p.add_argument("--neighbor-k", type=int, default=3)
+    p.add_argument("--ls-loss", type=str, default="soft_l1", choices=["linear", "soft_l1", "huber", "cauchy", "arctan"])
+    p.add_argument("--ls-f-scale", type=str, default="auto", help="Use 'auto' or provide a positive numeric value.")
+    p.add_argument("--ls-max-nfev", type=int, default=200)
+
+    args = p.parse_args()
+    rng = random.Random(args.seed)
+
+    manual_assignments = _parse_manual_assignments(args.manual_assignments_file)
+    if args.use_input_assignments:
+        if args.spectrum_file:
+            raise SystemExit("--use-input-assignments requires --peaks-file with labeled stick data.")
+        if manual_assignments:
+            raise SystemExit("Use either --manual-assignments-file or --use-input-assignments, not both.")
+        manual_assignments = _parse_input_assignments_from_peaks_file(args.peaks_file)
+    if manual_assignments:
+        label_requests = [LabelRequest(item.label, item.theory_freq_hint) for item in manual_assignments]
+        control_labels: List[str] = []
+    else:
+        label_requests = _parse_label_requests(args.labels_file, args.labels)
+        control_label_requests = _parse_optional_label_requests(args.control_labels_file, args.control_labels)
+
+    # Peaks
+    if manual_assignments:
+        peaks = [Peak(freq=item.obs_freq, intensity=1.0, snr=1.0, q=1.0) for item in manual_assignments]
+    elif args.peaks_file:
+        peaks = _parse_peaks_file(args.peaks_file)
+    else:
+        peaks = _peak_pick_profile(args.spectrum_file, args.min_height, args.min_distance)
+    if len(peaks) < 3:
+        raise SystemExit("Not enough peaks.")
+    peak_freqs = np.array([p.freq for p in peaks], dtype=float)
+
+    # Load input file and set globals
+    file_data = fitmod._load_input_file(args.input_file)
+    fitmod._apply_file_simulation_globals(file_data, qrot_override=args.qrot_override)
+
+    freq_min = float(peak_freqs[0])
+    freq_max = float(peak_freqs[-1])
+    pad = 1.0
+    if manual_assignments:
+        # In manual mode use the full experimental range (with padding), not only selected pairs.
+        try:
+            if args.peaks_file:
+                freq_min, freq_max = _read_freq_range(args.peaks_file)
+            elif args.spectrum_file:
+                freq_min, freq_max = _read_freq_range(args.spectrum_file)
+        except Exception:
+            pass
+        pad = 100.0
+    freq_min = max(0.0, freq_min - pad)
+    freq_max = freq_max + pad
+    if (not np.isfinite(freq_min)) or (not np.isfinite(freq_max)) or (freq_max <= freq_min):
+        freq_min = max(0.0, float(peak_freqs[0]))
+        freq_max = float(peak_freqs[-1])
+    vmsrot.FREQ_MIN = max(0.0, freq_min)
+    vmsrot.FREQ_MAX = freq_max
+
+    model_overrides = {name: getattr(args, name, None) for name in MODEL_PARAM_NAMES}
+    initial_state_raw = fitmod._build_model_state(file_data, overrides=model_overrides)
+    initial_source = "input"
+    if args.A is not None:
+        initial_source = "override"
+    if args.B is not None or args.C is not None:
+        initial_source = "override"
+    if any(initial_state_raw.get(name) is None for name in BASE_FIT_PARAM_NAMES):
+        raise SystemExit("Missing A/B/C in input file.")
+
+    initial_state: Dict[str, float] = {
+        name: float(initial_state_raw[name])  # type: ignore[arg-type]
+        for name in MODEL_PARAM_NAMES
+    }
+    fit_param_names = list(BASE_FIT_PARAM_NAMES) + _normalize_fit_param_names(args.fit_params)
+    custom_param_bounds = _parse_custom_param_bounds(args.param_bound)
+    quartic_scale = fitmod._normalize_quartic_scale(args.quartic_scale)
+    quartic_reference: Dict[str, float] = {}
+    for name in QUARTIC_PARAM_NAMES:
+        explicit = getattr(args, f"quartic_ref_{name}")
+        if explicit is not None:
+            quartic_reference[name] = float(explicit)
+        else:
+            quartic_reference[name] = float(initial_state[name]) * (quartic_scale * quartic_scale)
+    initial_opt_state: Dict[str, float] = {
+        **initial_state,
+        SCALE_FIT_PARAM_NAME: quartic_scale,
+    }
+    reduction_value = file_data.get("reduction") or getattr(vmsrot, "REDUCTION", "A")
+
+    fixed = _build_fixed_params(args, file_data, initial_state)
+    cache = CatalogCache()
+
+    # Build initial catalog and label frequencies
+    initial_effective_state = _resolve_effective_model_state(
+        initial_opt_state,
+        quartic_reference,
+        reduction_value,
+        fit_param_names,
+    )
+    cat0 = cache.get(initial_effective_state, fixed)
+    if cat0.size == 0:
+        raise SystemExit("No predicted lines from initial guess.")
+    label_map = {str(lbl): float(f) for f, _, lbl in cat0}
+    if manual_assignments:
+        labels = _resolve_label_requests(label_requests, label_map, "Manual label")
+    else:
+        labels = _resolve_label_requests(label_requests, label_map, "Label")
+        control_labels = _resolve_label_requests(control_label_requests, label_map, "Control label")
+        if control_labels:
+            control_labels = [lbl for lbl in control_labels if lbl not in labels]
+
+    best_score = -1e9
+    best_combo: Optional[Tuple[int, ...]] = None
+    best_params: Optional[Dict[str, float]] = None
+    best_rms = float("inf")
+    best_bias = float("inf")
+
+    if manual_assignments:
+        best_combo = tuple(range(len(labels)))
+        best_params, _ = _fit_label_assignments(
+            labels, best_combo, peaks, fixed, cache, initial_opt_state, fit_param_names, args.span,
+            quartic_reference, reduction_value,
+            custom_bounds=custom_param_bounds,
+        )
+    else:
+        # Candidate peaks for each label
+        candidates: List[List[int]] = []
+        label_freqs: List[float] = []
+        for lbl in labels:
+            f0 = label_map[lbl]
+            delta_assign_mhz = _relative_tolerance_mhz(f0, args.delta_assign)
+            lo = f0 - delta_assign_mhz
+            hi = f0 + delta_assign_mhz
+            idxs = np.where((peak_freqs >= lo) & (peak_freqs <= hi))[0].tolist()
+            if not idxs:
+                raise SystemExit(f"No peaks near label: {lbl}")
+            # rank by proximity
+            idxs.sort(key=lambda i: abs(peak_freqs[i] - f0))
+            candidates.append(idxs[: args.kmax])
+            label_freqs.append(f0)
+
+        # Enumerate or sample combinations
+        combos = list(product(*candidates))
+        if len(combos) > args.max_combos:
+            combos = _sample_weighted_combos(
+                rng=rng,
+                label_freqs=label_freqs,
+                candidates=candidates,
+                peaks=peaks,
+                max_combos=args.max_combos,
+                delta_assign_pct=args.delta_assign,
+                temperature=args.sample_temp,
+            )
+
+        scored: List[Tuple[float, float, float, Tuple[int, ...], Dict[str, float]]] = []
+        labels_set = set(labels)
+
+        def evaluate_combo(combo: Tuple[int, ...]) -> Optional[Tuple[float, float, float, Tuple[int, ...], Dict[str, float]]]:
+            if len(set(combo)) < len(combo):
+                return None
+            x_fit, _ = _fit_label_assignments(
+                labels, combo, peaks, fixed, cache, initial_opt_state, fit_param_names, args.span,
+                quartic_reference, reduction_value,
+                custom_bounds=custom_param_bounds,
+            )
+            cat = cache.get(
+                _resolve_effective_model_state(x_fit, quartic_reference, reduction_value, fit_param_names),
+                fixed,
+            )
+            score, n_in, rms, mad, bias, _ = _score_assignment(
+                cat, peaks, peak_freqs, labels_set,
+                args.delta_match, args.mctrl, args.lambda_rms, args.lambda_bias, args.kappa_col,
+                control_labels=control_labels if control_labels else None
+            )
+            return (score, rms, abs(bias), combo, x_fit)
+
+        for combo in combos:
+            result = evaluate_combo(combo)
+            if result is None:
+                continue
+            score, rms, bias_abs, combo, x_fit = result
+            scored.append(result)
+            if score > best_score or (score == best_score and (rms < best_rms or (rms == best_rms and bias_abs < best_bias))):
+                best_score = score
+                best_combo = combo
+                best_params = x_fit
+                best_rms = rms
+                best_bias = bias_abs
+
+        # Local beam refinement around top candidates
+        if scored:
+            scored.sort(key=lambda t: (-t[0], t[1], t[2]))
+            beam_size = min(int(args.beam_size), max(20, args.max_combos // 20))
+            neighbor_k = max(1, int(args.neighbor_k))
+            base_combos = [t[3] for t in scored[:beam_size]]
+            neighbors = _beam_refine_combos(base_combos, candidates, beam_size=beam_size, neighbor_k=neighbor_k)
+            seen = set(sc[3] for sc in scored)
+            for combo in neighbors:
+                if combo in seen:
+                    continue
+                seen.add(combo)
+                result = evaluate_combo(combo)
+                if result is None:
+                    continue
+                score, rms, bias_abs, combo, x_fit = result
+                if score > best_score or (score == best_score and (rms < best_rms or (rms == best_rms and bias_abs < best_bias))):
+                    best_score = score
+                    best_combo = combo
+                    best_params = x_fit
+                    best_rms = rms
+                    best_bias = bias_abs
+
+    if best_combo is None or best_params is None:
+        raise SystemExit("No valid assignment found.")
+
+    # Final local fit (optional Powell) + least_squares
+    x_final, opt_diag = _final_global_fit(
+        labels, best_combo, peaks, fixed, cache,
+        best_params, fit_param_names, args.final_span, (not args.skip_powell),
+        args.ls_loss, args.ls_f_scale, args.ls_max_nfev,
+        quartic_reference, reduction_value,
+        custom_bounds=custom_param_bounds,
+    )
+    x_final_model = _resolve_effective_model_state(
+        x_final,
+        quartic_reference,
+        reduction_value,
+        fit_param_names,
+    )
+    final_scale_value, final_quartic_reference = _final_quartic_scale_state(
+        x_final,
+        x_final_model,
+        quartic_reference,
+        fit_param_names,
+    )
+
+    # Report (initial vs final)
+    catalog_init = cache.get(initial_effective_state, fixed)
+    freq_map_init = {str(lbl): float(f) for f, _, lbl in catalog_init}
+    res_init = []
+    for lbl, pidx in zip(labels, best_combo):
+        f_pred = freq_map_init.get(lbl)
+        if f_pred is None:
+            continue
+        res_init.append(peak_freqs[pidx] - f_pred)
+    rms_init = float(math.sqrt(np.mean(np.array(res_init) ** 2))) if res_init else float("inf")
+
+    catalog_final = cache.get(x_final_model, fixed)
+    freq_map_final = {str(lbl): float(f) for f, _, lbl in catalog_final}
+    res_final = []
+    for lbl, pidx in zip(labels, best_combo):
+        f_pred = freq_map_final.get(lbl)
+        if f_pred is None:
+            continue
+        res_final.append(peak_freqs[pidx] - f_pred)
+    rms_final = float(math.sqrt(np.mean(np.array(res_final) ** 2))) if res_final else float("inf")
+
+    score_final, n_ctrl_final, rms_ctrl_final, mad_ctrl_final, bias_ctrl_final, ctrl_lines_final = _score_assignment(
+        catalog_final,
+        peaks,
+        peak_freqs,
+        set(labels),
+        args.delta_match,
+        args.mctrl,
+        args.lambda_rms,
+        args.lambda_bias,
+        args.kappa_col,
+        control_labels=control_labels if control_labels else None,
+    )
+    if not np.isfinite(score_final):
+        score_final = best_score
+
+    print(f"Initial constants ({initial_source}):")
+    print(
+        f"A={initial_effective_state['A']:.6f}  "
+        f"B={initial_effective_state['B']:.6f}  "
+        f"C={initial_effective_state['C']:.6f} (MHz)"
+    )
+    if len(fit_param_names) > len(BASE_FIT_PARAM_NAMES):
+        print(f"Additional fitted parameters: {', '.join(fit_param_names[len(BASE_FIT_PARAM_NAMES):])}")
+    if abs(quartic_scale - 1.0) > 1.0e-12 or SCALE_FIT_PARAM_NAME in fit_param_names:
+        print(f"Quartic scale s={quartic_scale:.12g}")
+    print(f"RMS(labels)={rms_init:.6f} MHz")
+    print("Initial assignments (label -> f_obs, residual):")
+    for lbl, pidx in zip(labels, best_combo):
+        f_pred = freq_map_init.get(lbl)
+        if f_pred is None:
+            continue
+        f_obs = peak_freqs[pidx]
+        print(f"{lbl} | {f_obs:.6f} | {f_obs - f_pred:.6f}")
+
+    final_uncertainties = _estimate_formal_fit_uncertainties(
+        x_final,
+        fit_param_names,
+        labels,
+        best_combo,
+        peaks,
+        peak_freqs,
+        fixed,
+        cache,
+        quartic_reference,
+        reduction_value,
+    )
+    final_sigma_map = final_uncertainties.get("sigmas") or {}
+    fit_metrics = compute_fit_sensitivity_metrics(
+        x_final,
+        fit_param_names,
+        labels,
+        best_combo,
+        peaks,
+        peak_freqs,
+        fixed,
+        cache,
+        quartic_reference,
+        reduction_value,
+    )
+    LAST_FIT_METRICS = _serialize_fit_metrics_json(fit_metrics)
+
+    print("Final constants:")
+    print(
+        f"A={_format_with_parenthetical_uncertainty(x_final_model['A'], final_sigma_map.get('A'))}  "
+        f"B={_format_with_parenthetical_uncertainty(x_final_model['B'], final_sigma_map.get('B'))}  "
+        f"C={_format_with_parenthetical_uncertainty(x_final_model['C'], final_sigma_map.get('C'))} (MHz)"
+    )
+    if len(fit_param_names) > len(BASE_FIT_PARAM_NAMES):
+        print("Final optional parameters:")
+        for name in fit_param_names[len(BASE_FIT_PARAM_NAMES):]:
+            value = x_final.get(name)
+            if value is None and name in MODEL_PARAM_NAMES:
+                value = x_final_model.get(name)
+            if value is None:
+                continue
+            print(f"{name}={_format_with_parenthetical_uncertainty(float(value), final_sigma_map.get(name))}")
+    print(f"FINAL_MODEL|{_format_model_state_line(x_final_model)}")
+    if final_sigma_map:
+        print(
+            "FINAL_SIGMA|"
+            + "|".join(
+                f"{name}={float(final_sigma_map[name]):.12g}"
+                for name in fit_param_names
+                if name in final_sigma_map and np.isfinite(final_sigma_map[name])
+            )
+        )
+        print(
+            "FINAL_FORMATTED|"
+            + "|".join(
+                f"{name}={_format_with_parenthetical_uncertainty(float(x_final.get(name, x_final_model.get(name))), final_sigma_map.get(name))}"
+                for name in fit_param_names
+                if (name in x_final or name in x_final_model)
+            )
+        )
+        print(
+            "FINAL_UNCERTAINTY_STATUS|"
+            + "|".join(
+                f"{name}={_uncertainty_status(final_sigma_map.get(name))}"
+                for name in fit_param_names
+                if (name in x_final or name in x_final_model)
+            )
+        )
+    quartic_scale_line = "|".join(
+        [f"s={final_scale_value:.12g}"]
+        + [f"ref_{name}={float(final_quartic_reference[name]):.12g}" for name in QUARTIC_PARAM_NAMES]
+    )
+    print(f"FINAL_QUARTIC_SCALE|{quartic_scale_line}")
+    print(f"FIT_PARAMS|{','.join(fit_param_names)}")
+    print(
+        "OPT_POWELL|"
+        f"success={1 if bool(opt_diag['powell_success']) else 0}|"
+        f"nit={int(opt_diag['powell_nit'])}|"
+        f"nfev={int(opt_diag['powell_nfev'])}|"
+        f"fun={float(opt_diag['powell_fun']):.12g}"
+    )
+    print(
+        "OPT_LS|"
+        f"success={1 if bool(opt_diag['ls_success']) else 0}|"
+        f"nfev={int(opt_diag['ls_nfev'])}|"
+        f"cost={float(opt_diag['ls_cost']):.12g}|"
+        f"optimality={float(opt_diag['ls_optimality']):.12g}"
+    )
+    if manual_assignments:
+        print(f"RMS(labels)={rms_final:.6f} MHz  Score=n/a (manual assignments)")
+    else:
+        print(f"RMS(labels)={rms_final:.6f} MHz  Score={score_final:.3f}")
+    print("Final assignments (label -> f_obs, residual):")
+    n_fitted_final = 0
+    for lbl, pidx in zip(labels, best_combo):
+        f_pred = freq_map_final.get(lbl)
+        if f_pred is None:
+            continue
+        f_obs = peak_freqs[pidx]
+        n_fitted_final += 1
+        print(f"{lbl} | {f_obs:.6f} | {f_obs - f_pred:.6f}")
+    print(f"Fitted lines: {n_fitted_final}")
+    print(f"FITTED_LINES|n={n_fitted_final}")
+
+    if not manual_assignments:
+        mode_tag = "EXPLICIT" if control_labels else "AUTO"
+        source_desc = "user-specified control labels" if control_labels else f"automatic top-{args.mctrl} control labels"
+        print(f"Control scoring source: {source_desc}")
+        print(
+            "Control metrics: "
+            f"n={n_ctrl_final} RMS={rms_ctrl_final:.6f} MHz "
+            f"MAD={mad_ctrl_final:.6f} MHz bias={bias_ctrl_final:.6f} MHz score={score_final:.3f}"
+        )
+        print(f"CTRL_MODE|{mode_tag}|n={n_ctrl_final}|delta_match_pct={args.delta_match}")
+        print("Control lines used (label | f_obs | residual_MHz):")
+        for lbl, f_obs, df in ctrl_lines_final:
+            print(f"{lbl} | {f_obs:.6f} | {df:.6f}")
+            print(f"CTRL_LINE|{mode_tag}|{lbl}|{f_obs:.6f}|{df:.6f}")
+        print(
+            "CTRL_METRICS|"
+            f"{mode_tag}|n={n_ctrl_final}|rms={rms_ctrl_final:.6f}|mad={mad_ctrl_final:.6f}|"
+            f"bias={bias_ctrl_final:.6f}|score={score_final:.6f}"
+        )
+
+
+if __name__ == "__main__":
+    main()

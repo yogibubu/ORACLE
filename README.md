@@ -48,7 +48,8 @@ python -m oracle lcb25 fetch
 
 ORACLE shell helpers are available without editing personal startup files
 automatically. `oracle-set` creates `ORACLE_VENV` when missing and installs the
-core runtime dependencies, including RDKit for SMILES imports:
+core runtime dependencies, including RDKit for SMILES imports and
+Pandas/SymPy for the vendored WMS-Rot rotational engine:
 
 ```bash
 source /Users/vincenzobarone/ORACLE/scripts/oracle_env.sh

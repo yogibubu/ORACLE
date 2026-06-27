@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="WMS-Rot">
+  <title>WMS-Rot: Rotor Spectrum Simulator</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" type="image/png" href="./icons/icon-192.png">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="../style.css">
+  <link rel="stylesheet" href="./theme.css">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+  <script src="pwa-enhancements.js" defer></script>
+  <script src="script.js" defer></script>
+  <style>
+    body { font-family: var(--wms-font); margin: 20px; }
+    fieldset { margin-bottom: 1em; padding: 1em; }
+    label { display: block; margin: 0.3em 0; }
+    input[type="number"] { width: 6em; }
+    .box {
+      background: var(--wms-panel-soft);
+      border: 1px solid var(--wms-border);
+      padding: 1em;
+      margin-bottom: 1em;
+      border-radius: 10px;
+    }
+    #equations {
+      max-width: 100%;
+      overflow-x: auto;
+    }
+    #equations mjx-container {
+      max-width: 100%;
+    }
+    #equations mjx-container[display="true"] {
+      display: block;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding-bottom: 0.1em;
+    }
+    #spectrum { width: 100%; height: 420px; }
+    #file-loader-grid {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr);
+      gap: 12px;
+      align-items: start;
+      max-width: none;
+    }
+    .file-loader-item {
+      border: 1px solid var(--wms-border);
+      border-radius: 8px;
+      padding: 10px;
+      background: var(--wms-panel-soft);
+    }
+    .file-loader-item button {
+      width: 100%;
+    }
+    @media (max-width: 760px) {
+      #file-loader-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Loading overlay (same pattern as VMSvib) */
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(10, 10, 20, 0.85);
+      backdrop-filter: blur(1px);
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0.25s ease, visibility 0.25s ease;
+    }
+
+    .loading-overlay.is-visible {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    .loading-overlay__content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.25rem;
+      padding: 2rem 2.5rem;
+      border-radius: 12px;
+      background: rgba(20, 20, 35, 0.9);
+      box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.4);
+    }
+
+    .loading-overlay__spinner {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      border: 6px solid rgba(255, 255, 255, 0.25);
+      border-top-color: #ffffff;
+      animation: loading-overlay-spin 0.95s linear infinite;
+    }
+
+    .loading-overlay__message {
+      margin: 0;
+      color: #f1f1f1;
+      font-size: 1.1rem;
+      text-align: center;
+    }
+
+    .loading-overlay--error {
+      background: rgba(35, 10, 10, 0.9);
+    }
+
+    .loading-overlay--error .loading-overlay__content {
+      background: rgba(45, 15, 15, 0.95);
+    }
+
+    .loading-overlay--error .loading-overlay__message {
+      color: #ffd2d2;
+    }
+
+    @keyframes loading-overlay-spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <div
+    id="loading-overlay"
+    class="loading-overlay is-visible"
+    aria-hidden="false"
+  >
+    <div class="loading-overlay__content" role="presentation">
+      <div class="loading-overlay__spinner" data-role="loading-spinner" aria-hidden="true"></div>
+      <p class="loading-overlay__message" data-role="loading-message">
+        Loading WMS-Rot…
+      </p>
+    </div>
+  </div>
+
+  <section class="wms-suite-header" aria-labelledby="wms-rot-suite-title">
+    <div class="wms-suite-brand">
+      <img class="wms-suite-logo" src="./icons/logo-full.png" alt="WMS-Rot logo">
+      <div class="wms-suite-copy">
+        <p class="wms-suite-kicker">WMS-Rot Suite</p>
+        <h1 class="wms-suite-title" id="wms-rot-suite-title">WMS-Rot: Rotor Spectrum Simulator</h1>
+        <p class="wms-suite-subtitle">Unified branding for simulation, preparation, wavefunction inspection, and fitting across the WMS-Rot toolchain.</p>
+        <details class="wms-suite-privacy">
+          <summary><span>A Note on Privacy</span></summary>
+          <div class="wms-suite-privacy__content">
+            <p>
+              We strongly believe in collaboration and open science. Privacy and security are central to how this tool is designed. For us, the web is an open platform that, without relying on system-dependent compiled software, better reflects those values through accessibility, transparency, and portability.
+            </p>
+            <p>
+              Although WMS-Rot is presented as a website, all code is executed locally on the user's own machine within the user's own web browser. No data is collected, uploaded, or processed by a remote background server, because there is no background server running the calculations. Everything runs locally in the browser. WMS-Rot can also be saved as a web app on the computer, and it can continue to run even after the network connection is interrupted.
+            </p>
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+  <p class="wms-suite-intro">
+    Follow the workflow below to prepare or import the input, simulate the spectrum in WMS-Rot, and then move directly into fitting or wavefunction inspection.
+  </p>
+
+  <main class="workflow-shell">
+    <section class="workflow-section workflow-section--core" aria-labelledby="core-simulation-title">
+      <div class="workflow-section__inner">
+        <div class="workflow-section__badge" aria-hidden="true">1</div>
+        <div class="workflow-section__header">
+          <p class="workflow-section__eyebrow">Core Calculation</p>
+          <h2 class="workflow-section__title" id="core-simulation-title">Simulate the Rotational Spectrum</h2>
+          <p class="workflow-section__lead">
+            Upload an existing input file or enter the parameters manually. This is the main working area of the page.
+          </p>
+        </div>
+
+        <div class="workflow-section__body">
+          <div class="workflow-intake">
+            <div class="workflow-intake__card">
+              <p class="workflow-card-label">Input File</p>
+              <h3 class="workflow-card-title">Load an existing WMS-Rot input</h3>
+              <div id="file-loader">
+                <div id="file-loader-grid">
+                  <div class="file-loader-item">
+                    <button type="button" id="load-input-file">Upload input file</button>
+                    <input type="file" id="input-file" style="display:none;">
+                    <span id="input-file-name" style="margin-left:0.5em;"></span>
+                    <div id="input-file-status" style="margin-top:0.5em;color:#555;"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="workflow-intake__card workflow-intake__card--accent">
+              <p class="workflow-card-label">Prepare a WMS-Rot input</p>
+              <h3 class="workflow-card-title">Generate the template with WMS-Prep</h3>
+              <p class="workflow-helper-text">
+                WMS-Prep extracts final DPCS3 geometry, starting rotational constants, quartic distortion constants,
+                dipole components, and DVib corrections from multi-step Gaussian workflows.
+              </p>
+              <a class="workflow-link-button workflow-button" href="./WMS-Prep/index.html" target="_blank" rel="noopener">
+                Open WMS-Prep
+              </a>
+            </div>
+          </div>
+          <p class="workflow-intake__note">
+            Or build the input directly below. The form below and the export button already let you create a valid WMS-Rot <code>.txt</code> input file.
+          </p>
+
+          <details class="workflow-details workflow-details--equations">
+            <summary><span>Model equations and selection rules</span></summary>
+            <div class="workflow-details__content">
+              <div class="box" id="equations"></div>
+            </div>
+          </details>
+
+          <div class="workflow-inline-control">
+            <label for="rotorType">Rotor type:
+              <select id="rotorType">
+                <option value="asymmetric" selected>Asymmetric</option>
+                <option value="prolate">Symmetric - prolate</option>
+                <option value="oblate">Symmetric - oblate</option>
+                <option value="spherical">(Spherical)</option>
+                <option value="linear">Linear</option>
+              </select>
+            </label>
+          </div>
+
+          <form id="params-form">
+            <div class="wms-form-grid">
+              <fieldset class="wms-fieldset">
+                <legend>Physical Conditions and Symmetry</legend>
+                <label>Temperature T (K): <input type="number" id="T" step="any" value="298.15"></label>
+                <label>Rotational partition function override: <input type="number" id="qrot_override" step="any" placeholder="auto"></label>
+                <p><small>If not specified, the rotational partition function is calculated automatically.</small></p>
+                <p id="qrot-auto-info"></p>
+                <label>Point group:
+                  <select id="groupSymmetry">
+                    <option value="C1" selected>C1</option>
+                    <option value="Cs">Cs</option>
+                    <option value="Ci">Ci</option>
+                    <option value="C2">C2</option>
+                    <option value="C3">C3</option>
+                    <option value="C4">C4</option>
+                    <option value="C5">C5</option>
+                    <option value="C6">C6</option>
+                    <option value="C2v">C2v</option>
+                    <option value="C3v">C3v</option>
+                    <option value="C4v">C4v</option>
+                    <option value="C6v">C6v</option>
+                    <option value="C2h">C2h</option>
+                    <option value="C3h">C3h</option>
+                    <option value="C4h">C4h</option>
+                    <option value="C6h">C6h</option>
+                    <option value="D2">D2</option>
+                    <option value="D3">D3</option>
+                    <option value="D4">D4</option>
+                    <option value="D6">D6</option>
+                    <option value="D2h">D2h</option>
+                    <option value="D3h">D3h</option>
+                    <option value="D4h">D4h</option>
+                    <option value="D6h">D6h</option>
+                    <option value="D2d">D2d</option>
+                    <option value="D3d">D3d</option>
+                    <option value="D4d">D4d</option>
+                    <option value="S4">S4</option>
+                    <option value="S6">S6</option>
+                    <option value="S8">S8</option>
+                    <option value="Td">Td</option>
+                    <option value="Oh">Oh</option>
+                    <option value="Ih">Ih</option>
+                    <option value="Cinfv">Cinfv</option>
+                    <option value="Dinfh">Dinfh</option>
+                  </select>
+                </label>
+              </fieldset>
+
+              <fieldset class="wms-fieldset wms-fieldset--wide">
+                <legend>Standard Parameters</legend>
+                <p class="fieldset-subheading">Rotational Constants (MHz)</p>
+                <label>A <span class="axis-role-badge" data-axis-role="a"></span>: <input type="number" id="A" step="any" value="2019.517"> DVib (A) <span class="axis-role-badge" data-axis-role="a"></span>: <input type="number" id="DVibA" step="any" value="0"></label>
+                <label>B <span class="axis-role-badge" data-axis-role="b"></span>: <input type="number" id="B" step="any" value="571.4362"> DVib (B) <span class="axis-role-badge" data-axis-role="b"></span>: <input type="number" id="DVibB" step="any" value="0"></label>
+                <label>C <span class="axis-role-badge" data-axis-role="c"></span>: <input type="number" id="C" step="any" value="460.3632"> DVib (C) <span class="axis-role-badge" data-axis-role="c"></span>: <input type="number" id="DVibC" step="any" value="0"></label>
+                <p id="rotor-constants-note"></p>
+                <p><small>DVib (A/B/C) are anharmonic corrections computed as the difference between rotational constants at the |0&gt; level and the equilibrium constants.</small></p>
+                <p class="fieldset-subheading">Dipole Moment (Debye)</p>
+                <label id="mu_a_label"><span id="mu_a_label_text">μ<sub>a</sub></span> <span class="axis-role-badge" data-axis-role="a"></span>: <input type="number" id="mu_a" step="any" value="1.0"></label>
+                <label id="mu_b_label"><span id="mu_b_label_text">μ<sub>b</sub></span> <span class="axis-role-badge" data-axis-role="b"></span>: <input type="number" id="mu_b" step="any" value="0.0"></label>
+                <label id="mu_c_label"><span id="mu_c_label_text">μ<sub>c</sub></span> <span class="axis-role-badge" data-axis-role="c"></span>: <input type="number" id="mu_c" step="any" value="0.0"></label>
+                <div id="mu_spherical_wrap" style="display:none;">
+                  <label>μ (dummy): <input type="number" id="mu_spherical" step="any" value="1.0"></label>
+                  <div id="mu_spherical_note" style="color:#c00;">
+                    A spherical rotor has zero permanent dipole; this value is only a placeholder.
+                  </div>
+                </div>
+              </fieldset>
+
+              <fieldset class="wms-fieldset wms-fieldset--wide">
+                <legend>Additional Hamiltonian Contributions</legend>
+                <label>Representation:
+                  <select id="representation">
+                    <option value="Ir" selected>Ir (almost-prolate)</option>
+                    <option value="IIIl">IIIl (almost-oblate)</option>
+                  </select>
+                </label>
+                <p id="representation-status" class="workflow-helper-text"></p>
+                <p id="representation-help" class="workflow-helper-text">
+                  Choose the convention that matches the constants entered below. Need to reorient the coordinates first?
+                  <a href="./WMS-Prep/index.html" target="_blank" rel="noopener">Open WMS-Prep</a> to rewrite coordinates consistently and generate the WMS-Rot input template automatically.
+                </p>
+                <label>Watson Reduction:
+                  <select id="reduction">
+                    <option value="A" selected>A</option>
+                    <option value="S">S</option>
+                  </select>
+                </label>
+                <p id="reduction-help" class="workflow-helper-text">
+                  Choose the Watson reduction corresponding to the centrifugal-distortion constants entered below.
+                </p>
+                <label>Distortion units:
+                  <select id="distortion_unit">
+                    <option value="kHz" selected>kHz</option>
+                    <option value="MHz">MHz</option>
+                  </select>
+                </label>
+                <p class="fieldset-subheading">Quartic Centrifugal Distortion (<span id="distortion-unit-label">kHz</span>)</p>
+                <p id="representation-distortion-warning" class="representation-warning-note" hidden>
+                  Make sure the values of centrifugal distortions are compatible with the selected representation.
+                </p>
+                <div id="DJ/DeltaJ"><label>Δ<sub>J</sub>:  <input type="number" id="DJ"  step="any" value="0"></label></div>
+                <div id="DJK/DeltaJK"><label>Δ<sub>JK</sub>: <input type="number" id="DJK" step="any" value="0"></label></div>
+                <div id="DK/DeltaK"><label>Δ<sub>K</sub>:  <input type="number" id="DK"  step="any" value="0"></label></div>
+                <div id="d1/dJ"><label>d<sub>1</sub>:  <input type="number" id="dJ"  step="any" value="0"></label></div>
+                <div id="d2/dK"><label>d<sub>2</sub>:  <input type="number" id="dK"  step="any" value="0"></label></div>
+                <p class="fieldset-subheading">Sextic Centrifugal Distortion (<span id="distortion-unit-label-sextic">kHz</span>)</p>
+                <div id="HJ/PHIN"><label>Φ<sub>N</sub>:  <input type="number" id="HJ"  step="any" value="0"></label></div>
+                <div id="HJK/PHINK"><label>Φ<sub>NK</sub>: <input type="number" id="HJK" step="any" value="0"></label></div>
+                <div id="HKJ/PHIKN"><label>Φ<sub>KN</sub>: <input type="number" id="HKJ" step="any" value="0"></label></div>
+                <div id="HK/PHIK"><label>Φ<sub>K</sub>:  <input type="number" id="HK"  step="any" value="0"></label></div>
+                <div id="h1/phiN"><label>φ<sub>N</sub>:  <input type="number" id="h1"  step="any" value="0"></label></div>
+                <div id="h2/phiNK"><label>φ<sub>NK</sub>: <input type="number" id="h2" step="any" value="0"></label></div>
+                <div id="h3/phiK"><label>φ<sub>K</sub>:  <input type="number" id="h3"  step="any" value="0"></label></div>
+              </fieldset>
+
+              <fieldset class="wms-fieldset wms-fieldset--wide">
+                <legend>Hyperfine Quadrupole (SPCAT-like)</legend>
+                <label>Max F (optional): <input type="number" id="F_max" step="any" placeholder="auto"></label>
+                <p class="fieldset-subheading">Nucleus 1</p>
+                <label>Nuclear spin I<sub>1</sub>: <input type="number" id="I_nuc" step="any" value="0"></label>
+                <label>&chi;<sub>aa</sub><sup>(1)</sup> <span class="axis-role-badge" data-axis-pair="aa"></span> (MHz): <input type="number" id="chi_aa" step="any" value="0"></label>
+                <label>&chi;<sub>bb</sub><sup>(1)</sup> <span class="axis-role-badge" data-axis-pair="bb"></span> (MHz): <input type="number" id="chi_bb" step="any" value="0"></label>
+                <label>&chi;<sub>cc</sub><sup>(1)</sup> <span class="axis-role-badge" data-axis-pair="cc"></span> (MHz): <input type="number" id="chi_cc" step="any" value="0"></label>
+                <label>&chi;<sub>ab</sub><sup>(1)</sup> <span class="axis-role-badge" data-axis-pair="ab"></span> (MHz): <input type="number" id="chi_ab" step="any" value="0"></label>
+                <label>&chi;<sub>ac</sub><sup>(1)</sup> <span class="axis-role-badge" data-axis-pair="ac"></span> (MHz): <input type="number" id="chi_ac" step="any" value="0"></label>
+                <label>&chi;<sub>bc</sub><sup>(1)</sup> <span class="axis-role-badge" data-axis-pair="bc"></span> (MHz): <input type="number" id="chi_bc" step="any" value="0"></label>
+                <p class="fieldset-subheading">Nucleus 2 (optional)</p>
+                <label>Nuclear spin I<sub>2</sub>: <input type="number" id="I_nuc_2" step="any" value="0"></label>
+                <label>&chi;<sub>aa</sub><sup>(2)</sup> <span class="axis-role-badge" data-axis-pair="aa"></span> (MHz): <input type="number" id="chi_aa_2" step="any" value="0"></label>
+                <label>&chi;<sub>bb</sub><sup>(2)</sup> <span class="axis-role-badge" data-axis-pair="bb"></span> (MHz): <input type="number" id="chi_bb_2" step="any" value="0"></label>
+                <label>&chi;<sub>cc</sub><sup>(2)</sup> <span class="axis-role-badge" data-axis-pair="cc"></span> (MHz): <input type="number" id="chi_cc_2" step="any" value="0"></label>
+                <label>&chi;<sub>ab</sub><sup>(2)</sup> <span class="axis-role-badge" data-axis-pair="ab"></span> (MHz): <input type="number" id="chi_ab_2" step="any" value="0"></label>
+                <label>&chi;<sub>ac</sub><sup>(2)</sup> <span class="axis-role-badge" data-axis-pair="ac"></span> (MHz): <input type="number" id="chi_ac_2" step="any" value="0"></label>
+                <label>&chi;<sub>bc</sub><sup>(2)</sup> <span class="axis-role-badge" data-axis-pair="bc"></span> (MHz): <input type="number" id="chi_bc_2" step="any" value="0"></label>
+                <p><small>Up to two quadrupolar nuclei are supported. Use only the first block for single-nucleus cases.</small></p>
+              </fieldset>
+
+              <fieldset class="wms-fieldset">
+                <legend>Nuclear Statistics</legend>
+                <label>Nuclear Weight (ee transition): <input type="number" id="eeWt" step="any" value="1"></label>
+                <label>Nuclear Weight (eo transition): <input type="number" id="eoWt" step="any" value="1"></label>
+                <label>Nuclear Weight (oe transition): <input type="number" id="oeWt" step="any" value="1"></label>
+                <label>Nuclear Weight (oo transition): <input type="number" id="ooWt" step="any" value="1"></label>
+              </fieldset>
+
+              <fieldset class="wms-fieldset wms-fieldset--wide">
+                <legend>Levels and Transition Options</legend>
+                <div class="frequency-window-card">
+                  <div class="frequency-window-card__header">
+                    <p class="fieldset-subheading frequency-window-card__title">Frequency Window</p>
+                    <p class="frequency-window-card__unit">Simulation range</p>
+                  </div>
+                  <div class="frequency-window-card__scale" aria-hidden="true">
+                    <span class="frequency-window-card__marker"></span>
+                    <span class="frequency-window-card__track"></span>
+                    <span class="frequency-window-card__marker"></span>
+                  </div>
+                  <div class="frequency-window-card__inputs">
+                    <label class="frequency-window-card__field frequency-window-card__field--min">
+                      <span class="frequency-window-card__label">Min (MHz)</span>
+                      <input type="number" id="freq_min_spcat" step="any" value="6000.0">
+                    </label>
+                    <div class="frequency-window-card__arrow" aria-hidden="true">→</div>
+                    <label class="frequency-window-card__field frequency-window-card__field--max">
+                      <span class="frequency-window-card__label">Max</span>
+                      <input type="number" id="freq_max_spcat" step="any" value="12000.0">
+                    </label>
+                  </div>
+                  <p class="frequency-window-card__note">
+                    Values are treated as MHz. For backward compatibility, if <strong>Max ≤ 1000</strong> it is interpreted as GHz.
+                  </p>
+                </div>
+                <hr class="levels-options-divider">
+                <div class="levels-parameter-grid">
+                  <div class="levels-parameter-block">
+                    <p class="fieldset-subheading">Active Components</p>
+                    <label><input type="checkbox" id="a_axis" checked> A axis</label>
+                    <label><input type="checkbox" id="b_axis" checked> B axis</label>
+                    <label><input type="checkbox" id="c_axis" checked> C axis</label>
+                  </div>
+                  <div class="levels-parameter-block">
+                    <p class="fieldset-subheading">Thresholds</p>
+                    <label>STR0: <input type="number" id="str0" step="any" value="-12.0"></label>
+                    <label>STR1: <input type="number" id="str1" step="any" value="-10.0"></label>
+                  </div>
+                </div>
+                <label>MIN J: <input type="number" id="J_min" step="1" min="0" value="0"></label>
+                <label>MAX J: <input type="number" id="J_max" step="1" min="0" value="10"></label>
+                <label><input type="checkbox" id="auto_estimate_j_range" checked> Auto-estimate J_min / J_max from the frequency window</label>
+                <div style="display:flex;gap:0.5em;flex-wrap:wrap;align-items:center;margin:0.35em 0 0.5em;">
+                  <button type="button" id="estimate-j-range">Estimate J_min / J_max</button>
+                  <span id="j-range-status" style="color:#555;"></span>
+                </div>
+                <details class="workflow-details workflow-details--inline">
+                  <summary><span>How J-range estimation works (rigid analytic model)</span></summary>
+                  <div class="workflow-details__content">
+                    <p><small>
+                      The estimator uses a <em>rigid symmetric-top approximation</em> and ignores centrifugal distortion, quadrupole coupling, and intensities.
+                      Frequency-window bounds are normalized to MHz before the estimate.
+                    </small></p>
+                    <p><small><strong>Rigid energies (MHz):</strong></small></p>
+                    <p><small>
+                      Prolate: <code>E(J,K) = B J(J+1) + (A-B)K²</code><br>
+                      Oblate: <code>E(J,K) = B J(J+1) + (C-B)K²</code>
+                    </small></p>
+                    <p><small><strong>Main transition used:</strong></small></p>
+                    <p><small>
+                      For <code>ΔJ = +1, ΔK = 0</code>, the rigid estimate is<br>
+                      <code>ν ≈ 2B(J+1)</code>.
+                    </small></p>
+                    <p><small><strong>Symmetric-top edge envelope (prolate/oblate):</strong></small></p>
+                    <p><small>
+                      For <code>ΔJ = +1, ΔK = ±1</code>, the code uses only the two analytic edge values<br>
+                      <code>ν ≈ |2B(J+1) + γ m|</code>, with <code>γ = A-B</code> (prolate) or <code>γ = C-B</code> (oblate), and <code>m ∈ {-2J+1, 2J+1}</code>.
+                    </small></p>
+                    <p><small>
+                      Any J whose estimated transition frequency overlaps the selected window contributes to the final range.
+                      For asymmetric rotors, both prolate and oblate estimates are computed and merged:
+                      <code>J_min = min(...)</code>, <code>J_max = max(...)</code>.
+                    </small></p>
+                  </div>
+                </details>
+                <p class="workflow-helper-text">For asymmetric rotors, the estimate combines prolate and oblate symmetric-top approximations in the selected frequency window, then runs the final asymmetric-top diagonalization with the inferred J range.</p>
+              </fieldset>
+            </div>
+
+            <div class="workflow-action-row">
+              <button type="button" id="calculate" class="workflow-button workflow-button--primary">Calculate spectrum</button>
+              <button type="button" id="download-input-file" class="workflow-button">Download WMS-Rot input .txt</button>
+            </div>
+          </form>
+
+          <section id="simulated-spectrum-section" class="spectrum-panel" hidden>
+            <div class="spectrum-panel__header">
+              <div>
+                <p class="workflow-section__eyebrow">Calculated Output</p>
+                <h3 class="spectrum-panel__title">Simulated Spectrum</h3>
+              </div>
+              <p class="spectrum-panel__note">
+                Inspect the simulated branches here, then continue with the post-processing section for fitting, wavefunction analysis, or result export.
+              </p>
+            </div>
+            <fieldset class="wms-fieldset">
+              <legend>Visualization Options</legend>
+              <label>Intensity scale:
+                <select id="intensityScale">
+                  <option value="relative" selected>Relative</option>
+                  <option value="absolute">Absolute</option>
+                </select>
+              </label>
+              <label><input type="checkbox" id="showP" checked> Show P transitions</label>
+              <label>Color P: <input type="color" id="colorP" value="#1f77b4"></label>
+              <label><input type="checkbox" id="showQ" checked> Show Q transitions</label>
+              <label>Color Q: <input type="color" id="colorQ" value="#2ca02c"></label>
+              <label><input type="checkbox" id="showR" checked> Show R transitions</label>
+              <label>Color R: <input type="color" id="colorR" value="#d62728"></label>
+            </fieldset>
+            <div id="spectrum"></div>
+            <div class="plot-download-row">
+              <button type="button" id="download-spectrum-png" class="plot-download-button" disabled>Download PNG (high-res)</button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <section class="workflow-section workflow-section--compact" aria-labelledby="post-processing-title">
+      <div class="workflow-section__inner">
+        <div class="workflow-section__badge" aria-hidden="true">2</div>
+        <div class="workflow-section__header">
+          <p class="workflow-section__eyebrow">Post-Processing</p>
+          <h2 class="workflow-section__title" id="post-processing-title">Fit or interpret the calculated spectrum</h2>
+          <p class="workflow-section__lead">
+            Once a spectrum has been calculated, continue with fitting, wavefunction inspection, or result export.
+          </p>
+        </div>
+        <div class="workflow-section__body">
+          <div class="post-processing-grid">
+            <article class="post-tool-card">
+              <p class="workflow-card-label">Fit</p>
+              <h3 class="workflow-card-title">WMS-FitRot</h3>
+              <p class="workflow-helper-text">Send the current calculated spectrum and input setup to WMS-FitRot, or open it directly and restore a saved Fit Status LOG.</p>
+              <button type="button" id="open-compare" class="workflow-button">Open in WMS-FitRot</button>
+            </article>
+            <article class="post-tool-card">
+              <p class="workflow-card-label">Interpret</p>
+              <h3 class="workflow-card-title">WMS-Wavefunctions</h3>
+              <p class="workflow-helper-text">Inspect calculated wavefunctions to obtain a more qualitative and interpretative view of the states.</p>
+              <button type="button" id="open-wavefunction-viewer" class="workflow-button" disabled>Open WMS-Wavefunctions</button>
+            </article>
+            <article class="post-tool-card">
+              <p class="workflow-card-label">Export</p>
+              <h3 class="workflow-card-title">Spectra Files</h3>
+              <p class="workflow-helper-text">Download the calculated spectrum, energies, and export files for external analysis.</p>
+              <button type="button" id="download-results" class="workflow-button" disabled>Download spectra files</button>
+            </article>
+          </div>
+          <p id="post-processing-status" class="workflow-section__status" aria-live="polite">
+            Calculate a spectrum in Core Calculation to enable post-processing tools.
+          </p>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

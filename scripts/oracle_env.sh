@@ -21,7 +21,7 @@ export ORACLE_PYTHON="${ORACLE_PYTHON:-python3}"
 export ORACLE_AUTO_CREATE_VENV="${ORACLE_AUTO_CREATE_VENV:-1}"
 export ORACLE_AUTO_INSTALL_RUNTIME_DEPS="${ORACLE_AUTO_INSTALL_RUNTIME_DEPS:-1}"
 export ORACLE_AUTO_INSTALL_GUI_DEPS="${ORACLE_AUTO_INSTALL_GUI_DEPS:-0}"
-export ORACLE_RUNTIME_DEPS="${ORACLE_RUNTIME_DEPS:-numpy scipy matplotlib pytest rdkit}"
+export ORACLE_RUNTIME_DEPS="${ORACLE_RUNTIME_DEPS:-numpy scipy matplotlib pandas sympy pytest rdkit}"
 export ORACLE_GUI_DEPS="${ORACLE_GUI_DEPS:-PySide6 pytest-qt}"
 
 oracle-package-path() {
@@ -57,7 +57,21 @@ PY
         return 0
     fi
     echo "Dipendenze ORACLE GUI/DVR mancanti: installo $ORACLE_GUI_DEPS..."
-    python -m pip install $ORACLE_GUI_DEPS
+    oracle-pip-install-list "$ORACLE_GUI_DEPS"
+}
+
+oracle-pip-install-list() {
+    _ORACLE_PIP_DEPS="$1" python - <<'PY'
+import os
+import shlex
+import subprocess
+import sys
+
+deps = shlex.split(os.environ.get("_ORACLE_PIP_DEPS", ""))
+if not deps:
+    raise SystemExit(0)
+raise SystemExit(subprocess.call([sys.executable, "-m", "pip", "install", *deps]))
+PY
 }
 
 oracle-create-venv() {
@@ -103,16 +117,18 @@ oracle-ensure-runtime-deps() {
     python - <<'PY' >/dev/null 2>&1
 import matplotlib
 import numpy
+import pandas
 import pytest
 import rdkit
 import scipy
+import sympy
 PY
     if [ $? -eq 0 ]; then
         return 0
     fi
     echo "Dipendenze ORACLE runtime mancanti: installo $ORACLE_RUNTIME_DEPS..."
     python -m pip install --upgrade pip setuptools wheel || return
-    python -m pip install $ORACLE_RUNTIME_DEPS
+    oracle-pip-install-list "$ORACLE_RUNTIME_DEPS"
 }
 
 oracle-conda-hook() {
@@ -247,7 +263,7 @@ oracle-run-check() {
     python - <<'PY'
 import importlib
 
-mods = ["oracle_core", "numpy", "scipy", "matplotlib", "PySide6", "rdkit"]
+mods = ["oracle_core", "numpy", "scipy", "matplotlib", "pandas", "sympy", "PySide6", "rdkit"]
 ok = True
 for name in mods:
     try:
@@ -282,13 +298,13 @@ PY
 
 oracle-install-gui-deps() {
     ORACLE_AUTO_INSTALL_GUI_DEPS=0 oracle-set || return
-    python -m pip install $ORACLE_GUI_DEPS
+    oracle-pip-install-list "$ORACLE_GUI_DEPS"
 }
 
 oracle-install-runtime-deps() {
     ORACLE_AUTO_INSTALL_RUNTIME_DEPS=0 oracle-set || return
     python -m pip install --upgrade pip setuptools wheel || return
-    python -m pip install $ORACLE_RUNTIME_DEPS
+    oracle-pip-install-list "$ORACLE_RUNTIME_DEPS"
 }
 
 oracle-clean() {

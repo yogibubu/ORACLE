@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="WMS-FitRot">
+  <title>WMS-FitRot</title>
+  <link rel="manifest" href="../manifest.webmanifest">
+  <link rel="icon" type="image/png" href="../icons/icon-192.png">
+  <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="../../style.css">
+  <link rel="stylesheet" href="../theme.css">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="../pwa-enhancements.js" defer></script>
+  <script src="script.js" defer></script>
+</head>
+<body class="compare-page">
+  <section class="wms-suite-header tool-header" aria-labelledby="wms-fitrot-title">
+    <div class="wms-suite-brand">
+      <img class="wms-suite-logo" src="../icons/logo-full.png" alt="WMS-Rot logo">
+      <div class="wms-suite-copy">
+        <p class="wms-suite-kicker">WMS-Rot Suite</p>
+        <h1 class="wms-suite-title" id="wms-fitrot-title">WMS-FitRot</h1>
+        <p class="wms-suite-subtitle">Rotational spectra overlay and targeted autofit companion for WMS-Rot.</p>
+        <details class="wms-suite-privacy">
+          <summary><span>A Note on Privacy</span></summary>
+          <div class="wms-suite-privacy__content">
+            <p>
+              We strongly believe in collaboration and open science. Privacy and security are central to how this tool is designed. For us, the web is an open platform that, without relying on system-dependent compiled software, better reflects those values through accessibility, transparency, and portability.
+            </p>
+            <p>
+              Although WMS-FitRot is presented as a website, all code is executed locally on the user's own machine within the user's own web browser. No data is collected, uploaded, or processed by a remote background server, because there is no background server running the calculations. Everything runs locally in the browser. WMS-FitRot can also be saved as a web app on the computer, and it can continue to run even after the network connection is interrupted.
+            </p>
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <main class="tool-content">
+    <section class="panel">
+      <div class="panel__header">
+        <div>
+          <h2>Uploaded Files</h2>
+          <p class="panel__subtitle">Upload experimental spectra or a Fit Status LOG and browse each file in its own tab.</p>
+        </div>
+        <div class="panel__actions">
+          <button type="button" id="upload-button" class="primary">Upload experimental .dat</button>
+          <button type="button" id="autofit-upload-log" class="ghost">Upload Fit Status LOG</button>
+          <input type="file" id="upload-input" accept=".dat" multiple hidden>
+          <input type="file" id="autofit-upload-log-input" accept=".json,.log" hidden>
+        </div>
+      </div>
+      <details class="workflow-details workflow-details--inline fitrot-method-details">
+        <summary><span>How the derived stick spectrum is obtained from a continuous profile</span></summary>
+        <div class="workflow-details__content">
+          <p><small>
+            In WMS-FitRot, a profile-mode <code>.dat</code> file is interpreted as an ordered sampled spectrum, i.e. a sequence of pairs <code>(nu_i, I_i)</code> sorted by frequency. The derived stick view is not a deconvolution or a full line-shape inversion; it is a peak-picked discrete surrogate of the sampled profile, intended for visualization, overlay, and assignment-oriented work.
+          </small></p>
+          <p><small>
+            Peak detection is performed on <code>|I_i|</code>, so that line finding is invariant with respect to whether the spectrum is later displayed in absorbance or transmittance convention. When no explicit threshold is supplied, the intensity floor is estimated robustly as <code>median(|I|) + 5 * MAD(|I|)</code>, where <code>MAD</code> is the median absolute deviation.
+          </small></p>
+          <p><small>
+            A sampled point <code>i</code> is retained as a candidate transition only if it behaves as a proper local maximum: the left discrete slope must be positive, the right discrete slope must be non-positive, and the local second difference must be negative. In practice, this means that WMS-FitRot keeps only maxima that are both peak-like and above the robust detection floor; weak baseline structure and most noise excursions are therefore rejected automatically.
+          </small></p>
+          <p><small>
+            For every accepted maximum, the line center is refined by a three-point quadratic interpolation built from the neighboring samples <code>(nu_(i-1), I_(i-1))</code>, <code>(nu_i, I_i)</code>, and <code>(nu_(i+1), I_(i+1))</code>. The reported stick frequency is the vertex position of that local parabola, and the reported stick intensity is the corresponding vertex height. If the interpolated vertex is numerically unstable, falls outside the bracketing interval, or yields a non-physical negative apex, WMS-FitRot falls back to the sampled maximum itself.
+          </small></p>
+          <p><small>
+            The resulting sticks should therefore be interpreted as experimentally detected peak positions and amplitudes extracted from the sampled profile. Closely blended features remain merged unless they generate distinct local maxima, and the stick intensities reflect the local peak envelope rather than fitted transition moments or a model-based unfolding of the instrumental profile.
+          </small></p>
+        </div>
+      </details>
+      <div class="uploaded-tabs">
+        <div id="uploaded-tabs" class="tab-list" role="tablist" aria-label="Uploaded files"></div>
+        <div id="uploaded-panels" class="tab-panels">
+          <p class="empty-message">No files loaded.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel__header">
+        <div>
+          <h2>Overlay Spectra</h2>
+          <p class="panel__subtitle">Select the uploaded files and overlay profiles/sticks in absorbance or transmittance. All assignment clicks are performed on the overlay plot in this panel.</p>
+        </div>
+      </div>
+      <div id="overlay-list" class="overlay-list">
+        <p class="empty-message">Upload at least one spectrum to enable the overlay.</p>
+      </div>
+      <div id="overlay-plot" class="plot" aria-label="Overlay spectra"></div>
+      <div class="plot-download-row">
+        <button type="button" id="overlay-download-png" class="plot-download-button" disabled>Download PNG (high-res)</button>
+      </div>
+      <div class="overlay-interaction" aria-labelledby="overlay-interaction-title">
+        <div class="overlay-interaction__header">
+          <div>
+            <h3 id="overlay-interaction-title" class="overlay-interaction__title">
+              <span class="overlay-interaction__title-icon" aria-hidden="true">
+                <svg viewBox="0 0 54 40" role="presentation" focusable="false">
+                  <line x1="2" y1="11" x2="52" y2="11" stroke="rgba(148,163,184,0.35)" stroke-width="1.5"/>
+                  <line x1="2" y1="22" x2="52" y2="22" stroke="rgba(148,163,184,0.35)" stroke-width="1.5"/>
+                  <line x1="2" y1="33" x2="52" y2="33" stroke="rgba(148,163,184,0.35)" stroke-width="1.5"/>
+                  <line x1="18" y1="14" x2="18" y2="38" stroke="#f59e0b" stroke-width="2.6" stroke-linecap="round"/>
+                  <rect x="13" y="9" width="10" height="10" rx="1.2" ry="1.2" transform="rotate(45 18 14)" fill="#fb923c" stroke="#9a3412" stroke-width="1.8"/>
+                  <path d="M21 8.6L45.5 20.1C47.3 21 47.1 23.6 45.2 24.1L36.8 26.2C35.9 26.4 35.3 27.1 35 28L32.4 35.9C31.8 37.7 29.3 37.9 28.5 36.2L17 11.7C16.1 9.7 18.9 7.7 21 8.6Z" fill="#0f172a" stroke="#ffffff" stroke-width="1.7" stroke-linejoin="round"/>
+                </svg>
+              </span>
+              <span>Click on lines to select transitions to fit and make assignments!</span>
+            </h3>
+            <br>
+            <p class="section-help">Use these controls to decide how mouse clicks on the overlay spectrum are interpreted during assignment building.</p>
+          </div>
+        </div>
+        <div class="overlay-interaction__controls">
+          <label class="autofit-field">
+            Assignment mode
+            <select id="autofit-assignment-mode">
+              <option value="manual">Manual Assignation</option>
+              <option value="auto">Automatic Assignation</option>
+            </select>
+          </label>
+          <label class="autofit-field" id="autofit-click-mode-field" hidden>
+            Click adds to
+            <select id="autofit-click-mode">
+              <option value="fit">Fit labels</option>
+              <option value="control">Control labels</option>
+            </select>
+          </label>
+        </div>
+        <p id="overlay-click-summary" class="overlay-interaction__summary"></p>
+        <div class="overlay-interaction__figures">
+          <div id="overlay-figure-auto" class="overlay-figure">
+            <div class="overlay-figure__title">Automatic mode</div>
+            <p class="overlay-figure__intro"><strong>Choose where automatic clicks go</strong><br>The selected box defines the effective click behavior on the overlay plot.</p>
+            <div class="overlay-target-toggle" role="group" aria-label="Automatic click destination">
+              <button type="button" id="overlay-target-fit" class="overlay-target-option overlay-target-option--fit" data-mode="fit" aria-pressed="true">
+                <span class="overlay-target-option__badge">Selected</span>
+                <strong>Fit labels</strong>
+                <span>Orange target. Clicked labels are added to the residual vector used in optimization.</span>
+              </button>
+              <button type="button" id="overlay-target-control" class="overlay-target-option overlay-target-option--control" data-mode="control" aria-pressed="false">
+                <span class="overlay-target-option__badge">Selected</span>
+                <strong>Control labels</strong>
+                <span>Blue target. Control labels are optional; if you do not specify them manually, WMS-FitRot can assign them automatically for ranking, validation, and control-line checks.</span>
+              </button>
+            </div>
+            <details class="workflow-details workflow-details--inline auto-click-details">
+              <summary><span>How automatic assignment uses fit and control labels</span></summary>
+              <div class="workflow-details__content">
+                <p><small>
+                  In automatic mode, clicks are accepted only on the selected theoretical trace in the overlay plot. Clicking a labeled theoretical line adds it to the currently selected target set; clicking the same label again removes it from that set.
+                </small></p>
+                <p><small>
+                  Fit labels define the residual vector used in the least-squares refinement. Control labels are not fitted directly; instead, they are used after each local fit to rank candidate assignments through residual compactness, residual bias, and peak-collision consistency checks.
+                </small></p>
+                <p><small>
+                  Supplying control labels explicitly is optional. If none are selected manually, WMS-FitRot can populate the control set automatically and use those lines only for post-fit scoring rather than for direct parameter optimization.
+                </small></p>
+              </div>
+            </details>
+          </div>
+          <div id="overlay-figure-manual" class="overlay-figure overlay-figure--manual" hidden>
+            <div class="overlay-figure__title">Manual mode</div>
+            <div class="overlay-steps">
+              <div class="overlay-step overlay-step--theory" id="overlay-step-theory">
+                <span class="overlay-step__index">1</span>
+                <div>
+                  <strong>Click an orange theoretical line</strong>
+                  <span>Choose the predicted transition.</span>
+                </div>
+              </div>
+              <div class="overlay-step overlay-step--experimental" id="overlay-step-experimental">
+                <span class="overlay-step__index">2</span>
+                <div>
+                  <strong>Click an experimental line on another trace</strong>
+                  <span>Select the observed counterpart on a different trace.</span>
+                </div>
+              </div>
+              <div class="overlay-step overlay-step--pair" id="overlay-step-pair">
+                <span class="overlay-step__index">3</span>
+                <div>
+                  <strong>The accepted pair is stored as a 1:1 link</strong>
+                  <span>The stored pair links the orange theory line to the selected experimental peak.</span>
+                  <div class="overlay-link-preview" aria-hidden="true">
+                    <svg class="overlay-link-preview__svg" viewBox="0 0 190 118" role="presentation" focusable="false" aria-hidden="true">
+                      <defs>
+                        <pattern id="overlay-link-grid" width="63.333" height="39.333" patternUnits="userSpaceOnUse">
+                          <path d="M 63.333 0 L 0 0 0 39.333" fill="none" stroke="rgba(203,213,225,0.55)" stroke-width="1"/>
+                        </pattern>
+                      </defs>
+                      <rect x="0.5" y="0.5" width="189" height="117" rx="12" fill="url(#overlay-link-grid)" stroke="#dbe4ef"/>
+                      <line x1="135" y1="28" x2="135" y2="92" stroke="#f97316" stroke-width="3"/>
+                      <line x1="55" y1="68" x2="55" y2="94" stroke="#0f766e" stroke-width="3"/>
+                      <line x1="55" y1="68" x2="135" y2="28" stroke="#0f766e" stroke-width="4" stroke-dasharray="8 7"/>
+                      <circle cx="135" cy="28" r="11" fill="#f97316" stroke="#9a3412" stroke-width="3"/>
+                      <circle cx="55" cy="68" r="11" fill="#10b981" stroke="#0f766e" stroke-width="3"/>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p id="overlay-manual-status" class="overlay-figure__caption">Manual mode expects one theory click first, followed by one experimental click.</p>
+          </div>
+        </div>
+      </div>
+      <div id="overlay-toast" class="overlay-toast" aria-live="polite" aria-hidden="true" hidden></div>
+    </section>
+
+    <section class="panel" id="autofit-panel">
+      <div class="panel__header">
+        <div>
+          <h2>Fitting Procedure</h2>
+          <p class="panel__subtitle">Click theoretical stick peaks to build the label list, then run the fit in-browser.</p>
+        </div>
+        <div class="panel__actions">
+          <button type="button" id="autofit-restore-initial" class="ghost">Restore Initial Parameters</button>
+          <button type="button" id="autofit-run" class="primary">Run Autofit</button>
+          <button type="button" id="autofit-run-local" class="ghost">Run locally</button>
+          <button type="button" id="autofit-cancel" class="ghost" disabled>Cancel</button>
+        </div>
+      </div>
+
+      <div class="autofit-grid">
+        <div class="autofit-card">
+          <h3>Inputs</h3>
+          <p class="section-help">This section defines the spectra and data mode used to build the fitting problem.</p>
+          <label class="autofit-field">
+            Theoretical spectrum (stick with labels)
+            <select id="autofit-theory-select"></select>
+          </label>
+          <small class="parameter-help"><em>Represents the predicted labeled stick spectrum used as reference transitions. Changing it changes all target lines and the fitted model context.</em></small>
+          <label class="autofit-field">
+            Experimental spectrum
+            <select id="autofit-exp-select"></select>
+          </label>
+          <small class="parameter-help"><em>Represents the measured spectrum used as observation target. Changing it updates candidate peaks and residuals.</em></small>
+          <label class="autofit-field">
+            Experimental mode
+            <select id="autofit-exp-mode">
+              <option value="profile">Profile (peak-pick in Python)</option>
+              <option value="stick">Stick list</option>
+            </select>
+          </label>
+          <small class="parameter-help"><em>Represents how experimental data are interpreted. Profile mode performs peak-picking first; stick mode uses provided lines directly.</em></small>
+          <label class="autofit-checkbox">
+            <input type="checkbox" id="autofit-use-input-assignment">
+            Use input file assignation
+          </label>
+          <small class="parameter-help"><em>Available for stick spectra whose third column contains WMS-Rot labels. When enabled, WMS-FitRot reads those labels as explicit theory-to-experiment assignments and skips the assignment-search stage.</em></small>
+        </div>
+
+        <div class="autofit-card">
+          <h3>Selected labels</h3>
+          <p class="section-help">This section displays the fit labels, control labels, and manual pairs created from overlay-plot clicks and from manual text edits.</p>
+          <p class="autofit-hint">Use the click-behavior panel in Overlay Spectra to decide whether plot clicks create fit labels, control labels, or explicit manual pairs.</p>
+          <div id="autofit-fit-label-block">
+            <strong>Fit labels</strong>
+            <small class="parameter-help"><em>Represents transitions directly used in least-squares residuals. Better-distributed, correctly assigned lines usually improve robustness.</em></small>
+            <div id="autofit-label-list" class="label-list"></div>
+          </div>
+          <div id="autofit-control-block">
+            <strong>Control labels</strong>
+            <small class="parameter-help"><em>Represents validation lines used to score assignment plausibility. They do not directly define fitted residuals but guide candidate selection.</em></small>
+            <div id="autofit-control-list" class="label-list"></div>
+          </div>
+          <div id="autofit-manual-block" hidden>
+            <strong id="autofit-manual-title">Manual assignments (orange -> green)</strong>
+            <small id="autofit-manual-help" class="parameter-help"><em>Represents explicit theory-to-experiment line pairs. Use this when you already trust assignments and want deterministic fitting.</em></small>
+            <p id="autofit-manual-pending" class="autofit-hint"></p>
+            <div id="autofit-manual-list" class="label-list"></div>
+          </div>
+          <div class="label-actions">
+            <input type="text" id="autofit-label-input" placeholder="Paste label…">
+            <button type="button" id="autofit-add-label" class="ghost">Add</button>
+            <button type="button" id="autofit-clear-labels" class="ghost">Clear</button>
+          </div>
+          <small class="parameter-help"><em>Label input/Add/Clear let you edit selected transitions manually. Clearing labels resets fit/control/manual selections and restarts assignment setup.</em></small>
+        </div>
+
+        <div class="autofit-card">
+          <h3>Options</h3>
+          <p class="section-help">These groups control candidate generation, scoring, global search, and final numerical optimization.</p>
+            <details class="autofit-option-group" open>
+              <summary>Catalog And Bounds</summary>
+              <p class="group-help">Controls spectral catalog size and admissible ranges for rotational-constant updates during local/global fitting stages.</p>
+              <p class="autofit-mode-note-block autofit-mode-note-block--info">Span and Final span define the automatic relative bounds used in the local and final stages. The Custom Parameter Bounds section below is optional and only overrides the individual min/max sides that you fill in.</p>
+              <div class="autofit-options">
+                <small><em>Represents the highest rotational quantum number used in theoretical simulation. Increasing it includes more transitions but raises computational cost.</em></small>
+                <label>J max <input type="number" id="autofit-jmax" value="10"></label>
+              <small><em>Represents the intensity threshold for keeping predicted lines. Lower thresholds include weak lines (more complete but noisier search space).</em></small>
+              <label>Intensity cut <input type="number" id="autofit-intensity-cut" value="0.002"></label>
+              <small><em>Represents relative bounds for the initial local ABC fit. Larger span allows bigger corrections; smaller span enforces conservative updates.</em></small>
+              <label>Span <input type="number" id="autofit-span" value="0.3"></label>
+              <small><em>Represents relative bounds for the final global optimization stage. Wider bounds improve recovery from poor starts; tighter bounds stabilize refinement.</em></small>
+              <label>Final span <input type="number" id="autofit-final-span" value="0.1"></label>
+            </div>
+          </details>
+          
+          
+          <div class="autofit-option-groups">
+            <details class="autofit-option-group" data-manual-disabled-group>
+              <summary>Assignment Search <span class="autofit-mode-badge" hidden>Not used in manual mode</span></summary>
+              <p class="group-help">Defines how candidate experimental peaks are generated and how broadly assignment combinations are explored before refinement.</p>
+              <p class="autofit-mode-note-block" hidden>Not used in manual mode. Explicit 1:1 theory-to-experiment pairs bypass combinatorial candidate search.</p>
+              <div class="autofit-options">
+                <small><em>Represents the relative assignment window around each theoretical line (±Δ%). Increasing it captures more candidate peaks but increases ambiguity and runtime.</em></small>
+                <label>Δ assign (%) - candidate window <input type="number" id="autofit-delta-assign" value="0.1" step="0.01" min="0"></label>
+                <small><em>Represents the tolerance used when declaring a control-line match (±Δ%). Increasing it is more permissive; decreasing it is stricter.</em></small>
+                <label>Δ match (%) - control tolerance <input type="number" id="autofit-delta-match" value="0.1" step="0.01" min="0"></label>
+                <small><em>Represents the maximum candidate peaks retained per fit label. Higher values improve coverage but expand combinatorics.</em></small>
+                <label>Kmax - peaks per label <input type="number" id="autofit-kmax" value="3"></label>
+                <small><em>Represents the maximum number of label-to-peak combinations evaluated. Increasing it improves search thoroughness but can be much slower.</em></small>
+                <label>Max combos - assignment trials <input type="number" id="autofit-max-combos" value="10"></label>
+                <small><em>Represents stochastic sampling temperature for weighted combination generation. Higher values explore more diverse assignments; lower values favor near matches.</em></small>
+                <label>Sample temp - exploration level <input type="number" id="autofit-sample-temp" value="1.0" step="0.1"></label>
+              </div>
+            </details>
+
+            <details class="autofit-option-group">
+              <summary>Additional Fitted Parameters</summary>
+              <p class="group-help">A, B, and C are always fitted. Select optional quartic or sextic distortion constants to include in the least-squares vector; unchecked parameters remain fixed at the current theory values. As an alternative to fitting quartic constants directly, you can fit a single quartic scale parameter <code>s</code>.</p>
+              <div class="autofit-options">
+                <small><em>Represents which centrifugal distortion constants are promoted from fixed inputs to fitted variables. Leaving all unchecked preserves the current ABC-only behavior.</em></small>
+                <label class="autofit-checkbox"><input type="checkbox" id="autofit-fit-s"> Fit <code>s</code> (quartic tau scale)</label>
+                <div class="autofit-scale-control">
+                  <label>
+                    Quartic scale <code>s</code>
+                    <input type="range" id="autofit-quartic-scale" min="0.2" max="5" step="0.001" value="1">
+                  </label>
+                  <label>
+                    <code>s</code> value
+                    <input type="number" id="autofit-quartic-scale-value" min="0.000001" step="0.001" value="1">
+                  </label>
+                  <div class="autofit-scale-control__note">Applied quartic tau factor: <code>1/(s*s)</code> = <span id="autofit-quartic-scale-factor">1</span></div>
+                </div>
+                <div class="autofit-fit-param-grid">
+                  <label class="autofit-checkbox"><input type="checkbox" id="autofit-fit-DJ"> DJ</label>
+                  <label class="autofit-checkbox"><input type="checkbox" id="autofit-fit-DJK"> DJK</label>
+                  <label class="autofit-checkbox"><input type="checkbox" id="autofit-fit-DK"> DK</label>
+                  <label class="autofit-checkbox"><input type="checkbox" id="autofit-fit-dJ"> dJ / d1</label>
+                  <label class="autofit-checkbox"><input type="checkbox" id="autofit-fit-dK"> dK / d2</label>
+                  <label class="autofit-checkbox"><input type="checkbox" id="autofit-fit-HJ"> HJ</label>
+                  <label class="autofit-checkbox"><input type="checkbox" id="autofit-fit-HJK"> HJK</label>
+                  <label class="autofit-checkbox"><input type="checkbox" id="autofit-fit-HKJ"> HKJ</label>
+                  <label class="autofit-checkbox"><input type="checkbox" id="autofit-fit-HK"> HK</label>
+                  <label class="autofit-checkbox"><input type="checkbox" id="autofit-fit-h1"> h1</label>
+                  <label class="autofit-checkbox"><input type="checkbox" id="autofit-fit-h2"> h2</label>
+                  <label class="autofit-checkbox"><input type="checkbox" id="autofit-fit-h3"> h3</label>
+                </div>
+              </div>
+            </details>
+
+            <details class="autofit-option-group">
+              <summary>Custom Parameter Bounds</summary>
+              <p class="group-help">Optional explicit overrides for the automatic span-based bounds. Leave a field empty to keep the bound generated from Span / Final span for that side.</p>
+              <div class="autofit-options">
+                <small><em>Represents explicit lower and upper bounds passed to <code>scipy.optimize.least_squares</code>. This section does not replace Span / Final span globally; it only overrides the specific min/max sides you enter here.</em></small>
+                <div id="autofit-param-bound-grid" class="autofit-bound-grid" aria-label="Custom parameter bounds"></div>
+              </div>
+            </details>
+
+            <details class="autofit-option-group" data-manual-disabled-group>
+              <summary>Control Scoring <span class="autofit-mode-badge" hidden>Not used in manual mode</span></summary>
+              <p class="group-help">Defines how candidate assignments are ranked using control-line agreement, residual spread, bias, and peak-collision penalties.</p>
+              <p class="autofit-mode-note-block" hidden>Not used in manual mode. Manual assignments do not rely on control-line ranking or validation scoring.</p>
+              <div class="autofit-options">
+                <small><em>Represents how many control lines are included in scoring when auto-control mode is used. More lines improve validation but increase evaluation work.</em></small>
+                <label>M ctrl - control lines used <input type="number" id="autofit-mctrl" value="3"></label>
+                <small><em>Represents the penalty weight for control-line MAD (robust spread). Higher values prefer compact residual distributions.</em></small>
+                <label>λ RMS - spread penalty weight <input type="number" id="autofit-lambda-rms" value="1.0"></label>
+                <small><em>Represents the penalty weight for systematic residual bias. Increasing it discourages one-sided assignment errors.</em></small>
+                <label>λ bias - offset penalty weight <input type="number" id="autofit-lambda-bias" value="0.3"></label>
+                <small><em>Represents the penalty weight for peak collisions (reusing the same peak). Higher values enforce cleaner one-to-one behavior.</em></small>
+                <label>κ collisions - overlap penalty weight <input type="number" id="autofit-kappa-col" value="0.5"></label>
+              </div>
+            </details>
+
+            <details class="autofit-option-group" data-manual-disabled-group>
+              <summary>Beam Refinement <span class="autofit-mode-badge" hidden>Not used in manual mode</span></summary>
+              <p class="group-help">Performs local neighborhood search around top-ranked combinations to recover better assignments missed in the first pass.</p>
+              <p class="autofit-mode-note-block" hidden>Not used in manual mode. Beam refinement applies only to the automatic assignment-search workflow.</p>
+              <div class="autofit-options">
+                <small><em>Represents how many top combinations are kept as beam seeds. Larger beams increase recovery chance at higher runtime.</em></small>
+                <label>Beam size - top combos refined <input type="number" id="autofit-beam-size" value="10"></label>
+                <small><em>Represents how many local alternatives per label are tested during beam expansion. Higher values broaden local search.</em></small>
+                <label>Neighbor k - alternatives per label <input type="number" id="autofit-neighbor-k" value="3"></label>
+              </div>
+            </details>
+
+            <details class="autofit-option-group">
+              <summary>Local Refinement (Powell)</summary>
+              <p class="group-help">Powell performs derivative-free local search before final least-squares. It can improve convergence from rough initial constants, but it usually increases runtime.</p>
+              <div class="autofit-options">
+                <small><em>Enable Powell local refinement before final least-squares. Disable it to run LS-only (faster, but sometimes less robust).</em></small>
+                <label class="autofit-checkbox"><input type="checkbox" id="autofit-use-powell" checked> Use Powell local refinement</label>
+              </div>
+            </details>
+
+            <details class="autofit-option-group">
+              <summary>Least Squares (Final Stage)</summary>
+              <p class="group-help">Configures robust least-squares used in the final numerical refinement of A, B, and C after assignment selection.</p>
+              <div class="autofit-options">
+                <small><em>Represents the robust loss model used by <code>scipy.optimize.least_squares</code>. Nonlinear losses reduce outlier influence.</em></small>
+                <label>
+                  Loss
+                  <select id="autofit-ls-loss">
+                    <option value="soft_l1" selected>soft_l1 (default)</option>
+                    <option value="linear">linear</option>
+                    <option value="huber">huber</option>
+                    <option value="cauchy">cauchy</option>
+                    <option value="arctan">arctan</option>
+                  </select>
+                </label>
+                <small><em>Represents how the robust scale parameter is set. Auto follows data-driven scaling; custom enforces a fixed sensitivity.</em></small>
+                <label>
+                  f_scale mode
+                  <select id="autofit-ls-f-scale-mode">
+                    <option value="auto" selected>auto (current behavior)</option>
+                    <option value="custom">custom value</option>
+                  </select>
+                </label>
+                <small><em>Represents custom robust scale for residual weighting (used only in custom mode). Larger values make the fit less sensitive to moderate residuals.</em></small>
+                <label>f_scale <input type="number" id="autofit-ls-f-scale" value="1.0" min="0.000001" step="0.1" disabled></label>
+                <small><em>Represents the maximum number of function evaluations in final least-squares. Increasing it may improve convergence on hard cases.</em></small>
+                <label>max_nfev <input type="number" id="autofit-ls-max-nfev" value="200" min="1" step="1"></label>
+              </div>
+            </details>
+          </div>
+        </div>
+      </div>
+
+      <div class="autofit-output">
+        <div id="autofit-status" class="autofit-status">Waiting for input…</div>
+        <div class="autofit-progress">
+          <div id="autofit-progress-bar" class="autofit-progress__bar"></div>
+        </div>
+        <div id="autofit-warning" class="autofit-warning" hidden>Calculation may take a while, please do not close the window or considering running code locally</div>
+        <div id="autofit-downloads" class="autofit-downloads"></div>
+        <details id="sensitivity-panel" class="sensitivity-panel" hidden>
+          <summary class="sensitivity-panel__summary">
+            <span class="sensitivity-panel__summary-title">More Information on Sensitivity and Parameter Dependencies</span>
+            <span class="sensitivity-panel__summary-subtitle">Open this section only when you want a deeper view of correlations, ranking, and fit stability.</span>
+          </summary>
+          <div id="sensitivity-dashboard" class="sensitivity-dashboard">
+            <section class="sensitivity-card sensitivity-card--table">
+              <div class="sensitivity-card__header">
+                <div>
+                  <h3 class="sensitivity-card__title">Parameter Sensitivity</h3>
+                  <p class="sensitivity-card__subtitle">Local metrics derived from the Jacobian of the final fit.</p>
+                </div>
+                <label class="sensitivity-toggle">
+                  <input type="checkbox" id="sensitivity-hide-weak">
+                  <span>Hide weak parameters</span>
+                </label>
+              </div>
+              <div id="sensitivity-parameter-table" class="sensitivity-table-host"></div>
+            </section>
+            <div class="sensitivity-dashboard__grid sensitivity-dashboard__grid--aux">
+              <section class="sensitivity-card">
+                <div class="sensitivity-card__header">
+                  <div>
+                    <h3 class="sensitivity-card__title">Sensitivity Ranking</h3>
+                    <p class="sensitivity-card__subtitle">Parameter order by weighted sensitivity.</p>
+                  </div>
+                </div>
+                <div id="sensitivity-ranking-chart" class="plot sensitivity-plot" aria-label="Sensitivity ranking chart"></div>
+              </section>
+              <section class="sensitivity-card">
+                <div class="sensitivity-card__header">
+                  <div>
+                    <h3 class="sensitivity-card__title">Parameter Correlations</h3>
+                    <p class="sensitivity-card__subtitle">Click a cell to highlight the selected parameter pair.</p>
+                  </div>
+                </div>
+                <div id="sensitivity-correlation-heatmap" class="plot sensitivity-plot" aria-label="Correlation heatmap"></div>
+              </section>
+            </div>
+            <div class="sensitivity-dashboard__grid sensitivity-dashboard__grid--insights">
+              <section class="sensitivity-subpanel">
+                <div class="sensitivity-subpanel__header">
+                  <h4 class="sensitivity-subpanel__title">Selected Parameter</h4>
+                </div>
+                <div id="sensitivity-parameter-detail" class="sensitivity-detail"></div>
+              </section>
+              <section class="sensitivity-subpanel">
+                <div class="sensitivity-subpanel__header">
+                  <h4 class="sensitivity-subpanel__title">Fit Stability</h4>
+                </div>
+                <div id="sensitivity-diagnostics" class="sensitivity-diagnostics-panel"></div>
+              </section>
+              <section class="sensitivity-subpanel">
+                <div class="sensitivity-subpanel__header">
+                  <h4 class="sensitivity-subpanel__title">Automatic Suggestions</h4>
+                </div>
+                <div id="sensitivity-suggestions" class="sensitivity-suggestions-panel"></div>
+              </section>
+            </div>
+          </div>
+        </details>
+        <div id="autofit-diagnostics" class="autofit-diagnostics" hidden></div>
+        <div id="spfit-import-report" class="spfit-import-report" hidden></div>
+        <pre id="autofit-output" class="autofit-pre"></pre>
+      </div>
+
+      <div class="autofit-footer-actions">
+        <div class="autofit-import-block">
+          <div class="autofit-import-block__heading">
+            <strong>Fit Status LOG</strong>
+          </div>
+          <p class="autofit-import-block__text">Save the full WMS-FitRot session, including spectra, assignments, and fit parameter state, then reload it later.</p>
+          <div class="autofit-inline-actions">
+            <button type="button" id="autofit-download-log" class="ghost">Download Fit Status LOG</button>
+          </div>
+        </div>
+        <div class="autofit-import-block">
+          <div class="autofit-import-block__heading">
+            <strong>SPFIT Import</strong>
+            <details class="help-disclosure">
+              <summary class="help-button" aria-label="Show SPFIT import help">?</summary>
+              <div class="help-popover">
+                <h4>Import SPFIT Files</h4>
+                <div class="help-popover__body">
+                  <p>Accepted files: <code>session.json</code>, <code>.var</code>, <code>.fit</code>, <code>.out</code>, <code>.par</code>, <code>.txt</code>.</p>
+                  <p>Parameter priority is <code>.var &gt; .fit &gt; .out &gt; .par &gt; .txt</code>. Include <code>session.json</code> when you want WMS-FitRot to restore exported assignments and session context.</p>
+                </div>
+              </div>
+            </details>
+          </div>
+          <p class="autofit-import-block__text">Load a SPFIT seed or refinement package after reviewing the current fitting output.</p>
+          <button type="button" id="autofit-import-spfit" class="ghost">Import SPFIT</button>
+          <input type="file" id="autofit-import-input" accept=".json,.par,.var,.fit,.out,.txt" multiple hidden>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="dat-mode-dialog" class="modal" hidden aria-hidden="true">
+    <div class="modal__backdrop" data-role="dialog-backdrop"></div>
+    <div class="modal__content" role="dialog" aria-modal="true" aria-labelledby="dat-mode-title">
+      <h3 id="dat-mode-title">File format</h3>
+      <p class="modal__text">Does the file <strong data-role="file-name">selected</strong> contain a sampled continuous profile or a stick spectrum?</p>
+      <form data-role="dialog-form" class="modal__form">
+        <label>
+          <input type="radio" name="dat-file-mode" value="profile" checked>
+          Sampled continuous profile
+        </label>
+        <label>
+          <input type="radio" name="dat-file-mode" value="stick">
+          Stick spectrum
+        </label>
+      </form>
+      <div class="modal__actions">
+        <button type="button" data-role="dialog-cancel" class="ghost">Cancel</button>
+        <button type="button" data-role="dialog-confirm" class="primary">Confirm</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

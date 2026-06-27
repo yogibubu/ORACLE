@@ -52,6 +52,8 @@ def _gaussian_rovib_log() -> str:
         "Ae=  100.000     A00=  111.000     A0=  110.000\n"
         "Be=  200.000     B00=  222.000     B0=  220.000\n"
         "Ce=  300.000     C00=  333.000     C0=  330.000\n"
+        "Dipole moment (Debye):\n"
+        "      1.1000000      2.2000000      3.3000000  Tot=      4.1158231\n"
         "Normal termination of Gaussian 16\n"
     )
 
@@ -76,6 +78,7 @@ def test_parse_gaussian_rovib_log_builds_oracle_sections(tmp_path):
     assert data.rotational.point_group == "C2V"
     assert data.rotational.temperature_K == 298.15
     assert data.rotational.A_MHz == 110.0
+    assert data.rotational.dipole_debye == (1.1, 2.2, 3.3)
     assert data.rotational.delta_vib_MHz == (11.0, 22.0, 33.0)
 
 
@@ -96,6 +99,7 @@ def test_promote_gaussian_rovib_to_xyzin_writes_shared_sections(tmp_path):
     assert vib.nvib == 2
     assert delta.alpha_rows_MHz[0].mode == 1
     assert rot.A_MHz == 110.0
+    assert rot.dipole_debye == (1.1, 2.2, 3.3)
     assert rot.delta_vib_MHz == (11.0, 22.0, 33.0)
 
 

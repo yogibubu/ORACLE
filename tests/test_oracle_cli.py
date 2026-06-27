@@ -993,6 +993,81 @@ def test_rovib_summarize_cli_prints_summary(tmp_path, capsys):
     assert "rotational: A=1000MHz B=900MHz C=800MHz" in capsys.readouterr().out
 
 
+def test_rovib_wmsrot_input_cli_writes_browser_input(tmp_path, capsys):
+    path = tmp_path / "molecule.xyzin"
+    out = tmp_path / "wmsrot.txt"
+    path.write_text(
+        "\n".join(
+            [
+                "1",
+                "h",
+                "H 0 0 0",
+                "",
+                "#ROTATIONAL",
+                "rotor_type = linear",
+                "B_MHz = 60000.0",
+                "Dipole_a_D = 1.0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    rc = oracle_run.main(
+        ["rovib", "wmsrot-input", str(path), "--out", str(out), "--j-max", "3", "--reduction", "S"]
+    )
+
+    assert rc == 0
+    assert "Wrote WMS-Rot input" in capsys.readouterr().out
+    text = out.read_text(encoding="utf-8")
+    assert "rotor_type = linear" in text
+    assert "B_MHz = 60000" in text
+    assert "J_MAX = 3" in text
+    assert "DJ_MHz = 0" in text
+
+
+def test_rovib_wmsrot_run_cli_calls_local_engine_writer(tmp_path, monkeypatch, capsys):
+    calls = {}
+    path = tmp_path / "molecule.xyzin"
+    out = tmp_path / "spectrum.csv"
+    path.write_text("1\nh\nH 0 0 0\n\n#ROTATIONAL\nB_MHz = 1000\n", encoding="utf-8")
+
+    def fake_write(target, output, *, options=None):
+        calls["target"] = target
+        calls["output"] = output
+        calls["options"] = options
+        output.write_text("Frequency (MHz),Relative intensity\n1.0,2.0\n", encoding="utf-8")
+        return output
+
+    monkeypatch.setattr("oracle_rovib.write_wmsrot_spectrum_csv", fake_write)
+
+    rc = oracle_run.main(
+        [
+            "rovib",
+            "wmsrot-run",
+            str(path),
+            "--out",
+            str(out),
+            "--j-min",
+            "2",
+            "--j-max",
+            "5",
+            "--reduction",
+            "A",
+            "--no-c-type",
+        ]
+    )
+
+    assert rc == 0
+    assert calls["target"] == path
+    assert calls["output"] == out
+    assert calls["options"].j_min == 2
+    assert calls["options"].j_max == 5
+    assert calls["options"].reduction == "A"
+    assert calls["options"].c_type is False
+    assert "Wrote WMS-Rot spectrum line list" in capsys.readouterr().out
+
+
 def test_thermo_cli_calls_shared_pipeline(tmp_path, monkeypatch, capsys):
     calls = {}
     path = tmp_path / "molecule.xyzin"

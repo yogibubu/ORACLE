@@ -213,6 +213,29 @@ def build_parser(
     rovib_qcent.add_argument("--vibin", type=Path)
     rovib_qcent.add_argument("--append-vibin", action="store_true")
     rovib_qcent.add_argument("--out", type=Path)
+    rovib_wmsrot = rovib_sub.add_parser(
+        "wmsrot-input",
+        help="Export a WMS-Rot browser input file from normalized xyzin sections",
+    )
+    rovib_wmsrot.add_argument("xyzin", type=Path)
+    rovib_wmsrot.add_argument("--out", type=Path)
+    rovib_wmsrot.add_argument("--j-min", type=int, default=0)
+    rovib_wmsrot.add_argument("--j-max", type=int, default=30)
+    rovib_wmsrot.add_argument("--auto-estimate-j-range", action="store_true")
+    rovib_wmsrot.add_argument("--reduction", choices=("A", "S"))
+    rovib_wmsrot_run = rovib_sub.add_parser(
+        "wmsrot-run",
+        help="Run the vendored WMS-Rot Hamiltonian engine on normalized xyzin data",
+    )
+    rovib_wmsrot_run.add_argument("xyzin", type=Path)
+    rovib_wmsrot_run.add_argument("--out", type=Path, required=True)
+    rovib_wmsrot_run.add_argument("--j-min", type=int, default=0)
+    rovib_wmsrot_run.add_argument("--j-max", type=int, default=30)
+    rovib_wmsrot_run.add_argument("--intensity-cut", type=float, default=1.0e-20)
+    rovib_wmsrot_run.add_argument("--reduction", choices=("A", "S"))
+    rovib_wmsrot_run.add_argument("--no-a-type", action="store_true")
+    rovib_wmsrot_run.add_argument("--no-b-type", action="store_true")
+    rovib_wmsrot_run.add_argument("--no-c-type", action="store_true")
     rovib_dos = rovib_sub.add_parser("dos", help="Build direct vibrational DOS from #VIBRATIONAL")
     rovib_dos.add_argument("xyzin", type=Path)
     rovib_dos.add_argument("--vmax", type=int, default=6)
@@ -948,6 +971,48 @@ def main(
             vibin_path = args.vibin or (args.xyzin.parent / "vibin")
             append_qcent_to_vibin(vibin_path, result)
             print(f"Appended QCENT block: {vibin_path}")
+        return 0
+    if args.command == "rovib" and args.rovib_command == "wmsrot-input":
+        from oracle_rovib import (
+            WMSRotInputOptions,
+            wmsrot_input_text_from_xyzin,
+            write_wmsrot_input,
+        )
+
+        options = WMSRotInputOptions(
+            j_min=args.j_min,
+            j_max=args.j_max,
+            auto_estimate_j_range=args.auto_estimate_j_range,
+            reduction=args.reduction,
+        )
+        if args.out is not None:
+            out = write_wmsrot_input(args.xyzin, args.out, options=options)
+            print(f"Wrote WMS-Rot input: {out}")
+        else:
+            print(wmsrot_input_text_from_xyzin(args.xyzin, options=options), end="")
+        return 0
+    if args.command == "rovib" and args.rovib_command == "wmsrot-run":
+        from oracle_rovib import (
+            WMSRotEngineUnavailable,
+            WMSRotSimulationOptions,
+            write_wmsrot_spectrum_csv,
+        )
+
+        options = WMSRotSimulationOptions(
+            j_min=args.j_min,
+            j_max=args.j_max,
+            intensity_cut=args.intensity_cut,
+            reduction=args.reduction,
+            a_type=not args.no_a_type,
+            b_type=not args.no_b_type,
+            c_type=not args.no_c_type,
+        )
+        try:
+            out = write_wmsrot_spectrum_csv(args.xyzin, args.out, options=options)
+        except WMSRotEngineUnavailable as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        print(f"Wrote WMS-Rot spectrum line list: {out}")
         return 0
     if args.command == "rovib" and args.rovib_command == "dos":
         from oracle_rovib import direct_vibrational_dos_from_xyzin

@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="WMS-Prep">
+  <title>WMS-Prep</title>
+  <link rel="manifest" href="../manifest.webmanifest">
+  <link rel="icon" type="image/png" href="../icons/icon-192.png">
+  <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="../../style.css">
+  <link rel="stylesheet" href="../theme.css">
+  <script src="../vendor/mathjs/math.min.js"></script>
+  <script src="../vendor/pyodide/v0.23.4/full/pyodide.js"></script>
+  <script src="../vendor/rdkit/RDKit_minimal.js"></script>
+  <script src="../../BDPCS3/chem.js"></script>
+  <script src="../../BDPCS3/opt.js"></script>
+  <script src="../pwa-enhancements.js" defer></script>
+  <script src="./script.js" defer></script>
+  <style>
+    body {
+      font-family: var(--wms-font);
+      margin: 18px;
+    }
+
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(10, 10, 20, 0.85);
+      backdrop-filter: blur(1px);
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0.25s ease, visibility 0.25s ease;
+    }
+
+    .loading-overlay.is-visible {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    .loading-overlay__content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.25rem;
+      padding: 2rem 2.5rem;
+      border-radius: 12px;
+      background: rgba(20, 20, 35, 0.9);
+      box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.4);
+    }
+
+    .loading-overlay__spinner {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      border: 6px solid rgba(255, 255, 255, 0.25);
+      border-top-color: #ffffff;
+      animation: loading-overlay-spin 0.95s linear infinite;
+    }
+
+    .loading-overlay__message {
+      margin: 0;
+      color: #f1f1f1;
+      font-size: 1.1rem;
+      text-align: center;
+    }
+
+    .loading-overlay--error {
+      background: rgba(35, 10, 10, 0.9);
+    }
+
+    .loading-overlay--error .loading-overlay__content {
+      background: rgba(45, 15, 15, 0.95);
+    }
+
+    .loading-overlay--error .loading-overlay__message {
+      color: #ffd2d2;
+    }
+
+    @keyframes loading-overlay-spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    h1 {
+      margin-bottom: 0.4rem;
+    }
+
+    .top-panel {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+      align-items: end;
+      margin-bottom: 14px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 0.4rem;
+      font-weight: 600;
+    }
+
+    select, button, input[type="file"], input[type="text"] {
+      width: 100%;
+      padding: 8px;
+      box-sizing: border-box;
+    }
+
+    .preprocess-workspace {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+
+    .input-stack {
+      display: grid;
+      gap: 14px;
+    }
+
+    .analysis-panel,
+    .output-panel {
+      display: flex;
+      flex-direction: column;
+    }
+
+    #step1-detected-representation {
+      width: 100%;
+      min-height: 38px;
+      padding: 8px;
+      box-sizing: border-box;
+      border: 1px solid #cdd6df;
+      border-radius: 6px;
+      background: #f6fbff;
+      color: #173f80;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+    }
+
+    .analysis-controls {
+      display: grid;
+      gap: 0.75rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .analysis-controls h3 {
+      margin-bottom: 0;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: minmax(120px, 1fr);
+      gap: 10px;
+    }
+
+    .actions h3 {
+      margin: 0 0 0.6rem 0;
+      font-size: 1rem;
+    }
+
+    .upload-files-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+      align-items: stretch;
+      flex-wrap: wrap;
+    }
+
+    .upload-files-row input[type="file"] {
+      width: 100%;
+    }
+
+    .source-upload-btn {
+      width: 100%;
+      min-height: 40px;
+      padding: 9px 10px;
+      border-radius: 8px;
+      border: 1px solid #9fb8d3;
+      font-weight: 700;
+      font-size: 0.88rem;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .source-upload-a {
+      border-color: #72b8ac;
+      background: #e6f9f4;
+      color: #0d5d4f;
+    }
+
+    .source-upload-b {
+      border-color: #91acd8;
+      background: #ecf3ff;
+      color: #173f80;
+    }
+
+    .source-upload-c {
+      border-color: #bca3d9;
+      background: #f5ecff;
+      color: #5f2b8f;
+    }
+
+    .source-upload-d {
+      border-color: #d7b77b;
+      background: #fff3de;
+      color: #6d4300;
+    }
+
+    .status {
+      min-height: 1.25rem;
+      margin: 8px 0 14px 0;
+      color: var(--wms-accent);
+      font-size: 0.95rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+
+    .panel {
+      border: 1px solid var(--wms-border);
+      border-radius: 8px;
+      padding: 12px;
+      background: var(--wms-panel-bg);
+    }
+
+    .collapsible-panel {
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .panel-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px;
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(240, 247, 255, 0.96) 100%);
+    }
+
+    .panel-summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .panel-summary::after {
+      content: "▾";
+      font-size: 1rem;
+      font-weight: 700;
+      color: #24496d;
+      flex: 0 0 auto;
+    }
+
+    .collapsible-panel:not([open]) .panel-summary::after {
+      content: "▸";
+    }
+
+    .panel-summary h2 {
+      margin: 0;
+      font-size: 1.1rem;
+    }
+
+    .panel-body {
+      padding: 0 12px 12px 12px;
+    }
+
+    .panel-body > :first-child {
+      margin-top: 0;
+    }
+
+    .panel h2 {
+      margin-top: 0;
+      margin-bottom: 0.6rem;
+      font-size: 1.1rem;
+    }
+
+    .subpanel {
+      border: 1px solid var(--wms-border);
+      border-radius: 6px;
+      padding: 10px;
+      background: var(--wms-panel-soft);
+    }
+
+    .subpanel h3 {
+      margin-top: 0;
+      margin-bottom: 0.6rem;
+      font-size: 1rem;
+    }
+
+    #analysis {
+      margin: 0;
+      min-height: 520px;
+      height: 100%;
+      overflow: auto;
+      background: #f6fbff;
+      border: 1px solid var(--wms-border);
+      border-radius: 6px;
+      padding: 10px;
+      font-size: 0.9rem;
+      white-space: pre-wrap;
+    }
+
+    #xyz-input,
+    #xyz-output {
+      width: 100%;
+      box-sizing: border-box;
+      font-family: Menlo, Consolas, Monaco, monospace;
+      font-size: 0.88rem;
+      border-radius: 6px;
+      border: 1px solid #cdd6df;
+      padding: 10px;
+      resize: vertical;
+    }
+
+    #xyz-input {
+      min-height: 280px;
+    }
+
+    #xyz-output {
+      min-height: 520px;
+      flex: 1;
+    }
+
+    #smiles-input {
+      width: auto;
+      min-height: 40px;
+      min-width: 0;
+      max-width: 320px;
+      flex: 1 1 220px;
+      box-sizing: border-box;
+      font-family: Menlo, Consolas, Monaco, monospace;
+      font-size: 0.88rem;
+      border-radius: 6px;
+      border: 1px solid #cdd6df;
+      padding: 10px;
+    }
+
+    .smiles-inline {
+      display: flex;
+      gap: 0.6rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .smiles-inline button {
+      width: auto;
+      min-width: 180px;
+      max-width: 220px;
+    }
+
+    .field-label {
+      display: block;
+      margin-bottom: 0.4rem;
+      font-weight: 600;
+    }
+
+    .smiles-note {
+      margin: 0.5rem 0 0 0;
+      font-size: 0.88rem;
+      color: #3b4f66;
+    }
+
+    .download-bar h3 {
+      margin-top: 0;
+      margin-bottom: 0.75rem;
+      font-size: 1rem;
+    }
+
+    .download-actions {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    #wms-output,
+    #catref-output {
+      width: 100%;
+      min-height: 220px;
+      box-sizing: border-box;
+      font-family: Menlo, Consolas, Monaco, monospace;
+      font-size: 0.88rem;
+      border-radius: 6px;
+      border: 1px solid #cdd6df;
+      padding: 10px;
+      resize: vertical;
+    }
+
+    .generated-output-block {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .secondary-panel {
+      margin-top: 14px;
+    }
+
+    .readme-note {
+      margin: 0 0 10px 0;
+      padding: 10px;
+      background: #f4faff;
+      border: 1px solid var(--wms-border);
+      border-radius: 6px;
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }
+
+    .readme-note p {
+      margin: 0 0 0.75rem 0;
+    }
+
+    .readme-note p:last-child {
+      margin-bottom: 0;
+    }
+
+    .readme-note ol {
+      margin: 6px 0 8px 18px;
+      padding: 0;
+    }
+
+    .readme-note ul {
+      margin: 6px 0 8px 18px;
+      padding: 0;
+    }
+
+    .rep-tables {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin: 10px 0;
+    }
+
+    .rep-table-card {
+      padding: 10px;
+      border: 1px solid var(--wms-border);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.72);
+    }
+
+    .rep-table-card strong {
+      display: block;
+      margin-bottom: 0.45rem;
+      color: #173f80;
+    }
+
+    .rep-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.86rem;
+    }
+
+    .rep-table th,
+    .rep-table td {
+      padding: 0.35rem 0.45rem;
+      border: 1px solid #cdd6df;
+      text-align: center;
+    }
+
+    .rep-table th {
+      background: #eef5fc;
+      font-weight: 700;
+    }
+
+    .rep-caption {
+      font-size: 0.88rem;
+      color: #34506f;
+    }
+
+    .rotation-note {
+      margin: 8px 0 0 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9rem;
+      color: #1b4f3f;
+    }
+
+    .rotation-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: #1aa36a;
+      color: transparent;
+      font-size: 0;
+      line-height: 0;
+      box-shadow: 0 0 0 2px rgba(26, 163, 106, 0.2);
+      flex: 0 0 auto;
+    }
+
+    .generator-representation-stack {
+      display: grid;
+      gap: 8px;
+    }
+
+    .representation-help {
+      margin: 0;
+      font-size: 0.85rem;
+      color: #475467;
+    }
+
+    .representation-warning {
+      display: none;
+      margin-top: 12px;
+      padding: 10px 12px;
+      border: 1px solid #f5b5b5;
+      border-radius: 6px;
+      background: #fff1f1;
+      color: #b42318;
+      font-weight: 700;
+      line-height: 1.4;
+    }
+
+    .representation-warning.is-visible {
+      display: block;
+    }
+
+    .representation-warning__line + .representation-warning__line {
+      margin-top: 4px;
+    }
+
+    .flow-summary {
+      margin: 8px 0 10px 0;
+      padding: 10px;
+      border: 1px solid var(--wms-border);
+      border-radius: 6px;
+      background: #fbfdff;
+      font-size: 0.9rem;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+
+    .loaded-logs {
+      margin: 0 0 10px 0;
+      padding: 10px;
+      border: 1px solid var(--wms-border);
+      border-radius: 6px;
+      background: #ffffff;
+      font-size: 0.88rem;
+    }
+
+    .loaded-logs strong {
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .loaded-log-list {
+      margin: 0;
+      padding-left: 18px;
+      max-height: 140px;
+      overflow: auto;
+      line-height: 1.4;
+    }
+
+    .loaded-log-list li {
+      margin: 2px 0;
+    }
+
+    .flow-board-wrap {
+      margin-bottom: 12px;
+      border: 1px solid var(--wms-border);
+      border-radius: 8px;
+      background: #f8fcff;
+      overflow: auto;
+    }
+
+    .flow-board {
+      position: relative;
+      min-width: 1180px;
+      min-height: 420px;
+      background:
+        radial-gradient(circle at 1px 1px, #dbe7f3 1px, transparent 0) 0 0 / 24px 24px,
+        linear-gradient(180deg, #fdfefe 0%, #f6faff 100%);
+    }
+
+    .flow-lanes {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .flow-lane {
+      position: absolute;
+      top: 8px;
+      bottom: 8px;
+      border: 1px dashed #c6d9ea;
+      border-radius: 10px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.74) 0%, rgba(236, 245, 255, 0.62) 100%);
+    }
+
+    .flow-lane-label {
+      position: absolute;
+      left: 10px;
+      top: 8px;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #335b83;
+      font-weight: 700;
+    }
+
+    .flow-lines {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      overflow: visible;
+      z-index: 20;
+    }
+
+    .flow-node {
+      position: absolute;
+      width: 188px;
+      min-height: 76px;
+      padding: 12px 40px 12px 12px;
+      border-radius: 12px;
+      border: 1px solid #9fb8d3;
+      background: #ffffff;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+      font-size: 0.85rem;
+      line-height: 1.35;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 8px;
+      cursor: grab;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      z-index: 3;
+    }
+
+    .flow-node.dragging {
+      cursor: grabbing;
+    }
+
+    .flow-node h4 {
+      margin: 0;
+      font-size: 0.83rem;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .flow-node-expand-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 22px;
+      height: 22px;
+      padding: 0;
+      border-radius: 999px;
+      border: 1px solid #7f9bb7;
+      background: rgba(255, 255, 255, 0.9);
+      color: #264b70;
+      font-size: 0.95rem;
+      font-weight: 700;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .flow-node-expand-btn:hover {
+      background: #ffffff;
+      border-color: #4a739c;
+    }
+
+    .flow-node-expand-btn:focus-visible {
+      outline: 2px solid #2b6cb0;
+      outline-offset: 1px;
+    }
+
+    .flow-node-actions {
+      margin-top: auto;
+      display: flex;
+      justify-content: flex-start;
+    }
+
+    .delta-create-btn {
+      width: auto;
+      min-width: 66px;
+      padding: 4px 8px;
+      border: 1px solid #2a7a61;
+      border-radius: 6px;
+      background: #eef9f5;
+      color: #175340;
+      font-size: 0.76rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .delta-create-btn:disabled {
+      border-color: #b5c3cd;
+      background: #f3f6f9;
+      color: #8a97a2;
+      cursor: not-allowed;
+    }
+
+    .flow-handle {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      border: 2px solid #4f6d8b;
+      background: #ffffff;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: crosshair;
+      touch-action: none;
+      z-index: 2;
+    }
+
+    .flow-handle.output {
+      right: -10px;
+      border-color: #2f8f6a;
+    }
+
+    .flow-handle.input {
+      left: -10px;
+      border-color: #0f67b8;
+    }
+
+    .flow-handle.connected {
+      background: #d9ecff;
+    }
+
+    .flow-node.source {
+      border-left: 4px solid #2f8f6a;
+      padding-bottom: 12px;
+    }
+
+    .flow-node.source.bdpcs3-parent-source {
+      border-left-color: #2e7f6d;
+      border-color: #95c7bb;
+      background: linear-gradient(180deg, #f7fffc 0%, #eefaf5 100%);
+    }
+
+    .flow-node.source.bdpcs3-derived-source {
+      border-left-color: #9b5d13;
+      border-color: #e2c39a;
+      background: linear-gradient(180deg, #fffaf2 0%, #fff2df 100%);
+    }
+
+    .flow-node.source.bdpcs3-derived-source h4 {
+      color: #6f3d03;
+    }
+
+    .flow-node.source.origin-a {
+      border-left-color: #006d5b;
+      border-color: #72b8ac;
+      background: linear-gradient(180deg, #f1fffb 0%, #e6f9f4 100%);
+    }
+
+    .flow-node.source.origin-a h4 {
+      color: #0d5d4f;
+    }
+
+    .flow-node.source.origin-a .flow-handle.output {
+      border-color: #0d6b58;
+      background: #e4f7f1;
+    }
+
+    .flow-node.source.origin-b {
+      border-left-color: #174a9c;
+      border-color: #91acd8;
+      background: linear-gradient(180deg, #f6f9ff 0%, #ecf3ff 100%);
+    }
+
+    .flow-node.source.origin-b h4 {
+      color: #173f80;
+    }
+
+    .flow-node.source.origin-b .flow-handle.output {
+      border-color: #174a9c;
+      background: #e8f0ff;
+    }
+
+    .flow-node.source.origin-c {
+      border-left-color: #7a3fb3;
+      border-color: #bca3d9;
+      background: linear-gradient(180deg, #fcf8ff 0%, #f5ecff 100%);
+    }
+
+    .flow-node.source.origin-c h4 {
+      color: #5f2b8f;
+    }
+
+    .flow-node.source.origin-c .flow-handle.output {
+      border-color: #7a3fb3;
+      background: #f5e9ff;
+    }
+
+    .flow-node.source.origin-d {
+      border-left-color: #8a5a00;
+      border-color: #d7b77b;
+      background: linear-gradient(180deg, #fffaf1 0%, #fff3de 100%);
+    }
+
+    .flow-node.source.origin-d h4 {
+      color: #6d4300;
+    }
+
+    .flow-node.source.origin-d .flow-handle.output {
+      border-color: #8a5a00;
+      background: #fff3df;
+    }
+
+    .flow-node.source.hessian-source {
+      border-left-color: #4b5f72;
+      border-color: #a5b2bd;
+      background: linear-gradient(180deg, #f8fafc 0%, #eef3f7 100%);
+    }
+
+    .flow-node.source.hessian-source h4 {
+      color: #344454;
+    }
+
+    .flow-node.source .flow-handle.output {
+      right: auto;
+      left: 50%;
+      top: auto;
+      bottom: -10px;
+      transform: translateX(-50%);
+    }
+
+    .flow-node.generator {
+      min-height: 156px;
+      border: 1px solid #1a5d96;
+      border-radius: 22px;
+      background: #e8f3ff;
+      color: #18324d;
+      box-shadow: 0 8px 22px rgba(20, 83, 136, 0.22);
+      padding: 16px 18px 18px 18px;
+    }
+
+    .flow-node.generator h4 {
+      color: #154972;
+      font-size: 1.18rem;
+      line-height: 1.1;
+      text-align: center;
+    }
+
+    .flow-node.generator .flow-node-expand-btn {
+      top: 12px;
+      right: 12px;
+      background: rgba(232, 243, 255, 0.96);
+    }
+
+    .flow-generator-rows {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 4px;
+    }
+
+    .flow-generator-row {
+      position: relative;
+      min-height: 62px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 22px 8px 8px 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      color: #1f4d78;
+      border-radius: 12px;
+      background: rgba(26, 93, 150, 0.1);
+      text-align: center;
+    }
+
+    .flow-generator-row.connected {
+      color: #154972;
+      background: rgba(26, 93, 150, 0.2);
+    }
+
+    .flow-generator-row .flow-handle.input {
+      left: 50%;
+      top: -9px;
+      transform: translateX(-50%);
+      width: 18px;
+      height: 18px;
+      border-width: 2px;
+      border-color: #154972;
+      background: #eaf4ff;
+    }
+
+    .flow-generator-row .flow-handle.input.connected {
+      background: #d0e6ff;
+      border-color: #154972;
+    }
+
+    .flow-empty {
+      position: absolute;
+      left: 18px;
+      top: 18px;
+      color: #44596e;
+      font-size: 0.92rem;
+      max-width: 360px;
+    }
+
+    body.modal-open {
+      overflow: hidden;
+    }
+
+    .flow-node-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(12, 23, 35, 0.58);
+      backdrop-filter: blur(2px);
+    }
+
+    .flow-node-modal[hidden] {
+      display: none;
+    }
+
+    .flow-node-modal-dialog {
+      width: min(760px, calc(100vw - 36px));
+      max-height: min(84vh, 920px);
+      border-radius: 16px;
+      border: 1px solid #a9bfd3;
+      background: #f9fcff;
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.25);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .flow-node-modal-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 18px 12px 18px;
+      border-bottom: 1px solid #d3e0ec;
+      background: linear-gradient(180deg, #ffffff 0%, #f2f8fd 100%);
+    }
+
+    .flow-node-modal-header h3 {
+      margin: 0;
+      font-size: 1.02rem;
+      color: #18324d;
+      overflow-wrap: anywhere;
+    }
+
+    .flow-node-modal-close {
+      width: auto;
+      min-width: 34px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid #8ca6be;
+      background: #ffffff;
+      color: #24496d;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      flex: 0 0 auto;
+    }
+
+    .flow-node-modal-close:hover {
+      border-color: #577da4;
+    }
+
+    .flow-node-modal-body {
+      margin: 0;
+      padding: 18px;
+      overflow: auto;
+      white-space: pre-wrap;
+      font-family: Menlo, Consolas, Monaco, monospace;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      color: #22384d;
+      background: #f9fcff;
+    }
+
+    @media (min-width: 960px) {
+      .grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .preprocess-workspace {
+        grid-template-columns: minmax(260px, 1.15fr) minmax(220px, 0.85fr) minmax(260px, 1fr);
+        align-items: stretch;
+      }
+
+      .rep-tables {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .analysis-controls {
+        grid-template-columns: minmax(180px, 1fr);
+      }
+
+      .download-actions {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    @media (min-width: 1320px) {
+      .preprocess-workspace {
+        grid-template-columns: minmax(320px, 1.15fr) minmax(260px, 0.78fr) minmax(320px, 1fr);
+        align-items: stretch;
+      }
+    }
+</style>
+</head>
+<body>
+  <div
+    id="loading-overlay"
+    class="loading-overlay"
+    aria-hidden="true"
+  >
+    <div class="loading-overlay__content" role="presentation">
+      <div class="loading-overlay__spinner" data-role="loading-spinner" aria-hidden="true"></div>
+      <p class="loading-overlay__message" data-role="loading-message">
+        Refreshing output…
+      </p>
+    </div>
+  </div>
+
+  <section class="wms-suite-header" aria-labelledby="wms-prep-title">
+    <div class="wms-suite-brand">
+      <img class="wms-suite-logo" src="../icons/logo-full.png" alt="WMS-Rot logo">
+      <div class="wms-suite-copy">
+        <p class="wms-suite-kicker">WMS-Rot Suite</p>
+        <h1 class="wms-suite-title" id="wms-prep-title">WMS-Prep</h1>
+        <p class="wms-suite-subtitle">Prepare geometries and export WMS-Rot inputs with Gaussian TauP/Phi reconstruction, selectable final representation, and optional quadrupole data.</p>
+      </div>
+    </div>
+  </section>
+  <details class="panel collapsible-panel secondary-panel">
+    <summary class="panel-summary">
+      <h2>Preparing GAUSSIAN gjf</h2>
+    </summary>
+    <div class="panel-body">
+      <div class="readme-note">
+        <p>This section detects the principal-axis representation of the input geometry. Representation changes are disabled, so XYZ and GAUSSIAN exports keep the detected input representation.</p>
+        <p>In the tables below, each representation shows which rotational axis is written on the exported <code>X</code>, <code>Y</code>, and <code>Z</code> coordinates.</p>
+        <div class="rep-tables">
+          <div class="rep-table-card">
+            <strong>Right-handed set</strong>
+            <table class="rep-table">
+              <thead>
+                <tr>
+                  <th>Rep</th>
+                  <th>X</th>
+                  <th>Y</th>
+                  <th>Z</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>Ir</td><td>b</td><td>c</td><td>a</td></tr>
+                <tr><td>IIr</td><td>c</td><td>a</td><td>b</td></tr>
+                <tr><td>IIIr</td><td>a</td><td>b</td><td>c</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="rep-table-card">
+            <strong>Left-handed set</strong>
+            <table class="rep-table">
+              <thead>
+                <tr>
+                  <th>Rep</th>
+                  <th>X</th>
+                  <th>Y</th>
+                  <th>Z</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>Il</td><td>c</td><td>b</td><td>a</td></tr>
+                <tr><td>IIl</td><td>a</td><td>c</td><td>b</td></tr>
+                <tr><td>IIIl</td><td>b</td><td>a</td><td>c</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <p class="rep-caption">Internal Z/X/Y assignment used by the tool: Ir = a/b/c, IIr = b/c/a, IIIr = c/a/b, Il = a/c/b, IIl = b/a/c, IIIl = c/b/a.</p>
+      </div>
+
+      <div id="status" class="status"></div>
+
+      <div class="preprocess-workspace">
+        <div class="input-stack">
+          <section class="subpanel">
+            <h3>Load XYZ File</h3>
+            <label class="field-label" for="xyz-file">Select an XYZ file</label>
+            <input id="xyz-file" type="file" accept=".xyz,text/plain">
+          </section>
+
+          <section class="subpanel">
+            <h3>Paste XYZ</h3>
+            <textarea id="xyz-input" placeholder="Paste XYZ content here. Analysis updates automatically on each change."></textarea>
+          </section>
+
+          <section class="subpanel">
+            <h3>SMILES</h3>
+            <div class="smiles-inline">
+              <input id="smiles-input" type="text" placeholder="Paste a SMILES string">
+              <button id="convert-smiles-btn" type="button">Convert to XYZ</button>
+            </div>
+            <p class="smiles-note">RDKit adds explicit hydrogens and generates an initial coordinate set.</p>
+          </section>
+
+          <section class="subpanel">
+            <h3>Detected Representation</h3>
+            <div id="step1-detected-representation">Undetermined</div>
+          </section>
+        </div>
+
+        <section class="subpanel analysis-panel">
+          <div class="analysis-controls">
+            <h3>Analysis</h3>
+            <div>
+              <label class="field-label" for="step1-output-representation">Output Representation (locked)</label>
+              <select id="step1-output-representation" disabled>
+                <option value="Ir" selected>Ir</option>
+                <option value="Il">Il</option>
+                <option value="IIr">IIr</option>
+                <option value="IIl">IIl</option>
+                <option value="IIIr">IIIr</option>
+                <option value="IIIl">IIIl</option>
+              </select>
+              <p class="representation-help">
+                Representation changes are disabled on this page. XYZ and GJF exports keep the detected input representation.
+              </p>
+            </div>
+          </div>
+          <pre id="analysis">No file loaded.</pre>
+        </section>
+
+        <section class="subpanel output-panel">
+          <h3>Output XYZ</h3>
+          <textarea id="xyz-output" readonly placeholder="The XYZ export in the detected input representation will appear here."></textarea>
+        </section>
+      </div>
+
+      <section class="subpanel download-bar">
+        <h3>Downloads</h3>
+        <div class="download-actions">
+          <button id="download-btn" type="button" disabled>Download XYZ</button>
+          <button id="download-gjf-btn" type="button" disabled>Download GJF</button>
+          <button id="download-basis-set-btn" type="button" disabled>Download Basis Set</button>
+        </div>
+      </section>
+    </div>
+  </details>
+  <br>
+  
+  
+  <details class="panel collapsible-panel" open>
+    <summary class="panel-summary">
+      <h2>Generate WMS Input from GAUSSIAN log</h2>
+    </summary>
+    <div class="panel-body">
+      <div class="readme-note">
+        <p>Load Gaussian logs and XYZ files to populate Geometry, Quartic, Sextic, and DVib sources in the flow board and generate the final WMS-Rot input.</p>
+        <ul>
+          <li>Gaussian logs rebuild quartic constants from <code>TauP</code> and sextic constants from inertial <code>Phi abc</code> tensors.</li>
+          <li>The final export can be generated in <code>Ir</code> (quasi-prolate) or <code>IIIl</code> (quasi-oblate).</li>
+          <li>Both Watson reductions, <code>A</code> and <code>S</code>, are written to the final WMS-Rot input.</li>
+          <li>If a Gaussian log contains nuclear quadrupole tensors, they are extracted and added to the generated WMS-Rot input.</li>
+          <li>XYZ sources contribute geometry only and use default dipoles <code>1.0 / 1.0 / 1.0</code>.</li>
+        </ul>
+        <p class="rotation-note">
+          <span class="rotation-dot" aria-hidden="true">•</span>
+          If one loaded source already contains a complete pipeline, the tool auto-connects that set first.
+        </p>
+      </div>
+      <div class="top-panel">
+        <div>
+          <label for="gaussian-log-file">Load Sources</label>
+          <div class="upload-files-row">
+            <button id="load-log-btn" type="button" class="source-upload-btn source-upload-a">Load Log(s)</button>
+            <button id="load-step2-xyz-btn" type="button" class="source-upload-btn source-upload-b">Load XYZ</button>
+          </div>
+          <input id="gaussian-log-file" type="file" accept=".log,.out,text/plain" multiple hidden>
+          <input id="step2-xyz-file" type="file" accept=".xyz,text/plain" hidden>
+        </div>
+        <div class="actions">
+          <button id="clear-logs-btn" type="button">Clear Loaded Sources</button>
+        </div>
+        <div class="generator-representation-stack">
+          <div>
+            <label for="wms-output-representation">Final Representation</label>
+            <select id="wms-output-representation">
+              <option value="Ir" selected>Ir (quasi-prolate)</option>
+              <option value="IIIl">IIIl (quasi-oblate)</option>
+            </select>
+          </div>
+          <p class="representation-help">
+          Quartic, sextic, and quadrupole data are re-expressed in the selected final representation. Rotational constants, dipole, and DVib are always exported in a fixed a/b/c ordering.
+          </p>
+        </div>
+      </div>
+      <div class="loaded-logs">
+        <strong>Loaded sources</strong>
+        <ul id="loaded-log-list" class="loaded-log-list">
+          <li>No source loaded.</li>
+        </ul>
+      </div>
+      <div id="log-summary" class="flow-summary">No source loaded.</div>
+      <div class="flow-board-wrap">
+        <div id="flow-board" class="flow-board">
+          <div id="flow-lanes" class="flow-lanes"></div>
+          <svg id="flow-lines" class="flow-lines" aria-hidden="true"></svg>
+          <div id="flow-nodes"></div>
+        </div>
+      </div>
+      <div id="wms-output-representation-warning" class="representation-warning" aria-live="polite"></div>
+      <div class="generated-output-block">
+        <textarea id="wms-output" readonly placeholder="Load Gaussian logs or XYZ sources and connect the flow blocks to generate the WMS-Rot input text."></textarea>
+        <button id="download-wms-input-btn" type="button" disabled>Download WMS-Rot Input</button>
+      </div>
+      <div class="generated-output-block">
+        <textarea id="catref-output" readonly placeholder="The CATREF export (.var + .int) will appear here after connecting at least one Geometry source."></textarea>
+        <button id="download-catref-input-btn" type="button" disabled>Download CATREF Input</button>
+      </div>
+    </div>
+  </details>
+
+  <div
+    id="flow-node-modal"
+    class="flow-node-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-hidden="true"
+    hidden
+  >
+    <div class="flow-node-modal-dialog">
+      <div class="flow-node-modal-header">
+        <h3 id="flow-node-modal-title">Panel details</h3>
+        <button id="flow-node-modal-close" class="flow-node-modal-close" type="button" aria-label="Close details">×</button>
+      </div>
+      <pre id="flow-node-modal-body" class="flow-node-modal-body">No additional details available.</pre>
+    </div>
+  </div>
+</body>
+</html>

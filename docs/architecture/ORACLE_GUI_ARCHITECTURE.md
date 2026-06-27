@@ -48,7 +48,7 @@ or figures. They still use the same `xyzin` sections and service boundaries.
 
 | Workbench | Responsibility | Examples |
 | --- | --- | --- |
-| Rotational Spectroscopy | Collect rotational constants, corrections and assignments; draw rotational spectra. | isotopologue comparison, SEFit residuals, line-list/stick/envelope plots, publication CSV/SVG/PDF/LaTeX export |
+| Rotational Spectroscopy | Collect rotational constants, corrections and assignments; draw rotational spectra. | local WMS-Rot Hamiltonian run, isotopologue comparison, SEFit residuals, WMS-Rot input export/reference launch, line-list/stick/envelope plots, publication CSV/SVG/PDF/LaTeX export |
 | Vibrational Spectroscopy | Collect harmonic, GF/PED, VPT2/VCI and DVR data; draw vibrational spectra. | normal-mode overlap heat maps, force-constant scaling, IR/Raman-style peak tables, publication plots |
 | Electronic Spectroscopy | Collect electronic-state and transition data; visualize orbitals/densities. | UV/visible stick/broadened spectra, orbital viewing through Avogadro/Avogadro2/Molden/MOrbVis, transition tables |
 | Molecular Structure / Synthons | Inspect and publish structure, topology, fragments and synthon classifications. | structure tables, synthon maps, fragment maps, Avogadro editing |
@@ -64,6 +64,13 @@ Orbital visualization is delegated to external viewers. ORACLE should prepare
 or pass through supported files, then launch Avogadro/Avogadro2, Molden,
 MOrbVis or another configured viewer through `oracle_gui.commands`, rather
 than embedding a private orbital renderer in the first GUI pass.
+
+Rotational spectroscopy follows the same boundary. The GUI may open the
+browser-based WMS-Rot reference application and may export a WMS-Rot input
+through `oracle rovib wmsrot-input`, while production calculations call the
+vendored WMS-Rot Python Hamiltonian through `oracle rovib wmsrot-run`. The
+internal source of truth remains the shared `xyzin` sections, not browser
+JavaScript or uploaded web-state.
 
 ## Implementation Boundary
 

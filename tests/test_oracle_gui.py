@@ -27,6 +27,7 @@ from oracle_gui import (
     OracleStructureController,
     OracleThermoKineticsController,
     OracleTrinityController,
+    WMSROT_URL,
     WorkflowStatus,
     all_known_sections,
     avogadro_command,
@@ -95,6 +96,9 @@ from oracle_gui import (
     trinity_gui_state_lines,
     load_trinity_gui_state,
     tool_contract_gui_state_lines,
+    wmsrot_command,
+    wmsrot_input_command,
+    wmsrot_run_command,
 )
 from oracle_vpt2_vci import vpt2_vci_section_from_run, write_vpt2_vci_section
 
@@ -1058,6 +1062,11 @@ def test_gui_window_specs_cover_primary_oracle_workflows():
     }.issubset(keys)
     assert window_spec("gicforge").produced_sections == ("GIC", "SYCART")
     assert window_spec("rotational_spectroscopy").category == "spectroscopy"
+    assert window_spec("rotational_spectroscopy").produced_sections == ("ROTATIONAL_SPECTRUM",)
+    assert "WMS-Rot browser reference" in window_spec("rotational_spectroscopy").external_viewers
+    rotational_actions = window_spec("rotational_spectroscopy").actions
+    assert any(action.key == "wmsrot_input" for action in rotational_actions)
+    assert any(action.key == "wmsrot_run" for action in rotational_actions)
     assert "mode heat-map" in window_spec("vibrational_spectroscopy").publication_exports
     assert "Molden" in window_spec("electronic_spectroscopy").external_viewers
     assert "MOrbVis" in window_spec("electronic_spectroscopy").external_viewers
@@ -1076,6 +1085,7 @@ def test_gui_window_specs_cover_primary_oracle_workflows():
     assert "ORBITALS" in all_known_sections()
     assert "KINETICS" in all_known_sections()
     assert "TRINITY" in all_known_sections()
+    assert "ROTATIONAL_SPECTRUM" in all_known_sections()
 
 
 def test_gui_command_specs_use_oracle_cli_without_shell(tmp_path):
@@ -1089,6 +1099,9 @@ def test_gui_command_specs_use_oracle_cli_without_shell(tmp_path):
     avogadro = avogadro_command(xyzin, executable="avogadro")
     molden = molden_command(fchk)
     morbvis = morbvis_command()
+    wmsrot = wmsrot_command()
+    wmsrot_input = wmsrot_input_command(xyzin, out=tmp_path / "wmsrot.txt", j_max=12)
+    wmsrot_run = wmsrot_run_command(xyzin, out=tmp_path / "wmsrot_spectrum.csv", j_max=8)
     promote_fchk = gaussian_promote_fchk_command(fchk, xyzin, qff=False)
     promote_electronic = gaussian_promote_electronic_command(log, xyzin, orbital_files=(fchk,))
     promote_rovib = gaussian_promote_rovib_command(log, xyzin, exclude_modes=(1, 3))
@@ -1133,6 +1146,13 @@ def test_gui_command_specs_use_oracle_cli_without_shell(tmp_path):
     assert avogadro.argv == ("avogadro", str(xyzin))
     assert molden.argv == ("molden", str(fchk))
     assert morbvis.argv == (sys.executable, "-m", "webbrowser", "-t", MORBVIS_URL)
+    assert wmsrot.argv == (sys.executable, "-m", "webbrowser", "-t", WMSROT_URL)
+    assert wmsrot_input.argv[:5] == (sys.executable, "-m", "oracle", "rovib", "wmsrot-input")
+    assert wmsrot_input.argv[wmsrot_input.argv.index("--j-max") + 1] == "12"
+    assert wmsrot_input.required_sections == ("ROTATIONAL",)
+    assert wmsrot_run.argv[:5] == (sys.executable, "-m", "oracle", "rovib", "wmsrot-run")
+    assert wmsrot_run.argv[wmsrot_run.argv.index("--j-max") + 1] == "8"
+    assert wmsrot_run.produced_sections == ("ROTATIONAL_SPECTRUM",)
     assert promote_fchk.argv[-1] == "--no-qff"
     assert promote_fchk.produced_sections == (
         "CARTESIAN_HESSIAN",

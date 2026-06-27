@@ -30,12 +30,14 @@ class RotationalSection:
     rotor_type: str = ""
     representation: str = ""
     point_group: str = ""
+    watson_reduction: str = ""
     symmetry_number: int | None = None
     temperature_K: float | None = None
     pressure_atm: float | None = None
     A_MHz: float | None = None
     B_MHz: float | None = None
     C_MHz: float | None = None
+    dipole_debye: tuple[float | None, float | None, float | None] | None = None
     q_rot: float | None = None
     delta_vib_MHz: tuple[float | None, float | None, float | None] | None = None
     schema: str = ORACLE_XYZ_ROTATIONAL_SCHEMA
@@ -81,12 +83,14 @@ def parse_rotational_section(lines: Iterable[str]) -> RotationalSection:
         rotor_type=values.get("ROTOR_TYPE", ""),
         representation=values.get("REPRESENTATION", ""),
         point_group=values.get("POINT_GROUP", ""),
+        watson_reduction=values.get("WATSON_REDUCTION", values.get("REDUCTION", "")),
         symmetry_number=_optional_int(values.get("SYMM_NUMBER") or values.get("SIGMA")),
         temperature_K=_optional_float(values.get("T_K")),
         pressure_atm=_optional_float(values.get("P_ATM")),
         A_MHz=_optional_float(values.get("A_MHZ")),
         B_MHz=_optional_float(values.get("B_MHZ")),
         C_MHz=_optional_float(values.get("C_MHZ")),
+        dipole_debye=_parse_dipole(values),
         q_rot=_optional_float(values.get("Q_ROT")),
         delta_vib_MHz=_parse_delta_vib(values),
         schema=values.get("SCHEMA", ORACLE_XYZ_ROTATIONAL_SCHEMA),
@@ -98,6 +102,7 @@ def rotational_section_lines(section: RotationalSection) -> list[str]:
         "ROTOR_TYPE": section.rotor_type or None,
         "REPRESENTATION": section.representation or None,
         "POINT_GROUP": section.point_group or None,
+        "WATSON_REDUCTION": section.watson_reduction or None,
         "SYMM_NUMBER": section.symmetry_number,
         "T_K": _format_float(section.temperature_K),
         "P_ATM": _format_float(section.pressure_atm),
@@ -106,6 +111,15 @@ def rotational_section_lines(section: RotationalSection) -> list[str]:
         "C_MHZ": _format_float(section.C_MHz),
         "Q_ROT": _format_float(section.q_rot),
     }
+    if section.dipole_debye is not None:
+        a, b, c = section.dipole_debye
+        values.update(
+            {
+                "DIPOLE_A_D": _format_float(a),
+                "DIPOLE_B_D": _format_float(b),
+                "DIPOLE_C_D": _format_float(c),
+            }
+        )
     if section.delta_vib_MHz is not None:
         a, b, c = section.delta_vib_MHz
         values.update(
@@ -122,12 +136,16 @@ def rotational_section_lines(section: RotationalSection) -> list[str]:
             "ROTOR_TYPE",
             "REPRESENTATION",
             "POINT_GROUP",
+            "WATSON_REDUCTION",
             "SYMM_NUMBER",
             "T_K",
             "P_ATM",
             "A_MHZ",
             "B_MHZ",
             "C_MHZ",
+            "DIPOLE_A_D",
+            "DIPOLE_B_D",
+            "DIPOLE_C_D",
             "DVIBA_MHZ",
             "DVIBB_MHZ",
             "DVIBC_MHZ",
@@ -273,6 +291,32 @@ def _parse_delta_vib(
     a = _optional_float(values.get("DVIBA_MHZ") or values.get("DVIB_A_MHZ"))
     b = _optional_float(values.get("DVIBB_MHZ") or values.get("DVIB_B_MHZ"))
     c = _optional_float(values.get("DVIBC_MHZ") or values.get("DVIB_C_MHZ"))
+    if a is None and b is None and c is None:
+        return None
+    return a, b, c
+
+
+def _parse_dipole(
+    values: dict[str, str],
+) -> tuple[float | None, float | None, float | None] | None:
+    a = _optional_float(
+        values.get("DIPOLE_A_D")
+        or values.get("DIPOLE_A_DEBYE")
+        or values.get("MU_A_D")
+        or values.get("MU_A")
+    )
+    b = _optional_float(
+        values.get("DIPOLE_B_D")
+        or values.get("DIPOLE_B_DEBYE")
+        or values.get("MU_B_D")
+        or values.get("MU_B")
+    )
+    c = _optional_float(
+        values.get("DIPOLE_C_D")
+        or values.get("DIPOLE_C_DEBYE")
+        or values.get("MU_C_D")
+        or values.get("MU_C")
+    )
     if a is None and b is None and c is None:
         return None
     return a, b, c

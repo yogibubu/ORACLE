@@ -375,19 +375,40 @@ ORACLE_GUI_WINDOWS: tuple[WindowSpec, ...] = (
         description="Collect rotational calculations, inspect assignments and draw publication spectra.",
         category="spectroscopy",
         required_sections=("ROTATIONAL",),
+        produced_sections=("ROTATIONAL_SPECTRUM",),
         capabilities=(
             "collect rotational constants and rovibrational corrections",
             "compare isotopologues and semiexperimental residuals",
-            "simulate rotational stick/envelope spectra",
+            "simulate rotational stick/envelope spectra with the local WMS-Rot engine",
+            "export WMS-Rot input as a reference/compatibility bridge",
             "scale or select rotational components for planar/asymmetric systems",
         ),
         publication_exports=("CSV line list", "SVG spectrum", "PDF spectrum", "LaTeX table"),
+        external_viewers=("WMS-Rot browser reference",),
         actions=(
             WorkflowActionSpec(
                 key="rotational_summary",
                 label="Summarize rotational state",
                 command="rovib summarize",
                 required_sections=("ROTATIONAL",),
+            ),
+            WorkflowActionSpec(
+                key="wmsrot_input",
+                label="Export WMS-Rot input",
+                command="rovib wmsrot-input",
+                required_sections=("ROTATIONAL",),
+            ),
+            WorkflowActionSpec(
+                key="wmsrot_run",
+                label="Run local WMS-Rot",
+                command="rovib wmsrot-run",
+                required_sections=("ROTATIONAL",),
+                produced_sections=("ROTATIONAL_SPECTRUM",),
+            ),
+            WorkflowActionSpec(
+                key="open_wmsrot",
+                label="Open WMS-Rot",
+                command="wmsrot",
             ),
             WorkflowActionSpec(
                 key="semiexp_fit",

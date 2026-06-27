@@ -76,13 +76,21 @@ intensities, anharmonic chi matrices, rotational constants and vibrational
 rotational corrections into shared ORACLE sections:
 
 - `#VIBRATIONAL` stores frequencies, intensities and optional chi values.
-- `#ROTATIONAL` stores rotational constants, point group, temperature and the
-  DeltaBvib bridge values consumed by rovibrational utilities.
+- `#ROTATIONAL` stores rotational constants, point group, Watson reduction,
+  temperature, dipole components and the DeltaBvib bridge values consumed by
+  rovibrational utilities and rotational spectroscopy.
 - `#DELTABVIB` stores the normalized DeltaBvib values and, when available, the
   Gaussian alpha rows used to compute them.
 
 GF, Thermo, SEfit/MORPHEUS and anharmonic workflows consume these sections
 rather than reparsing Gaussian output.
+
+`oracle rovib wmsrot-input molecule.xyzin` exports the normalized rotational
+state to the browser WMS-Rot input format. `oracle rovib wmsrot-run
+molecule.xyzin --out molecule.rotational.csv` calls the copied first-party
+WMS-Rot Hamiltonian engine locally and writes the generated line list. Future
+GUI state should record generated line-list/broadened-spectrum artifacts under
+`#ROTATIONAL_SPECTRUM`.
 
 ## SEFit / MORPHEUS State
 
