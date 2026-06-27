@@ -689,10 +689,10 @@ def test_gicforge_build_gaussian_input_includes_readgic_block(tmp_path):
 @pytest.mark.parametrize(
     ("molecule", "expected_point_group", "expected_rank", "expected_tokens"),
     [
-        ("pyrrole.inp", "C2v", 24, ("A1RPck001", "B2RPck001", "D(")),
-        ("azulene.inp", "C2v", 48, ("A1BtFl001", "A1RPck001", "D(")),
+        ("pyrrole.inp", "C2v", 24, ("A2RPck001", "B1RPck001", "D(")),
+        ("azulene.inp", "C2v", 48, ("BtFl", "RPck", "D(")),
         ("spiro.inp", "D2", 87, ("ASpir001", "ARPck001", "D(")),
-        ("cubane.inp", "Oh", 42, ("A2gBtFl001", "D(")),
+        ("cubane.inp", "Oh", 42, ("A2uBtFl001", "D(")),
         ("ferrocene.inp", "D5h", 57, ("A1pCnAt001", "CxC031(Inactive)", "SQRT(")),
         (
             "ferrocene_staggered.inp",
@@ -1961,12 +1961,12 @@ def test_gicforge_benzene_d6h_projector_symmetrizes_ring_puckering(tmp_path):
     assert definition.symmetry_diagnostics.method == "POINT_GROUP_PROJECTOR"
     assert "POINT_GROUP D6h" in gic
     assert "SYMMETRY_MODE POINT_GROUP_PROJECTOR" in gic
-    assert [gic.irrep for gic in rpck] == ["E2g", "E2g", "B2u"]
-    assert [gic.name for gic in rpck] == ["E2gRPck001", "E2gRPck002", "B2uRPck001"]
+    assert [gic.irrep for gic in rpck] == ["B2g", "E2u", "E2u"]
+    assert [gic.name for gic in rpck] == ["B2gRPck001", "E2uRPck001", "E2uRPck002"]
     assert not any(name.startswith("A1gRPck") for name in total_symmetric_gic_names(definition))
-    assert any(line.startswith("E2gRPck001 =") for line in gaussian_lines)
-    assert any(line.startswith("E2gRPck002 =") for line in gaussian_lines)
-    assert any(line.startswith("B2uRPck001 =") for line in gaussian_lines)
+    assert any(line.startswith("B2gRPck001 =") for line in gaussian_lines)
+    assert any(line.startswith("E2uRPck001 =") for line in gaussian_lines)
+    assert any(line.startswith("E2uRPck002 =") for line in gaussian_lines)
     assert not any("RPck" in line and "(Inactive)" in line for line in gaussian_lines)
     assert not any(line.startswith("QPck") for line in gaussian_lines)
     assert not any(line.startswith("PhiP") for line in gaussian_lines)
@@ -1983,6 +1983,7 @@ def test_gicforge_pyrrole_c2v_projector_keeps_ring_coordinates(tmp_path):
     total_gaussian_lines = gaussian_gic_lines_from_xyzin(xyzin, total_symmetric_only=True)
     gic = section_content(xyzin.read_text(encoding="utf-8").splitlines(), "GIC")
     rpck = [gic for gic in definition.gics if gic.family == "RING_PUCKER_COMPONENT"]
+    oop = [gic for gic in definition.gics if gic.family == "OUT_OF_PLANE"]
     cyclic_bends = [gic for gic in definition.gics if gic.family == "CYCLIC_BEND"]
 
     assert definition.point_group == "C2v"
@@ -1993,19 +1994,21 @@ def test_gicforge_pyrrole_c2v_projector_keeps_ring_coordinates(tmp_path):
     assert definition.symmetry_diagnostics.status == "APPLIED"
     assert "POINT_GROUP C2v" in gic
     assert "SYMMETRY_MODE POINT_GROUP_PROJECTOR" in gic
-    assert [gic.name for gic in rpck] == ["A1RPck001", "B2RPck001"]
-    assert [gic.irrep for gic in rpck] == ["A1", "B2"]
+    assert [gic.name for gic in rpck] == ["A2RPck001", "B1RPck001"]
+    assert [gic.irrep for gic in rpck] == ["A2", "B1"]
+    assert [gic.irrep for gic in oop] == ["A2", "A2", "B1", "B1", "B1"]
     assert [gic.name for gic in cyclic_bends] == ["A1CyBe001", "B2CyBe001"]
     assert [gic.irrep for gic in cyclic_bends] == ["A1", "B2"]
-    assert "A1RPck001" in total_symmetric_gic_names(definition)
-    assert "B2RPck001" not in total_symmetric_gic_names(definition)
-    assert any(line.startswith("A1RPck001 =") for line in gaussian_lines)
-    assert any(line.startswith("B2RPck001 =") for line in gaussian_lines)
+    assert not any(
+        any(token in name for token in ("RPck", "OuPl"))
+        for name in total_symmetric_gic_names(definition)
+    )
+    assert any(line.startswith("A2RPck001 =") for line in gaussian_lines)
+    assert any(line.startswith("B1RPck001 =") for line in gaussian_lines)
     assert not any("RPck" in line and "(Inactive)" in line for line in gaussian_lines)
     assert not any(line.startswith("QPck") for line in gaussian_lines)
     assert not any(line.startswith("PhiP") for line in gaussian_lines)
-    assert any(line.startswith("A1RPck001 =") for line in total_gaussian_lines)
-    assert not any(line.startswith("B2RPck001") for line in total_gaussian_lines)
+    assert not any("RPck" in line or "OuPl" in line for line in total_gaussian_lines)
 
 
 def test_gicforge_projector_handles_large_noncondensed_ring_puckering(tmp_path):

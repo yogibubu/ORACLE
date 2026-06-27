@@ -89,7 +89,8 @@ Current required gate:
   until the strict Fortran backend emits projector coefficients in a stable
   machine-readable form.
 - Pyrrole is an explicit regression: point group `C2v`, rank 24, retained ring
-  coordinates, and symmetrized `A1RPck001`/`B2RPck001`.
+  coordinates, and symmetrized `A2RPck001`/`B1RPck001`; ring puckering and
+  out-of-plane coordinates must not appear in the totally symmetric block.
 - Fused PAHs are explicit regressions: naphthalene, phenanthrene, anthracene,
   pyrene and fluorene must retain protected ring `RDef`/`RPck` sources, keep
   `BtFl` bridge coordinates when present, and export fused ring puckerings as

@@ -589,6 +589,15 @@ both irrep counts and coordinate-family counts.  For example, a missing
 torsional \(B_{2g}\) coordinate cannot be replaced by an extra stretch of the
 same irrep.
 
+Signed coordinates carry the parity of the Cartesian operation.  Torsions,
+improper dihedrals, out-of-plane coordinates, butterfly coordinates and
+\texttt{RPck} ring-puckering components are pseudoscalar rows: after the atom
+permutation and canonical coordinate orientation have been applied, their
+primitive transformation is multiplied by \(\det R\).  This prevents planar
+out-of-plane or puckering coordinates from being labelled as totally symmetric
+under a molecular-plane reflection.  Stretches, valence angles and ring bends
+remain scalar coordinates and do not receive this determinant factor.
+
 \subsection{Fortran local SALCs versus production symmetry}
 
 The keyword \texttt{SYMMALL} activates a limited Fortran-side local SALC pass

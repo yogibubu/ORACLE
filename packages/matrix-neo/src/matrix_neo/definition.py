@@ -2514,6 +2514,7 @@ def _operation_ring_pucker_transform(
         _ring_pucker_canonical_torsion_coefficients(_ring_pucker_terms_from_refs(primitive))
         for primitive in primitives
     ]
+    pseudoscalar_sign = _operation_pseudoscalar_sign(operation)
     mapped_coeffs = []
     for primitive in primitives:
         mapped_terms = []
@@ -2521,7 +2522,7 @@ def _operation_ring_pucker_transform(
             mapped_atoms = tuple(_mapped_atom(operation, atom) for atom in atoms)
             if any(atom < 1 for atom in mapped_atoms):
                 return None
-            mapped_terms.append((coefficient, mapped_atoms))
+            mapped_terms.append((coefficient * pseudoscalar_sign, mapped_atoms))
         mapped_coeffs.append(_ring_pucker_canonical_torsion_coefficients(tuple(mapped_terms)))
 
     torsion_keys = sorted({key for coeffs in (*source_coeffs, *mapped_coeffs) for key in coeffs})
@@ -2715,14 +2716,15 @@ def _mapped_primitive_projector_terms(
         and len(mapped_atoms) == 4
     ):
         canonical, sign = _canonical_torsion_key_and_sign(mapped_atoms)
-        return (((primitive.family, canonical), sign),)
+        return (((primitive.family, canonical), sign * _operation_pseudoscalar_sign(operation)),)
     if primitive.family == "RING_PUCKER_COMPONENT" and primitive.function == "RPCK":
+        pseudoscalar_sign = _operation_pseudoscalar_sign(operation)
         mapped_terms = []
         for coefficient, atoms in _ring_pucker_terms_from_refs(primitive):
             mapped_term_atoms = tuple(_mapped_atom(operation, atom) for atom in atoms)
             if any(atom < 1 for atom in mapped_term_atoms):
                 return None
-            mapped_terms.append((coefficient, mapped_term_atoms))
+            mapped_terms.append((coefficient * pseudoscalar_sign, mapped_term_atoms))
         signature = _ring_pucker_projector_signature_from_terms(tuple(mapped_terms))
         if signature is None:
             return None
@@ -2739,7 +2741,8 @@ def _mapped_primitive_projector_terms(
                     center,
                     sorted_substituents,
                 ),
-                _permutation_parity_sign(substituents, sorted_substituents),
+                _permutation_parity_sign(substituents, sorted_substituents)
+                * _operation_pseudoscalar_sign(operation),
             ),
         )
     if primitive.family == "FRAG_DISTANCE":
@@ -2834,6 +2837,13 @@ def _vector_component_terms(
         for target_mode in range(3)
         if abs(float(rotation[source_mode, target_mode])) > 1.0e-10
     )
+
+
+def _operation_pseudoscalar_sign(operation: GICPointGroupOperation) -> float:
+    rotation = np.asarray(operation.rotation, dtype=float)
+    if rotation.shape != (3, 3):
+        return 1.0
+    return -1.0 if float(np.linalg.det(rotation)) < 0.0 else 1.0
 
 
 def _atom_set_key(atoms: tuple[int, ...]) -> tuple[int, ...]:
