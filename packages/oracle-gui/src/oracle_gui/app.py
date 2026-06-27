@@ -48,6 +48,11 @@ from .trinity import (
     load_trinity_gui_state,
     trinity_gui_state_lines,
 )
+from .workbench import (
+    WorkbenchTable,
+    load_workbench_gui_state,
+    workbench_gui_state_lines,
+)
 from .workflows import ORACLE_GUI_WINDOWS
 
 
@@ -105,6 +110,21 @@ def _run_qt(initial_xyzin: Path | None) -> int:
             self.process: QProcess | None = None
             self.current_actions: tuple[DashboardAction, ...] = ()
             self.pending_xyzin_after_run: Path | None = None
+            self.workbench_tabs = (
+                ("rovib_thermo", "Rovib/Thermo"),
+                ("anharmonic", "Anharmonic"),
+                ("qm_jobs", "QM Jobs"),
+                ("diagnostics", "Diagnostics"),
+                ("rotational_spectroscopy", "Rotational"),
+                ("vibrational_spectroscopy", "Vibrational"),
+                ("electronic_spectroscopy", "Electronic"),
+                ("thermochemistry_kinetics", "Thermo/Kinetics"),
+            )
+            self.workbench_summaries: dict[str, QTextEdit] = {}
+            self.workbench_section_tables: dict[str, QTableWidget] = {}
+            self.workbench_action_tables: dict[str, QTableWidget] = {}
+            self.workbench_capability_tables: dict[str, QTableWidget] = {}
+            self.workbench_export_tables: dict[str, QTableWidget] = {}
             self.setWindowTitle("ORACLE Project Dashboard")
             self.resize(1280, 780)
 
@@ -157,6 +177,8 @@ def _run_qt(initial_xyzin: Path | None) -> int:
             tabs.addTab(sefit_tab, "SEFit")
             trinity_tab = self._build_trinity_tab()
             tabs.addTab(trinity_tab, "TRINITY")
+            for key, label in self.workbench_tabs:
+                tabs.addTab(self._build_workbench_tab(key), label)
             layout.addWidget(tabs, stretch=2)
 
             self.details = QTextEdit()
@@ -197,6 +219,7 @@ def _run_qt(initial_xyzin: Path | None) -> int:
             self._clear_gf_tables()
             self._clear_sefit_tables()
             self._clear_trinity_tables()
+            self._clear_workbench_tables()
             if self.controller.xyzin is None:
                 self.path_label.setText("No ORACLE project loaded")
                 self.gicforge_summary.setPlainText("No ORACLE project loaded")
@@ -204,6 +227,8 @@ def _run_qt(initial_xyzin: Path | None) -> int:
                 self.sefit_summary.setPlainText("No ORACLE project loaded")
                 self.trinity_summary.setPlainText("No ORACLE project loaded")
                 self.contracts_summary.setPlainText("No ORACLE project loaded")
+                for summary in self.workbench_summaries.values():
+                    summary.setPlainText("No ORACLE project loaded")
                 self.details.setPlainText(
                     "\n".join(
                         f"{spec.title}: {spec.description}" for spec in ORACLE_GUI_WINDOWS
@@ -259,6 +284,7 @@ def _run_qt(initial_xyzin: Path | None) -> int:
             self._populate_gf_tables(state.xyzin)
             self._populate_sefit_tables(state.xyzin)
             self._populate_trinity_tables(state.xyzin)
+            self._populate_workbench_tables(state.xyzin)
 
         def show_workflow_details(self, _item=None) -> None:
             if self.controller.xyzin is None:
@@ -345,6 +371,55 @@ def _run_qt(initial_xyzin: Path | None) -> int:
             table = getattr(self, "contracts_table", None)
             if table is not None:
                 table.setRowCount(0)
+
+        def _build_workbench_tab(self, key: str) -> QWidget:
+            tab = QWidget()
+            layout = QVBoxLayout(tab)
+
+            summary = QTextEdit()
+            summary.setReadOnly(True)
+            summary.setMaximumHeight(120)
+            self.workbench_summaries[key] = summary
+            layout.addWidget(summary)
+
+            tables = QTabWidget()
+            section_table = QTableWidget(0, 3)
+            action_table = QTableWidget(0, 5)
+            capability_table = QTableWidget(0, 1)
+            export_table = QTableWidget(0, 2)
+            self.workbench_section_tables[key] = section_table
+            self.workbench_action_tables[key] = action_table
+            self.workbench_capability_tables[key] = capability_table
+            self.workbench_export_tables[key] = export_table
+            tables.addTab(section_table, "Sections")
+            tables.addTab(action_table, "Actions")
+            tables.addTab(capability_table, "Capabilities")
+            tables.addTab(export_table, "Exports")
+            layout.addWidget(tables, stretch=1)
+            return tab
+
+        def _populate_workbench_tables(self, xyzin: Path) -> None:
+            for key, _label in self.workbench_tabs:
+                state = load_workbench_gui_state(xyzin, key)
+                self.workbench_summaries[key].setPlainText(
+                    "\n".join(workbench_gui_state_lines(state))
+                )
+                self._fill_table(self.workbench_section_tables[key], state.sections)
+                self._fill_table(self.workbench_action_tables[key], state.actions)
+                self._fill_table(self.workbench_capability_tables[key], state.capabilities)
+                self._fill_table(self.workbench_export_tables[key], state.exports)
+
+        def _clear_workbench_tables(self) -> None:
+            for summary in getattr(self, "workbench_summaries", {}).values():
+                summary.clear()
+            for tables in (
+                getattr(self, "workbench_section_tables", {}),
+                getattr(self, "workbench_action_tables", {}),
+                getattr(self, "workbench_capability_tables", {}),
+                getattr(self, "workbench_export_tables", {}),
+            ):
+                for table in tables.values():
+                    table.setRowCount(0)
 
         def run_selected_action(self, _item=None) -> None:
             row = self.action_table.currentRow()
@@ -1333,6 +1408,7 @@ def _run_qt(initial_xyzin: Path | None) -> int:
                 | SEFitTable
                 | TrinityTable
                 | ToolContractTable
+                | WorkbenchTable
             ),
         ) -> None:
             widget.setColumnCount(len(table.columns))

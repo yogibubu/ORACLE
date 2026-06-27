@@ -101,6 +101,12 @@ from .vpt2_vci_state import (
     load_vpt2_vci_gui_state,
     vpt2_vci_gui_state_lines,
 )
+from .workbench import (
+    WorkbenchGuiState,
+    WorkbenchTable,
+    load_workbench_gui_state,
+    workbench_gui_state_lines,
+)
 from .workflows import (
     ORACLE_GUI_WINDOWS,
     WINDOWS_BY_KEY,
@@ -144,6 +150,8 @@ __all__ = [
     "TrinitySummary",
     "TrinityTable",
     "VPT2VCIGuiState",
+    "WorkbenchGuiState",
+    "WorkbenchTable",
     "WindowSpec",
     "WorkflowActionSpec",
     "WorkflowState",
@@ -183,6 +191,7 @@ __all__ = [
     "load_tool_contract_gui_state",
     "load_trinity_gui_state",
     "load_vpt2_vci_gui_state",
+    "load_workbench_gui_state",
     "molden_command",
     "preprocess_command",
     "project_state_lines",
@@ -201,5 +210,6 @@ __all__ = [
     "vpt2_vci_collect_command",
     "vpt2_vci_command",
     "vpt2_vci_gui_state_lines",
+    "workbench_gui_state_lines",
     "window_spec",
 ]

@@ -215,3 +215,17 @@ The tab is currently a skeleton for the future optimizer branch. It must not
 implement geometry optimization or external energy/gradient parsing in Qt. It
 only prepares the autonomous `#TRINITY` request and then reloads it through
 `oracle_trinity.read_trinity_section`.
+
+## Generic Workbench Tabs
+
+The Rovib/Thermo, Anharmonic, QM Jobs, Diagnostics, Rotational, Vibrational,
+Electronic and Thermo/Kinetics tabs use `oracle_gui.workbench`. They expose the
+central `oracle_gui.workflows.WindowSpec` contract as four read-only tables:
+required/produced sections, available actions, capabilities and publication or
+viewer exports.
+
+These tabs are intentionally thin until their plotting or launcher controllers
+are implemented. They must not duplicate parser, projector, GF, SEFit,
+VPT2/VCI, DVR, thermo or spectroscopy logic. A workbench becomes operational by
+adding or improving the owning service/CLI and its `xyzin` sections, then
+teaching the GUI to call that service.

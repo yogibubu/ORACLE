@@ -46,6 +46,7 @@ from oracle_gui import (
     load_structure_gui_state,
     load_tool_contract_gui_state,
     load_vpt2_vci_gui_state,
+    load_workbench_gui_state,
     molden_command,
     preprocess_command,
     project_state_lines,
@@ -56,6 +57,7 @@ from oracle_gui import (
     sefit_gui_state_lines,
     load_sefit_gui_state,
     vpt2_vci_gui_state_lines,
+    workbench_gui_state_lines,
     window_spec,
     trinity_prepare_command,
     trinity_gui_state_lines,
@@ -244,6 +246,38 @@ def test_gui_tool_contract_state_reports_standalone_readiness(tmp_path):
     assert rows["gf"][3] == "no"
     assert rows["gf"][5] == "GIC, CARTESIAN_HESSIAN"
     assert rows["gicforge"][2] == "NEO"
+
+
+def test_gui_workbench_state_reads_window_specs_and_project_sections(tmp_path):
+    xyzin = tmp_path / "molecule.xyzin"
+    xyzin.write_text(
+        "\n".join(
+            [
+                "1",
+                "h",
+                "H 0.0 0.0 0.0",
+                "",
+                "#VIBRATIONAL",
+                "SCHEMA oracle.xyz.vibrational.v1",
+                "",
+                "#QFF",
+                "SCHEMA oracle.xyz.qff.v1",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    vibrational = load_workbench_gui_state(xyzin, "vibrational_spectroscopy")
+    anharmonic = load_workbench_gui_state(xyzin, "anharmonic")
+
+    assert vibrational.title == "Vibrational Spectroscopy"
+    assert ("required", "VIBRATIONAL", "yes") in vibrational.sections.rows
+    assert ("produced", "GF_PED", "no") in vibrational.sections.rows
+    assert any(row[0] == "vpt2_vci_run" and row[3] == "yes" for row in vibrational.actions.rows)
+    assert any(row[1] == "mode heat-map" for row in vibrational.exports.rows)
+    assert anharmonic.status == "ready"
+    assert "window: Anharmonic: VPT2 / VCI / DVR" in workbench_gui_state_lines(anharmonic)
 
 
 def test_dashboard_controller_builds_ready_actions_from_xyzin_sections(tmp_path):
