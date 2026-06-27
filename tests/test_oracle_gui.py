@@ -12,12 +12,18 @@ from oracle_gui import (
     all_known_sections,
     avogadro_command,
     dvr_gui_state_lines,
+    gaussian_promote_fchk_command,
+    gaussian_promote_rovib_command,
     gicforge_build_command,
     load_dvr_gui_state,
     load_oracle_project_state,
     load_vpt2_vci_gui_state,
+    molden_command,
     preprocess_command,
     project_state_lines,
+    rovib_density_command,
+    rovib_summary_command,
+    rovib_vibrational_dos_command,
     vpt2_vci_gui_state_lines,
     window_spec,
 )
@@ -184,23 +190,53 @@ def test_gui_window_specs_cover_primary_oracle_workflows():
         "sefit",
         "rovib_thermo",
         "anharmonic",
+        "rotational_spectroscopy",
+        "vibrational_spectroscopy",
+        "electronic_spectroscopy",
+        "thermochemistry_kinetics",
         "diagnostics",
     }.issubset(keys)
     assert window_spec("gicforge").produced_sections == ("GIC", "SYCART")
+    assert window_spec("rotational_spectroscopy").category == "spectroscopy"
+    assert "mode heat-map" in window_spec("vibrational_spectroscopy").publication_exports
+    assert "Molden" in window_spec("electronic_spectroscopy").external_viewers
+    assert "KINETICS" in window_spec("thermochemistry_kinetics").produced_sections
     assert "GIC" in all_known_sections()
+    assert "KINETICS" in all_known_sections()
 
 
 def test_gui_command_specs_use_oracle_cli_without_shell(tmp_path):
     source = tmp_path / "mol.xyz"
     xyzin = tmp_path / "mol.xyzin"
+    fchk = tmp_path / "mol.fchk"
+    log = tmp_path / "mol.log"
 
     preprocess = preprocess_command(source, xyzin, source_kind="xyz")
     avogadro = avogadro_command(xyzin, executable="avogadro")
+    molden = molden_command(fchk)
+    promote_fchk = gaussian_promote_fchk_command(fchk, xyzin, qff=False)
+    promote_rovib = gaussian_promote_rovib_command(log, xyzin, exclude_modes=(1, 3))
+    rovib_summary = rovib_summary_command(xyzin)
+    vib_dos = rovib_vibrational_dos_command(xyzin, out=tmp_path / "dos_vib.dat")
+    rovib_dos = rovib_density_command(
+        xyzin,
+        vib_dos=tmp_path / "dos_vib.dat",
+        out=tmp_path / "dos_rovib.dat",
+        jmax=20,
+    )
     gic = gicforge_build_command(xyzin)
 
     assert preprocess.argv[1:4] == ("-m", "oracle", "babel")
     assert preprocess.argv[-2:] == ("--source-kind", "xyz")
     assert avogadro.argv == ("avogadro", str(xyzin))
+    assert molden.argv == ("molden", str(fchk))
+    assert promote_fchk.argv[-1] == "--no-qff"
+    assert promote_fchk.produced_sections == ("CARTESIAN_HESSIAN", "NORMAL_MODES")
+    assert promote_rovib.argv[-4:] == ("--exclude-mode", "1", "--exclude-mode", "3")
+    assert promote_rovib.produced_sections == ("VIBRATIONAL", "ROTATIONAL", "DELTABVIB")
+    assert rovib_summary.argv[-3:] == ("rovib", "summarize", str(xyzin))
+    assert "dos" in vib_dos.argv
+    assert rovib_dos.argv[-2:] == ("--jmax", "20")
     assert " ".join(gic.argv).endswith(
         "gicforge build "
         f"{xyzin} --symmetrize --sycart --improper-dihedrals"

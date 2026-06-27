@@ -17,27 +17,52 @@ GUI view -> private topology or synthon perception
 GUI view -> direct Fortran executable without an oracle-* service boundary
 ```
 
-## Windows
+## Project Windows
 
 The first window is `ORACLE Project Dashboard`. It opens or creates the active
 project, displays the molecule state and lists all known `xyzin` sections.
 Every other window is reachable from this state.
 
-The planned windows are:
+The project/workflow windows are:
 
 | Window | Responsibility | Main sections |
 | --- | --- | --- |
 | ORACLE Project Dashboard | Project state, validation, section/workflow status | all sections |
 | ORACLE-Babel / Preprocessing | Import XYZ, QM formats, Z-matrix, SMILES/RDKit and LCB25 | `#SOURCE`, `#BASIC`, `#SYMMETRY`, `#TOPOLOGY`, `#SYNTHONS` |
 | Molecule Editor / Avogadro Bridge | Open/edit the first XYZ block and reimport edited coordinates | XYZ block |
-| Topology / Synthons / Fragments | Inspect bonds, rings, charges, synthons and fragments | `#TOPOLOGY`, `#SYNTHONS`, `#FRAGMENTS` |
+| Molecular Structure / Synthons | Inspect bonds, rings, charges, synthons and fragments | `#TOPOLOGY`, `#SYNTHONS`, `#FRAGMENTS` |
 | GICForge | Build, symmetrize and diagnose GICs and B matrices | `#GIC`, `#SYCART` |
 | GF / PED | Harmonic force-field analysis from Hessian plus GICs | `#CARTESIAN_HESSIAN`, `#GF_PED` |
 | SEFit / MORPHEUS | Single-molecule and ensemble semiexperimental refinement | `#ISOTOPOLOGUES`, `#MORPHEUS` |
-| Thermo / Rovib | Rotational/vibrational summaries and thermochemistry | `#ROTATIONAL`, `#VIBRATIONAL`, `#THERMO` |
+| Rovib / Thermo Utilities | Rotational/vibrational summaries and thermochemistry utilities | `#ROTATIONAL`, `#VIBRATIONAL`, `#THERMO` |
 | Anharmonic: VPT2 / VCI / DVR | Run and collect anharmonic workflow state | `#QFF`, `#VPT2_VCI`, `#DVR` |
 | QM Jobs | Generate Gaussian inputs and normalize QM output sections | `#CARTESIAN_HESSIAN`, `#NORMAL_MODES`, `#QFF` |
 | Diagnostics / Regression | Corpus, Python/Fortran and benchmark audits | reports/artifacts |
+
+## Scientific Workbenches
+
+The final user-facing GUI must also expose domain workbenches. These collect
+the project workflow outputs, perform domain-specific analysis and draw spectra
+or figures. They still use the same `xyzin` sections and service boundaries.
+
+| Workbench | Responsibility | Examples |
+| --- | --- | --- |
+| Rotational Spectroscopy | Collect rotational constants, corrections and assignments; draw rotational spectra. | isotopologue comparison, SEFit residuals, line-list/stick/envelope plots, publication CSV/SVG/PDF/LaTeX export |
+| Vibrational Spectroscopy | Collect harmonic, GF/PED, VPT2/VCI and DVR data; draw vibrational spectra. | normal-mode overlap heat maps, force-constant scaling, IR/Raman-style peak tables, publication plots |
+| Electronic Spectroscopy | Collect electronic-state and transition data; visualize orbitals/densities. | UV/visible stick/broadened spectra, orbital viewing through Avogadro/Avogadro2/Molden, transition tables |
+| Molecular Structure / Synthons | Inspect and publish structure, topology, fragments and synthon classifications. | structure tables, synthon maps, fragment maps, Avogadro editing |
+| Thermochemistry / Kinetics | Collect thermochemical functions and kinetic-model outputs. | thermo tables, rovibrational DOS, kinetic comparisons, publication-ready plots/tables |
+
+Publication export is a GUI contract: workbenches must export the final
+accepted spectrum or table as machine-readable data plus vector formats suited
+for papers. The first implementation records these export targets in
+`oracle_gui.workflows`; plotting backends can then implement them without
+changing the scientific services.
+
+Orbital visualization is delegated to external viewers. ORACLE should prepare
+or pass through supported files, then launch Avogadro/Avogadro2, Molden or
+another configured viewer through `oracle_gui.commands`, rather than embedding
+a private orbital renderer in the first GUI pass.
 
 ## Implementation Boundary
 
@@ -56,6 +81,8 @@ Scientific behavior remains in the owning packages:
 - `oracle-morpheus` for SEFit and MORPHEUS;
 - `oracle-rovib`, `oracle-thermo`, `oracle-vpt2-vci` and `oracle-dvr` for
   their corresponding sections.
+- spectrum drawing and publication export code should consume normalized
+  ORACLE reports/CSV/sections and must not parse QM outputs privately.
 
 The source-tree entry point is:
 

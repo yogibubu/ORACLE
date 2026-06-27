@@ -45,6 +45,23 @@ def avogadro_command(
     return OracleGuiCommand("Open in Avogadro", (executable, str(Path(xyzin))))
 
 
+def external_viewer_command(
+    target: Path | str,
+    *,
+    executable: str,
+    label: str | None = None,
+) -> OracleGuiCommand:
+    return OracleGuiCommand(label or f"Open in {executable}", (executable, str(Path(target))))
+
+
+def molden_command(
+    target: Path | str,
+    *,
+    executable: str = "molden",
+) -> OracleGuiCommand:
+    return external_viewer_command(target, executable=executable, label="Open in Molden")
+
+
 def preprocess_command(
     source: Path | str,
     output: Path | str,
@@ -67,6 +84,59 @@ def preprocess_command(
         "Preprocess molecule",
         tuple(argv),
         produced_sections=("SOURCE", "BASIC", "SYMMETRY", "TOPOLOGY", "SYNTHONS"),
+    )
+
+
+def gaussian_promote_fchk_command(
+    fchk: Path | str,
+    xyzin: Path | str,
+    *,
+    cartesian_hessian: bool = True,
+    normal_modes: bool = True,
+    qff: bool = True,
+) -> OracleGuiCommand:
+    argv = [*_oracle(), "gaussian", "promote-fchk", str(Path(fchk)), str(Path(xyzin))]
+    _append_flag(argv, "--no-cartesian-hessian", not cartesian_hessian)
+    _append_flag(argv, "--no-normal-modes", not normal_modes)
+    _append_flag(argv, "--no-qff", not qff)
+    produced: list[str] = []
+    if cartesian_hessian:
+        produced.append("CARTESIAN_HESSIAN")
+    if normal_modes:
+        produced.append("NORMAL_MODES")
+    if qff:
+        produced.append("QFF")
+    return OracleGuiCommand("Promote Gaussian FCHK data", tuple(argv), produced_sections=tuple(produced))
+
+
+def gaussian_promote_rovib_command(
+    log: Path | str,
+    xyzin: Path | str,
+    *,
+    vibrational: bool = True,
+    rotational: bool = True,
+    deltabvib: bool = True,
+    invert_imaginary: bool = True,
+    exclude_modes: Sequence[int] = (),
+) -> OracleGuiCommand:
+    argv = [*_oracle(), "gaussian", "promote-rovib", str(Path(log)), str(Path(xyzin))]
+    _append_flag(argv, "--no-vibrational", not vibrational)
+    _append_flag(argv, "--no-rotational", not rotational)
+    _append_flag(argv, "--no-deltabvib", not deltabvib)
+    _append_flag(argv, "--no-invert-imaginary", not invert_imaginary)
+    for mode in exclude_modes:
+        argv.extend(["--exclude-mode", str(int(mode))])
+    produced: list[str] = []
+    if vibrational:
+        produced.append("VIBRATIONAL")
+    if rotational:
+        produced.append("ROTATIONAL")
+    if deltabvib:
+        produced.append("DELTABVIB")
+    return OracleGuiCommand(
+        "Promote Gaussian rovibrational data",
+        tuple(argv),
+        produced_sections=tuple(produced),
     )
 
 
@@ -172,6 +242,76 @@ def thermo_command(xyzin: Path | str, *, out: Path | str | None = None) -> Oracl
         tuple(argv),
         required_sections=("BASIC", "ROTATIONAL"),
         produced_sections=("THERMO",),
+    )
+
+
+def rovib_summary_command(xyzin: Path | str) -> OracleGuiCommand:
+    return OracleGuiCommand(
+        "Summarize rovibrational sections",
+        (*_oracle(), "rovib", "summarize", str(Path(xyzin))),
+        required_sections=("ROTATIONAL",),
+    )
+
+
+def rovib_vibrational_dos_command(
+    xyzin: Path | str,
+    *,
+    out: Path | str | None = None,
+    vmax: int = 6,
+    emax_cm1: float = 8000.0,
+    bin_cm1: float = 50.0,
+    ncap: float = 10.0,
+) -> OracleGuiCommand:
+    argv = [
+        *_oracle(),
+        "rovib",
+        "dos",
+        str(Path(xyzin)),
+        "--vmax",
+        str(vmax),
+        "--emax",
+        str(emax_cm1),
+        "--bin-cm1",
+        str(bin_cm1),
+        "--ncap",
+        str(ncap),
+    ]
+    if out is not None:
+        argv.extend(["--out", str(Path(out))])
+    return OracleGuiCommand(
+        "Build vibrational density of states",
+        tuple(argv),
+        required_sections=("VIBRATIONAL",),
+    )
+
+
+def rovib_density_command(
+    xyzin: Path | str,
+    *,
+    vib_dos: Path | str | None = None,
+    out: Path | str | None = None,
+    rot_out: Path | str | None = None,
+    q_out: Path | str | None = None,
+    emax_rot: float | None = None,
+    jmax: int | None = None,
+) -> OracleGuiCommand:
+    argv = [*_oracle(), "rovib", "dos-rovib", str(Path(xyzin))]
+    if vib_dos is not None:
+        argv.extend(["--vib-dos", str(Path(vib_dos))])
+    if out is not None:
+        argv.extend(["--out", str(Path(out))])
+    if rot_out is not None:
+        argv.extend(["--rot-out", str(Path(rot_out))])
+    if q_out is not None:
+        argv.extend(["--q-out", str(Path(q_out))])
+    if emax_rot is not None:
+        argv.extend(["--emax-rot", str(emax_rot)])
+    if jmax is not None:
+        argv.extend(["--jmax", str(jmax)])
+    return OracleGuiCommand(
+        "Build rovibrational density of states",
+        tuple(argv),
+        required_sections=("ROTATIONAL", "VIBRATIONAL"),
     )
 
 

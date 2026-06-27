@@ -100,7 +100,9 @@ def _run_qt(initial_xyzin: Path | None) -> int:
             if self.xyzin is None:
                 self.path_label.setText("No ORACLE project loaded")
                 self.details.setPlainText(
-                    "\n".join(f"{spec.title}: {spec.description}" for spec in ORACLE_GUI_WINDOWS)
+                    "\n".join(
+                        f"{spec.title}: {spec.description}" for spec in ORACLE_GUI_WINDOWS
+                    )
                 )
                 return
 
@@ -150,9 +152,28 @@ def _run_qt(initial_xyzin: Path | None) -> int:
                         + (", ".join(workflow.required_sections) or "none"),
                         "Produced: "
                         + (", ".join(workflow.produced_sections) or "none"),
+                        "",
+                        *self._spec_extra_lines(workflow.key),
                     ]
                 ),
             )
+
+        def _spec_extra_lines(self, key: str) -> list[str]:
+            for spec in ORACLE_GUI_WINDOWS:
+                if spec.key != key:
+                    continue
+                lines = [f"Category: {spec.category}"]
+                if spec.capabilities:
+                    lines.append("Capabilities:")
+                    lines.extend(f"- {item}" for item in spec.capabilities)
+                if spec.publication_exports:
+                    lines.append("Publication export:")
+                    lines.extend(f"- {item}" for item in spec.publication_exports)
+                if spec.external_viewers:
+                    lines.append("External viewers:")
+                    lines.extend(f"- {item}" for item in spec.external_viewers)
+                return lines
+            return []
 
     app = QApplication([])
     window = OracleDashboardWindow(initial_xyzin)
