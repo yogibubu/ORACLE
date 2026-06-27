@@ -21,3 +21,24 @@ Recommended reading order for a new workflow:
    refinements with shared class corrections.
 
 All PDF files are generated from the adjacent LaTeX sources with `latexmk`.
+
+## Manual Completion Plan
+
+Before the current MATRIX release is considered complete, add or refresh manuals
+for the implemented tools below. Fragment search, nano-LEGO assembly and
+production TRINITY optimization belong to the next release and should not block
+this manual pass.
+
+| Manual | Status | Scope |
+| --- | --- | --- |
+| ORACLE-Babel / Preprocessing | Needed | Geometry/QM/SMILES import, RDKit use, symmetry/topology execution, Avogadro handoff and generated xyzin sections. |
+| NEO / GICForge | Existing, refresh | Rename transition from GICForge to NEO, fragment-aware GICs already implemented, symmetry projector, B matrix, Python/Fortran parity and golden tests. |
+| GF/PED | Existing, refresh | Standalone xyzin mode, `#GF_PED`, local force-field model, electrostatic/vdW subtraction, GIC force-constant scaling and publication tables. |
+| MORPHEUS / SEFit | Existing, refresh | Standalone and GUI workflows, local `se_geometries`, multi-structure refinements and exported diagnostics. |
+| Rotational Spectroscopy / WMS-Rot | Needed | Local WMS-Rot engine, line-list generation, shared diagonalizer policy, database-comparison roadmap and publication exports. |
+| Vibrational Spectroscopy | Needed | IR/Raman/VCD/ROA plotting, NIST gas-phase import policy, mirrored comparisons and hybrid level1+level2 spectra with normal-mode overlap checks. |
+| Thermochemistry / Kinetics | Needed | Thermo tables, rovibrational DOS, current `#THERMO` outputs and planned `#KINETICS` extension boundary. |
+| VPT2/VCI | Needed | QFF input contract, VPT2/VCI run modes, CSV/report outputs and relation to the vibrational workbench. |
+| DVR | Needed | Direct DVR runs, post-run normalization, shared diagonalizer use and `#DVR` GUI state. |
+| QM Adapters | Needed | One-adapter-per-format policy, Gaussian/Molpro/MRCC promotion commands, shared `#CARTESIAN_HESSIAN`, `#NORMAL_MODES`, `#QFF`, electronic and orbital sections. |
+| ORACLE GUI | Needed | Project dashboard, spectroscopy workbenches, structure/synthon view, external viewers, missing-section guidance and export workflows. |

@@ -136,9 +136,12 @@ def vibrational_spectrum_command(
     csv_path: Path | str,
     plot_path: Path | str | None = None,
     peaks_path: Path | str | None = None,
+    level2_xyzin: Path | str | None = None,
+    mode_match_csv_path: Path | str | None = None,
     observable: str = "IR",
     source: str = "harmonic",
     fwhm_cm1: float = 10.0,
+    min_mode_overlap: float = 0.70,
 ) -> OracleGuiCommand:
     argv = [
         *_oracle(),
@@ -151,50 +154,75 @@ def vibrational_spectrum_command(
         source.lower(),
         "--csv",
         str(Path(csv_path)),
+        "--min-mode-overlap",
+        str(float(min_mode_overlap)),
         "--fwhm-cm1",
         str(float(fwhm_cm1)),
     ]
+    if level2_xyzin is not None:
+        argv.extend(["--level2-xyzin", str(Path(level2_xyzin))])
+    if mode_match_csv_path is not None:
+        argv.extend(["--mode-match-csv", str(Path(mode_match_csv_path))])
     if plot_path is not None:
         argv.extend(["--plot", str(Path(plot_path))])
     if peaks_path is not None:
         argv.extend(["--peaks", str(Path(peaks_path))])
+    required = ("VIBRATIONAL", "NORMAL_MODES") if source.lower() == "hybrid" else ("VIBRATIONAL",)
     return OracleGuiCommand(
         f"Build {source} {observable.upper()} spectrum",
         tuple(argv),
-        required_sections=("VIBRATIONAL",),
+        required_sections=required,
         produced_sections=("VIBRATIONAL_SPECTRUM",),
     )
 
 
 def vibrational_spectrum_comparison_command(
     xyzin: Path | str,
+    second_xyzin: Path | str | None = None,
     *,
     csv_path: Path | str,
     plot_path: Path | str | None = None,
+    mode_match_csv_path: Path | str | None = None,
     observable: str = "IR",
     first_source: str = "harmonic",
     second_source: str = "anharmonic",
+    min_mode_overlap: float = 0.70,
 ) -> OracleGuiCommand:
     argv = [
         *_oracle(),
         "rovib",
         "vib-compare",
         str(Path(xyzin)),
-        "--observable",
-        observable.upper(),
-        "--first-source",
-        first_source.lower(),
-        "--second-source",
-        second_source.lower(),
-        "--csv",
-        str(Path(csv_path)),
     ]
+    if second_xyzin is not None:
+        argv.append(str(Path(second_xyzin)))
+    argv.extend(
+        [
+            "--observable",
+            observable.upper(),
+            "--first-source",
+            first_source.lower(),
+            "--second-source",
+            second_source.lower(),
+            "--csv",
+            str(Path(csv_path)),
+            "--min-mode-overlap",
+            str(float(min_mode_overlap)),
+        ]
+    )
+    if mode_match_csv_path is not None:
+        argv.extend(["--mode-match-csv", str(Path(mode_match_csv_path))])
     if plot_path is not None:
         argv.extend(["--plot", str(Path(plot_path))])
+    required = (
+        ("VIBRATIONAL", "NORMAL_MODES")
+        if "hybrid" in {first_source.lower(), second_source.lower()}
+        else ("VIBRATIONAL",)
+    )
     return OracleGuiCommand(
         f"Compare {observable.upper()} spectra",
         tuple(argv),
-        required_sections=("VIBRATIONAL",),
+        required_sections=required,
         produced_sections=("VIBRATIONAL_SPECTRUM",),
     )
 

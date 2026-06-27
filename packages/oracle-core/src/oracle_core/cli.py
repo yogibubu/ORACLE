@@ -248,12 +248,19 @@ def build_parser(
     )
     rovib_vib_spectrum.add_argument(
         "--source",
-        choices=("harmonic", "anharmonic"),
+        choices=("harmonic", "anharmonic", "hybrid"),
         default="harmonic",
+    )
+    rovib_vib_spectrum.add_argument(
+        "--level2-xyzin",
+        type=Path,
+        help="Level-2 xyzin used for hybrid harmonic(level1)+anharmonic correction(level2)",
     )
     rovib_vib_spectrum.add_argument("--csv", type=Path, required=True)
     rovib_vib_spectrum.add_argument("--plot", type=Path)
     rovib_vib_spectrum.add_argument("--peaks", type=Path)
+    rovib_vib_spectrum.add_argument("--mode-match-csv", type=Path)
+    rovib_vib_spectrum.add_argument("--min-mode-overlap", type=float, default=0.70)
     rovib_vib_spectrum.add_argument("--fwhm-cm1", type=float, default=10.0)
     rovib_vib_spectrum.add_argument("--step-cm1", type=float, default=1.0)
     rovib_vib_spectrum.add_argument(
@@ -268,22 +275,30 @@ def build_parser(
     )
     rovib_vib_compare.add_argument("xyzin", type=Path)
     rovib_vib_compare.add_argument(
+        "second_xyzin",
+        type=Path,
+        nargs="?",
+        help="Optional second xyzin file; defaults to the first file",
+    )
+    rovib_vib_compare.add_argument(
         "--observable",
         choices=("IR", "RAMAN", "VCD", "ROA"),
         default="IR",
     )
     rovib_vib_compare.add_argument(
         "--first-source",
-        choices=("harmonic", "anharmonic"),
+        choices=("harmonic", "anharmonic", "hybrid"),
         default="harmonic",
     )
     rovib_vib_compare.add_argument(
         "--second-source",
-        choices=("harmonic", "anharmonic"),
+        choices=("harmonic", "anharmonic", "hybrid"),
         default="anharmonic",
     )
     rovib_vib_compare.add_argument("--csv", type=Path, required=True)
     rovib_vib_compare.add_argument("--plot", type=Path)
+    rovib_vib_compare.add_argument("--mode-match-csv", type=Path)
+    rovib_vib_compare.add_argument("--min-mode-overlap", type=float, default=0.70)
     rovib_vib_compare.add_argument("--fwhm-cm1", type=float, default=10.0)
     rovib_vib_compare.add_argument("--step-cm1", type=float, default=1.0)
     rovib_vib_compare.add_argument(
@@ -1105,6 +1120,9 @@ def main(
     if args.command == "rovib" and args.rovib_command == "vib-spectrum":
         from oracle_rovib import VibrationalSpectrumOptions, write_vibrational_spectrum_outputs
 
+        if args.source == "hybrid" and args.level2_xyzin is None:
+            print("rovib vib-spectrum --source hybrid requires --level2-xyzin", file=sys.stderr)
+            return 2
         options = VibrationalSpectrumOptions(
             fwhm_cm1=args.fwhm_cm1,
             step_cm1=args.step_cm1,
@@ -1116,8 +1134,11 @@ def main(
             csv_path=args.csv,
             plot_path=args.plot,
             peaks_path=args.peaks,
+            level2_xyzin=args.level2_xyzin,
+            mode_match_csv_path=args.mode_match_csv,
             observable=args.observable,
             source=args.source,
+            min_mode_overlap=args.min_mode_overlap,
             options=options,
         )
         outputs = [f"CSV: {args.csv}"]
@@ -1125,6 +1146,8 @@ def main(
             outputs.append(f"plot: {args.plot}")
         if args.peaks is not None:
             outputs.append(f"peaks: {args.peaks}")
+        if args.mode_match_csv is not None:
+            outputs.append(f"mode matches: {args.mode_match_csv}")
         print(
             f"Wrote {spectrum.source} {spectrum.observable} spectrum "
             f"({len(spectrum.peaks)} peaks, {len(spectrum.x_cm1)} points): " + ", ".join(outputs)
@@ -1136,6 +1159,11 @@ def main(
             write_vibrational_spectrum_comparison_outputs,
         )
 
+        if "hybrid" in {args.first_source, args.second_source} and args.second_xyzin is None:
+            print(
+                "rovib vib-compare with source=hybrid requires a second xyzin file", file=sys.stderr
+            )
+            return 2
         options = VibrationalSpectrumOptions(
             fwhm_cm1=args.fwhm_cm1,
             step_cm1=args.step_cm1,
@@ -1146,19 +1174,26 @@ def main(
             args.xyzin,
             csv_path=args.csv,
             plot_path=args.plot,
+            second_xyzin=args.second_xyzin,
             observable=args.observable,
             first_source=args.first_source,
             second_source=args.second_source,
             options=options,
             mirror_second=False if args.no_mirror_second else None,
+            min_mode_overlap=args.min_mode_overlap,
+            mode_match_csv_path=args.mode_match_csv,
         )
         outputs = [f"CSV: {args.csv}"]
         if args.plot is not None:
             outputs.append(f"plot: {args.plot}")
+        if args.mode_match_csv is not None:
+            outputs.append(f"mode matches: {args.mode_match_csv}")
         mirror = "mirrored" if comparison.mirror_second else "not mirrored"
+        second_file = args.second_xyzin if args.second_xyzin is not None else args.xyzin
         print(
             f"Wrote {args.observable} comparison "
-            f"({args.first_source} vs {args.second_source}, second {mirror}): " + ", ".join(outputs)
+            f"({args.xyzin} {args.first_source} vs {second_file} {args.second_source}, "
+            f"second {mirror}): " + ", ".join(outputs)
         )
         return 0
     if args.command == "rovib" and args.rovib_command == "nist-ir":

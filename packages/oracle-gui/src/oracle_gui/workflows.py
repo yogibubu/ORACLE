@@ -440,6 +440,8 @@ ORACLE_GUI_WINDOWS: tuple[WindowSpec, ...] = (
             "scale force constants and compare frequency shifts",
             "draw harmonic and anharmonic IR, Raman, VCD and ROA spectra when data are present",
             "compare IR/Raman spectra with the second trace mirrored below zero",
+            "compare spectra from two calculation levels stored in separate xyzin files",
+            "build hybrid frequencies as harmonic(level1)+[anharmonic-harmonic](level2) after normal-mode overlap matching",
             "compare VCD/ROA spectra without mirroring because signed intensities carry information",
             "overlay broadened theoretical spectra with experimental gas-phase NIST IR data",
             "request user instructions when NIST has only condensed-phase data or no spectrum",

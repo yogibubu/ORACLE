@@ -16,6 +16,7 @@ from .contracts import VibrationalSection, read_vibrational_section
 NIST_WEBBOOK_BASE = "https://webbook.nist.gov"
 NIST_USER_AGENT = "ORACLE-MATRIX/0.1"
 VIBRATIONAL_OBSERVABLES = ("IR", "RAMAN", "VCD", "ROA")
+VIBRATIONAL_SOURCES = ("harmonic", "anharmonic", "hybrid")
 
 
 @dataclass(frozen=True)
@@ -56,6 +57,24 @@ class VibrationalSpectrumComparison:
     second_y: np.ndarray
     plotted_second_y: np.ndarray
     mirror_second: bool
+
+
+@dataclass(frozen=True)
+class NormalModeMatch:
+    level1_mode: int
+    level2_mode: int
+    overlap: float
+    level1_harmonic_cm1: float
+    level2_harmonic_cm1: float
+    level2_anharmonic_cm1: float
+    correction_cm1: float
+    hybrid_cm1: float
+
+
+@dataclass(frozen=True)
+class HybridVibrationalSpectrumResult:
+    spectrum: VibrationalSpectrum
+    matches: tuple[NormalModeMatch, ...]
 
 
 @dataclass(frozen=True)
@@ -226,22 +245,199 @@ def write_vibrational_spectrum_outputs(
     csv_path: Path | str,
     plot_path: Path | str | None = None,
     peaks_path: Path | str | None = None,
+    level2_xyzin: Path | str | None = None,
+    mode_match_csv_path: Path | str | None = None,
     observable: str = "IR",
     source: str = "harmonic",
+    min_mode_overlap: float = 0.70,
     options: VibrationalSpectrumOptions | None = None,
 ) -> VibrationalSpectrum:
-    spectrum = build_vibrational_spectrum_from_xyzin(
-        xyzin,
-        observable=observable,
-        source=source,
-        options=options,
-    )
+    if _normalize_source(source) == "hybrid":
+        if level2_xyzin is None:
+            raise ValueError("hybrid vibrational spectra require level2_xyzin")
+        result = build_hybrid_vibrational_spectrum_from_xyzin(
+            xyzin,
+            level2_xyzin,
+            observable=observable,
+            options=options,
+            min_mode_overlap=min_mode_overlap,
+        )
+        spectrum = result.spectrum
+        if mode_match_csv_path is not None:
+            write_normal_mode_match_csv(mode_match_csv_path, result.matches)
+    else:
+        spectrum = build_vibrational_spectrum_from_xyzin(
+            xyzin,
+            observable=observable,
+            source=source,
+            options=options,
+        )
     write_vibrational_spectrum_csv(csv_path, spectrum)
     if peaks_path is not None:
         write_vibrational_peak_csv(peaks_path, spectrum.peaks)
     if plot_path is not None:
         write_vibrational_spectrum_plot(plot_path, spectrum)
     return spectrum
+
+
+def match_normal_modes(
+    level1_modes: np.ndarray,
+    level2_modes: np.ndarray,
+    *,
+    min_overlap: float = 0.70,
+) -> tuple[tuple[int, int, float], ...]:
+    first = _normalized_mode_rows(level1_modes)
+    second = _normalized_mode_rows(level2_modes)
+    if first.shape != second.shape:
+        raise ValueError(
+            "normal-mode matching requires equal mode and coordinate counts "
+            f"(got {first.shape} and {second.shape})"
+        )
+    if not 0.0 <= min_overlap <= 1.0:
+        raise ValueError("min_overlap must be between 0 and 1")
+    overlap = np.abs(first @ second.T)
+    rows, cols = _linear_sum_assignment(-overlap)
+    matches = tuple(
+        sorted(
+            (
+                (int(row) + 1, int(col) + 1, float(overlap[row, col]))
+                for row, col in zip(rows, cols)
+            ),
+            key=lambda item: item[0],
+        )
+    )
+    weak = [item for item in matches if item[2] < min_overlap]
+    if weak:
+        text = ", ".join(
+            f"L1 mode {level1}->L2 mode {level2} overlap={value:.3f}"
+            for level1, level2, value in weak
+        )
+        raise ValueError(f"normal-mode correspondence below threshold: {text}")
+    return matches
+
+
+def hybrid_vibrational_section_from_sections(
+    level1: VibrationalSection,
+    level2: VibrationalSection,
+    matches: tuple[tuple[int, int, float], ...],
+) -> tuple[VibrationalSection, tuple[NormalModeMatch, ...]]:
+    if not level1.frequencies_cm1:
+        raise ValueError("level1 #VIBRATIONAL lacks harmonic frequencies")
+    if not level2.frequencies_cm1:
+        raise ValueError("level2 #VIBRATIONAL lacks harmonic frequencies")
+    if not level2.anharmonic_frequencies_cm1:
+        raise ValueError("level2 #VIBRATIONAL lacks anharmonic frequencies")
+    mode_count = len(level1.frequencies_cm1)
+    if len(matches) != mode_count:
+        raise ValueError("normal-mode match count does not match level1 vibrational mode count")
+    if (
+        len(level2.frequencies_cm1) < mode_count
+        or len(level2.anharmonic_frequencies_cm1) < mode_count
+    ):
+        raise ValueError("level2 harmonic/anharmonic frequency counts are incomplete")
+
+    hybrid_freqs = [0.0] * mode_count
+    detailed: list[NormalModeMatch] = []
+    for level1_mode, level2_mode, overlap in matches:
+        i = level1_mode - 1
+        j = level2_mode - 1
+        level1_harm = float(level1.frequencies_cm1[i])
+        level2_harm = float(level2.frequencies_cm1[j])
+        level2_anh = float(level2.anharmonic_frequencies_cm1[j])
+        correction = level2_anh - level2_harm
+        hybrid = level1_harm + correction
+        hybrid_freqs[i] = hybrid
+        detailed.append(
+            NormalModeMatch(
+                level1_mode=level1_mode,
+                level2_mode=level2_mode,
+                overlap=float(overlap),
+                level1_harmonic_cm1=level1_harm,
+                level2_harmonic_cm1=level2_harm,
+                level2_anharmonic_cm1=level2_anh,
+                correction_cm1=correction,
+                hybrid_cm1=hybrid,
+            )
+        )
+    section = VibrationalSection(
+        linear=level1.linear,
+        nvib=level1.nvib,
+        n_imag_like=level1.n_imag_like,
+        symmetry_group=level1.symmetry_group,
+        frequencies_cm1=tuple(hybrid_freqs),
+        ir_intensities_km_mol=level1.ir_intensities_km_mol,
+        raman_activities_A4_amu=level1.raman_activities_A4_amu,
+        vcd_rot_strengths=level1.vcd_rot_strengths,
+        roa_intensities=level1.roa_intensities,
+    )
+    return section, tuple(detailed)
+
+
+def build_hybrid_vibrational_spectrum_from_xyzin(
+    level1_xyzin: Path | str,
+    level2_xyzin: Path | str,
+    *,
+    observable: str = "IR",
+    options: VibrationalSpectrumOptions | None = None,
+    min_mode_overlap: float = 0.70,
+) -> HybridVibrationalSpectrumResult:
+    from oracle_qm import read_normal_modes_section
+
+    level1_path = Path(level1_xyzin)
+    level2_path = Path(level2_xyzin)
+    matches = match_normal_modes(
+        read_normal_modes_section(level1_path).modes,
+        read_normal_modes_section(level2_path).modes,
+        min_overlap=min_mode_overlap,
+    )
+    section, detailed = hybrid_vibrational_section_from_sections(
+        read_vibrational_section(level1_path),
+        read_vibrational_section(level2_path),
+        matches,
+    )
+    spectrum = build_vibrational_spectrum(
+        section,
+        observable=observable,
+        source="hybrid",
+        options=options,
+    )
+    return HybridVibrationalSpectrumResult(spectrum=spectrum, matches=detailed)
+
+
+def write_normal_mode_match_csv(
+    path: Path | str,
+    matches: tuple[NormalModeMatch, ...],
+) -> Path:
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(
+            [
+                "level1_mode",
+                "level2_mode",
+                "overlap_abs",
+                "level1_harmonic_cm-1",
+                "level2_harmonic_cm-1",
+                "level2_anharmonic_cm-1",
+                "correction_cm-1",
+                "hybrid_cm-1",
+            ]
+        )
+        for match in matches:
+            writer.writerow(
+                [
+                    match.level1_mode,
+                    match.level2_mode,
+                    f"{match.overlap:.12g}",
+                    f"{match.level1_harmonic_cm1:.8f}",
+                    f"{match.level2_harmonic_cm1:.8f}",
+                    f"{match.level2_anharmonic_cm1:.8f}",
+                    f"{match.correction_cm1:.8f}",
+                    f"{match.hybrid_cm1:.8f}",
+                ]
+            )
+    return target
 
 
 def compare_vibrational_spectra(
@@ -358,23 +554,34 @@ def write_vibrational_spectrum_comparison_outputs(
     *,
     csv_path: Path | str,
     plot_path: Path | str | None = None,
+    second_xyzin: Path | str | None = None,
     observable: str = "IR",
     first_source: str = "harmonic",
     second_source: str = "anharmonic",
     options: VibrationalSpectrumOptions | None = None,
     mirror_second: bool | None = None,
+    min_mode_overlap: float = 0.70,
+    mode_match_csv_path: Path | str | None = None,
 ) -> VibrationalSpectrumComparison:
-    first = build_vibrational_spectrum_from_xyzin(
+    second_target = xyzin if second_xyzin is None else second_xyzin
+    first = _comparison_spectrum(
         xyzin,
+        second_target,
         observable=observable,
         source=first_source,
         options=options,
+        min_mode_overlap=min_mode_overlap,
+        mode_match_csv_path=mode_match_csv_path,
     )
-    second = build_vibrational_spectrum_from_xyzin(
-        xyzin,
+    second = _comparison_spectrum(
+        second_target,
+        second_target,
+        level1_xyzin=xyzin,
         observable=observable,
         source=second_source,
         options=options,
+        min_mode_overlap=min_mode_overlap,
+        mode_match_csv_path=mode_match_csv_path,
     )
     comparison = compare_vibrational_spectra(first, second, mirror_second=mirror_second)
     write_vibrational_spectrum_comparison_csv(csv_path, comparison)
@@ -537,6 +744,37 @@ def _grid_step(x: np.ndarray) -> float:
     return float(np.min(positive))
 
 
+def _comparison_spectrum(
+    xyzin: Path | str,
+    level2_xyzin: Path | str,
+    *,
+    level1_xyzin: Path | str | None = None,
+    observable: str,
+    source: str,
+    options: VibrationalSpectrumOptions | None,
+    min_mode_overlap: float,
+    mode_match_csv_path: Path | str | None,
+) -> VibrationalSpectrum:
+    src = _normalize_source(source)
+    if src == "hybrid":
+        result = build_hybrid_vibrational_spectrum_from_xyzin(
+            xyzin if level1_xyzin is None else level1_xyzin,
+            level2_xyzin,
+            observable=observable,
+            options=options,
+            min_mode_overlap=min_mode_overlap,
+        )
+        if mode_match_csv_path is not None:
+            write_normal_mode_match_csv(mode_match_csv_path, result.matches)
+        return result.spectrum
+    return build_vibrational_spectrum_from_xyzin(
+        xyzin,
+        observable=observable,
+        source=source,
+        options=options,
+    )
+
+
 def _frequencies_for_source(section: VibrationalSection, source: str) -> tuple[float, ...]:
     if source == "anharmonic":
         return section.anharmonic_frequencies_cm1
@@ -574,9 +812,47 @@ def _normalize_observable(value: str) -> str:
 
 def _normalize_source(value: str) -> str:
     source = value.strip().lower()
-    if source not in {"harmonic", "anharmonic"}:
-        raise ValueError("source must be 'harmonic' or 'anharmonic'")
+    if source not in VIBRATIONAL_SOURCES:
+        raise ValueError("source must be 'harmonic', 'anharmonic' or 'hybrid'")
     return source
+
+
+def _normalized_mode_rows(modes: np.ndarray) -> np.ndarray:
+    matrix = np.asarray(modes, dtype=float)
+    if matrix.ndim != 2:
+        raise ValueError("normal-mode matrix must be two-dimensional")
+    norms = np.linalg.norm(matrix, axis=1)
+    if np.any(norms <= 0.0):
+        raise ValueError("normal-mode matrix contains zero-norm rows")
+    return matrix / norms[:, None]
+
+
+def _linear_sum_assignment(cost: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    try:
+        from scipy.optimize import linear_sum_assignment
+
+        rows, cols = linear_sum_assignment(cost)
+        return np.asarray(rows, dtype=int), np.asarray(cols, dtype=int)
+    except Exception:
+        return _linear_sum_assignment_greedy(cost)
+
+
+def _linear_sum_assignment_greedy(cost: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    if cost.shape[0] != cost.shape[1]:
+        raise ValueError("greedy normal-mode assignment fallback requires a square matrix")
+    remaining_rows = set(range(cost.shape[0]))
+    remaining_cols = set(range(cost.shape[1]))
+    pairs: list[tuple[int, int]] = []
+    while remaining_rows:
+        row, col = min(
+            ((row, col) for row in remaining_rows for col in remaining_cols),
+            key=lambda item: float(cost[item[0], item[1]]),
+        )
+        pairs.append((row, col))
+        remaining_rows.remove(row)
+        remaining_cols.remove(col)
+    rows, cols = zip(*pairs, strict=True)
+    return np.asarray(rows, dtype=int), np.asarray(cols, dtype=int)
 
 
 def _y_label(observable: str) -> str:

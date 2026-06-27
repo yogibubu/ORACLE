@@ -257,6 +257,7 @@ def test_vibrational_spectroscopy_window_declares_spectrum_and_nist_workflows():
 
 def test_vibrational_spectrum_and_nist_commands_build_cli_arguments(tmp_path):
     xyzin = tmp_path / "molecule.xyzin"
+    second_xyzin = tmp_path / "molecule_high_level.xyzin"
     spectrum = vibrational_spectrum_command(
         xyzin,
         csv_path=tmp_path / "ir.csv",
@@ -266,11 +267,20 @@ def test_vibrational_spectrum_and_nist_commands_build_cli_arguments(tmp_path):
     )
     comparison = vibrational_spectrum_comparison_command(
         xyzin,
+        second_xyzin,
         csv_path=tmp_path / "compare.csv",
         plot_path=tmp_path / "compare.svg",
         observable="IR",
     )
     nist = nist_ir_command("74-82-8", out=tmp_path / "nist.csv")
+    hybrid = vibrational_spectrum_command(
+        xyzin,
+        csv_path=tmp_path / "hybrid.csv",
+        level2_xyzin=second_xyzin,
+        mode_match_csv_path=tmp_path / "matches.csv",
+        observable="IR",
+        source="hybrid",
+    )
 
     assert "vib-spectrum" in spectrum.argv
     assert "--observable" in spectrum.argv
@@ -278,8 +288,13 @@ def test_vibrational_spectrum_and_nist_commands_build_cli_arguments(tmp_path):
     assert "anharmonic" in spectrum.argv
     assert spectrum.produced_sections == ("VIBRATIONAL_SPECTRUM",)
     assert "vib-compare" in comparison.argv
+    assert str(second_xyzin) in comparison.argv
+    assert comparison.argv.index(str(second_xyzin)) < comparison.argv.index("--observable")
     assert "--second-source" in comparison.argv
     assert "anharmonic" in comparison.argv
+    assert "--level2-xyzin" in hybrid.argv
+    assert "--mode-match-csv" in hybrid.argv
+    assert hybrid.required_sections == ("VIBRATIONAL", "NORMAL_MODES")
     assert nist.argv[-2:] == ("--index", "1")
     assert "nist-ir" in nist.argv
 

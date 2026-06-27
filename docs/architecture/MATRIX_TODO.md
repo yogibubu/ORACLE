@@ -1,5 +1,36 @@
 # MATRIX TODO
 
+## Current Release Completion
+
+- Finish user-facing manuals for the implemented tools before calling MATRIX
+  complete at this release level.
+- Keep the manuals focused on the tools that already have tested command-line
+  and GUI workflows: ORACLE-Babel/preprocessing, NEO/GICForge, GF/PED,
+  MORPHEUS/SEFit, rotational spectroscopy/WMS-Rot, vibrational spectroscopy,
+  thermo/kinetics tables, VPT2/VCI, DVR, QM adapters and the ORACLE GUI.
+- Each manual must document the shared xyzin sections consumed and produced by
+  the tool, standalone command usage, GUI workflow usage, publication exports,
+  required external programs and the regression fixtures that define expected
+  behavior.
+- Do not move parsing, topology, diagonalization or plotting logic into manual
+  examples. Examples must use the public MATRIX commands and shared libraries.
+
+## Next Release Scope
+
+- Fragment search, robust fragmentation/assembly and the nano-LEGO workflow are
+  next-release work. The current release keeps only the existing fragment
+  sections and fragment-aware consumers needed by implemented tools.
+- TRINITY external energy/gradient geometry optimization remains a next-release
+  production feature. The current release keeps its schema, command skeleton and
+  GUI entry point so workflows can be designed without blocking the implemented
+  spectroscopy/refinement tools.
+- LCB25-backed fragment libraries should stay in the next-release fragment
+  track, including one-time database caching, fragment indexing and assembly
+  heuristics.
+- Any next-release fragment/nano-LEGO/TRINITY implementation must consume the
+  existing topology, synthon, GIC and xyzin contracts instead of introducing
+  private parsers or molecular graph logic.
+
 ## WMS-Rot Homologation
 
 - Remove the hard `pandas` dependency from MATRIX-facing WMS-Rot services after

@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 from oracle_core import section_content
+from oracle_qm import normal_modes_section_from_arrays, write_normal_modes_section
 from oracle_rovib import (
     ORACLE_XYZ_ROTATIONAL_SCHEMA,
     ORACLE_XYZ_VIBRATIONAL_SCHEMA,
@@ -11,6 +12,7 @@ from oracle_rovib import (
     WMSRotSimulationOptions,
     VibrationalSection,
     VibrationalSpectrumOptions,
+    build_hybrid_vibrational_spectrum_from_xyzin,
     build_vibrational_spectrum,
     compare_vibrational_spectra,
     fetch_nist_ir_gas_phase_csv,
@@ -25,6 +27,7 @@ from oracle_rovib import (
     summarize_xyzin,
     wmsrot_input_text_from_xyzin,
     write_vibrational_spectrum_comparison_outputs,
+    write_normal_mode_match_csv,
     write_rotational_section,
     write_vibrational_spectrum_outputs,
     write_vibrational_section,
@@ -354,6 +357,97 @@ def test_vibrational_spectrum_comparison_mirrors_ir_but_not_vcd(tmp_path):
     assert written.mirror_second
     assert (tmp_path / "compare.csv").is_file()
     assert (tmp_path / "compare.svg").is_file()
+
+
+def test_vibrational_spectrum_comparison_accepts_two_xyzin_files(tmp_path):
+    first_section = VibrationalSection(
+        frequencies_cm1=(100.0, 200.0),
+        ir_intensities_km_mol=(1.0, 2.0),
+    )
+    second_section = VibrationalSection(
+        frequencies_cm1=(110.0, 210.0),
+        ir_intensities_km_mol=(0.8, 1.8),
+    )
+    first_xyzin = tmp_path / "b3lyp.xyzin"
+    second_xyzin = tmp_path / "ccsd_t.xyzin"
+    first_xyzin.write_text("1\nfirst\nH 0 0 0\n", encoding="utf-8")
+    second_xyzin.write_text("1\nsecond\nH 0 0 0\n", encoding="utf-8")
+    write_vibrational_section(first_xyzin, first_section)
+    write_vibrational_section(second_xyzin, second_section)
+
+    comparison = write_vibrational_spectrum_comparison_outputs(
+        first_xyzin,
+        second_xyzin=second_xyzin,
+        csv_path=tmp_path / "two_files.csv",
+        observable="IR",
+        first_source="harmonic",
+        second_source="harmonic",
+        options=VibrationalSpectrumOptions(fwhm_cm1=8.0, step_cm1=2.0),
+    )
+
+    assert comparison.mirror_second
+    assert comparison.first.peaks[0].frequency_cm1 == 100.0
+    assert comparison.second.peaks[0].frequency_cm1 == 110.0
+    assert (tmp_path / "two_files.csv").is_file()
+
+
+def test_hybrid_anharmonic_spectrum_matches_modes_before_applying_correction(tmp_path):
+    level1 = tmp_path / "level1.xyzin"
+    level2 = tmp_path / "level2.xyzin"
+    level1.write_text("1\nlevel1\nH 0 0 0\n", encoding="utf-8")
+    level2.write_text("1\nlevel2\nH 0 0 0\n", encoding="utf-8")
+    write_vibrational_section(
+        level1,
+        VibrationalSection(
+            frequencies_cm1=(100.0, 200.0, 300.0),
+            ir_intensities_km_mol=(1.0, 2.0, 3.0),
+        ),
+    )
+    write_vibrational_section(
+        level2,
+        VibrationalSection(
+            frequencies_cm1=(195.0, 305.0, 95.0),
+            anharmonic_frequencies_cm1=(190.0, 315.0, 93.0),
+            ir_intensities_km_mol=(9.0, 9.0, 9.0),
+        ),
+    )
+    write_normal_modes_section(
+        level1,
+        normal_modes_section_from_arrays(
+            (100.0, 200.0, 300.0),
+            np.eye(3),
+            coordinate_count=3,
+        ),
+    )
+    write_normal_modes_section(
+        level2,
+        normal_modes_section_from_arrays(
+            (195.0, 305.0, 95.0),
+            np.asarray(
+                [
+                    [0.0, 1.0, 0.0],
+                    [0.0, 0.0, -1.0],
+                    [-1.0, 0.0, 0.0],
+                ]
+            ),
+            coordinate_count=3,
+        ),
+    )
+
+    result = build_hybrid_vibrational_spectrum_from_xyzin(
+        level1,
+        level2,
+        observable="IR",
+        options=VibrationalSpectrumOptions(fwhm_cm1=8.0, step_cm1=2.0),
+        min_mode_overlap=0.95,
+    )
+    match_csv = write_normal_mode_match_csv(tmp_path / "matches.csv", result.matches)
+
+    assert [match.level2_mode for match in result.matches] == [3, 1, 2]
+    assert np.allclose([peak.frequency_cm1 for peak in result.spectrum.peaks], [98.0, 195.0, 310.0])
+    assert [peak.source for peak in result.spectrum.peaks] == ["hybrid", "hybrid", "hybrid"]
+    assert np.allclose([peak.intensity for peak in result.spectrum.peaks], [1.0, 2.0, 3.0])
+    assert match_csv.is_file()
 
 
 def test_nist_jcamp_parser_and_gas_phase_download_policy(tmp_path, monkeypatch):

@@ -49,7 +49,7 @@ or figures. They still use the same `xyzin` sections and service boundaries.
 | Workbench | Responsibility | Examples |
 | --- | --- | --- |
 | Rotational Spectroscopy | Collect rotational constants, corrections and assignments; draw rotational spectra. | local WMS-Rot Hamiltonian run, isotopologue comparison, SEFit residuals, WMS-Rot input export/reference launch, line-list/stick/envelope plots, publication CSV/SVG/PDF/LaTeX export |
-| Vibrational Spectroscopy | Collect harmonic, GF/PED, VPT2/VCI and DVR data; draw vibrational spectra. | IR/Raman/VCD/ROA spectra from harmonic or anharmonic data, mirrored IR/Raman comparisons, signed VCD/ROA comparisons, normal-mode overlap heat maps, force-constant scaling, NIST gas-phase IR comparison, publication CSV/SVG/PDF export |
+| Vibrational Spectroscopy | Collect harmonic, GF/PED, VPT2/VCI and DVR data; draw vibrational spectra. | IR/Raman/VCD/ROA spectra from harmonic, anharmonic or hybrid level1+level2 data, mirrored IR/Raman comparisons, signed VCD/ROA comparisons, comparisons between separate xyzin files/calculation levels, normal-mode overlap heat maps, GF/GIC force-constant scaling, NIST gas-phase IR comparison, publication CSV/SVG/PDF export |
 | Electronic Spectroscopy | Collect electronic-state and transition data; visualize orbitals/densities. | UV/visible stick/broadened spectra, orbital viewing through Avogadro/Avogadro2/Molden/MOrbVis, transition tables |
 | Molecular Structure / Synthons | Inspect and publish structure, topology, fragments and synthon classifications. | structure tables, synthon maps, fragment maps, Avogadro editing |
 | Thermochemistry / Kinetics | Collect thermochemical functions and kinetic-model outputs. | thermo tables, rovibrational DOS, kinetic comparisons, publication-ready plots/tables |
@@ -77,6 +77,12 @@ NIST WebBook JCAMP record declares a gas-phase state. Condensed-phase records,
 missing IR records or unparseable spectra are reported to the GUI as states
 requiring explicit user instructions; they are not silently overlaid with
 gas-phase theoretical spectra.
+
+Hybrid vibrational spectra use `harmonic(level1) + [anharmonic - harmonic](level2)`.
+Before applying that correction ORACLE compares `#NORMAL_MODES` from the two
+xyzin files and requires a sufficiently large absolute overlap for every mode.
+Frequency scaling is not part of this workflow; scaling of force constants
+belongs to the GF/GIC force-constant model.
 
 ## Implementation Boundary
 
