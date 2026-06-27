@@ -62,6 +62,63 @@ def molden_command(
     return external_viewer_command(target, executable=executable, label="Open in Molden")
 
 
+def gaussian_summary_command(log: Path | str) -> OracleGuiCommand:
+    return OracleGuiCommand(
+        "Summarize Gaussian log",
+        (*_oracle(), "gaussian", "summary", str(Path(log))),
+    )
+
+
+def gaussian_status_command(workdir: Path | str) -> OracleGuiCommand:
+    return OracleGuiCommand(
+        "Inspect Gaussian job",
+        (*_oracle(), "gaussian", "status", str(Path(workdir))),
+    )
+
+
+def gaussian_run_command(
+    workdir: Path | str,
+    *,
+    executable: str | None = None,
+    input_path: Path | str | None = None,
+    background: bool = False,
+    timeout: float | None = None,
+) -> OracleGuiCommand:
+    argv = [*_oracle(), "gaussian", "run", str(Path(workdir))]
+    if executable:
+        argv.extend(["--executable", executable])
+    if input_path is not None:
+        argv.extend(["--input", str(Path(input_path))])
+    _append_flag(argv, "--background", background)
+    if timeout is not None:
+        argv.extend(["--timeout", str(timeout)])
+    return OracleGuiCommand("Run Gaussian job", tuple(argv))
+
+
+def gaussian_formchk_command(
+    chk: Path | str,
+    fchk: Path | str | None = None,
+    *,
+    executable: str | None = None,
+    timeout: float | None = None,
+) -> OracleGuiCommand:
+    argv = [*_oracle(), "gaussian", "formchk", str(Path(chk))]
+    if fchk is not None:
+        argv.append(str(Path(fchk)))
+    if executable:
+        argv.extend(["--executable", executable])
+    if timeout is not None:
+        argv.extend(["--timeout", str(timeout)])
+    return OracleGuiCommand("Run formchk", tuple(argv), produced_sections=("FCHK",))
+
+
+def gaussian_fchk_summary_command(fchk: Path | str) -> OracleGuiCommand:
+    return OracleGuiCommand(
+        "Summarize Gaussian FCHK",
+        (*_oracle(), "gaussian", "fchk-summary", str(Path(fchk))),
+    )
+
+
 def preprocess_command(
     source: Path | str,
     output: Path | str,
@@ -137,6 +194,76 @@ def gaussian_promote_rovib_command(
         "Promote Gaussian rovibrational data",
         tuple(argv),
         produced_sections=tuple(produced),
+    )
+
+
+def molpro_summary_command(output: Path | str) -> OracleGuiCommand:
+    return OracleGuiCommand(
+        "Summarize Molpro output",
+        (*_oracle(), "molpro", "summary", str(Path(output))),
+    )
+
+
+def molpro_promote_command(
+    output: Path | str,
+    xyzin: Path | str,
+    *,
+    symmetry_distance: float = 1.0e-3,
+    symmetry_inertia: float = 1.0e-3,
+    max_rotation_order: int = 6,
+) -> OracleGuiCommand:
+    argv = [
+        *_oracle(),
+        "molpro",
+        "promote",
+        str(Path(output)),
+        str(Path(xyzin)),
+        "--symmetry-distance",
+        str(symmetry_distance),
+        "--symmetry-inertia",
+        str(symmetry_inertia),
+        "--max-rotation-order",
+        str(max_rotation_order),
+    ]
+    return OracleGuiCommand(
+        "Promote Molpro output",
+        tuple(argv),
+        produced_sections=("SOURCE", "BASIC", "SYMMETRY", "TOPOLOGY", "SYNTHONS"),
+    )
+
+
+def mrcc_summary_command(output: Path | str) -> OracleGuiCommand:
+    return OracleGuiCommand(
+        "Summarize MRCC output",
+        (*_oracle(), "mrcc", "summary", str(Path(output))),
+    )
+
+
+def mrcc_promote_command(
+    output: Path | str,
+    xyzin: Path | str,
+    *,
+    symmetry_distance: float = 1.0e-3,
+    symmetry_inertia: float = 1.0e-3,
+    max_rotation_order: int = 6,
+) -> OracleGuiCommand:
+    argv = [
+        *_oracle(),
+        "mrcc",
+        "promote",
+        str(Path(output)),
+        str(Path(xyzin)),
+        "--symmetry-distance",
+        str(symmetry_distance),
+        "--symmetry-inertia",
+        str(symmetry_inertia),
+        "--max-rotation-order",
+        str(max_rotation_order),
+    ]
+    return OracleGuiCommand(
+        "Promote MRCC output",
+        tuple(argv),
+        produced_sections=("SOURCE", "BASIC", "SYMMETRY", "TOPOLOGY", "SYNTHONS"),
     )
 
 

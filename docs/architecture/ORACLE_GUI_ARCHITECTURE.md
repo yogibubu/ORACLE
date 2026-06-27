@@ -115,10 +115,9 @@ The dashboard runtime is split in two layers:
 
 The first operational dashboard actions are intentionally conservative:
 validation, Avogadro launch, fragment build, GICForge build/report/B-matrix,
-rovibrational summary, Thermo, VPT2/VCI collection and DVR collection. Actions
-that need additional file choices, such as ORACLE-Babel import or FCHK
-promotion, remain command specifications until their dedicated windows provide
-the required file selectors.
+rovibrational summary, Thermo, VPT2/VCI collection and DVR collection.
+Dedicated workflow tabs own commands that need additional file choices, such
+as ORACLE-Babel import, Gaussian job control or FCHK promotion.
 
 ## Tool Contracts Tab
 
@@ -183,6 +182,29 @@ The tab must not parse Gaussian/FCHK data, reconstruct Hessians or solve GF
 itself. It launches `oracle gf`, then reloads `#GF_PED` through
 `oracle_gf.read_gf_ped_section`.
 
+## QM Jobs Tab
+
+The QM Jobs tab uses `oracle_gui.qm_jobs` and exposes the QM-adapter layer
+without embedding parser logic in Qt:
+
+- write Gaussian inputs from the frozen `#GIC` section through
+  `oracle gicforge gaussian-input`;
+- inspect and launch Gaussian work directories through
+  `oracle gaussian status` and `oracle gaussian run`;
+- run `formchk` through `oracle gaussian formchk`;
+- summarize and promote Gaussian FCHK data into `#CARTESIAN_HESSIAN`,
+  `#NORMAL_MODES` and `#QFF`;
+- summarize and promote Gaussian rovibrational logs into `#VIBRATIONAL`,
+  `#ROTATIONAL` and `#DELTABVIB`;
+- summarize and promote Molpro/MRCC outputs through their single shared
+  adapters.
+
+The tab is allowed to collect file paths, executable names and switches. It
+must not parse Gaussian, FCHK, Molpro or MRCC files directly. Normalization
+remains owned by `oracle-gaussian`, `oracle-molpro`, `oracle-mrcc`,
+`oracle-gicforge` and `oracle-chem`, and all promoted data must land in shared
+`xyzin` sections.
+
 ## SEFit / MORPHEUS Tab
 
 The SEFit tab uses `oracle_gui.sefit` and the `#MORPHEUS` section written by
@@ -217,7 +239,7 @@ only prepares the autonomous `#TRINITY` request and then reloads it through
 
 ## Generic Workbench Tabs
 
-The Anharmonic, QM Jobs, Diagnostics, Rotational, Vibrational, Electronic and
+The Anharmonic, Diagnostics, Rotational, Vibrational, Electronic and
 Thermo/Kinetics tabs use `oracle_gui.workbench`. They expose the central
 `oracle_gui.workflows.WindowSpec` contract as four read-only tables:
 required/produced sections, available actions, capabilities and publication or

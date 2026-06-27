@@ -29,6 +29,12 @@ from .gf import (
 )
 from .guidance import missing_sections_message
 from .project import load_oracle_project_state
+from .qm_jobs import (
+    OracleQMJobsController,
+    default_qm_formchk_output,
+    default_qm_gaussian_input_output,
+    default_qm_gaussian_workdir,
+)
 from .sefit import (
     OracleSEFitController,
     SEFitTable,
@@ -106,6 +112,7 @@ def _run_qt(initial_xyzin: Path | None) -> int:
             self.structure_controller = OracleStructureController(xyzin)
             self.gicforge_controller = OracleGICForgeController(xyzin)
             self.gf_controller = OracleGFController(xyzin)
+            self.qm_jobs_controller = OracleQMJobsController(xyzin)
             self.sefit_controller = OracleSEFitController(xyzin)
             self.trinity_controller = OracleTrinityController(xyzin)
             self.process: QProcess | None = None
@@ -113,7 +120,6 @@ def _run_qt(initial_xyzin: Path | None) -> int:
             self.pending_xyzin_after_run: Path | None = None
             self.workbench_tabs = (
                 ("anharmonic", "Anharmonic"),
-                ("qm_jobs", "QM Jobs"),
                 ("diagnostics", "Diagnostics"),
                 ("rotational_spectroscopy", "Rotational"),
                 ("vibrational_spectroscopy", "Vibrational"),
@@ -173,6 +179,8 @@ def _run_qt(initial_xyzin: Path | None) -> int:
             tabs.addTab(gicforge_tab, "GICForge")
             gf_tab = self._build_gf_tab()
             tabs.addTab(gf_tab, "GF/PED")
+            qm_jobs_tab = self._build_qm_jobs_tab()
+            tabs.addTab(qm_jobs_tab, "QM Jobs")
             sefit_tab = self._build_sefit_tab()
             tabs.addTab(sefit_tab, "SEFit")
             trinity_tab = self._build_trinity_tab()
@@ -205,6 +213,7 @@ def _run_qt(initial_xyzin: Path | None) -> int:
                 self.structure_controller.set_xyzin(Path(path))
                 self.gicforge_controller.set_xyzin(Path(path))
                 self.gf_controller.set_xyzin(Path(path))
+                self.qm_jobs_controller.set_xyzin(Path(path))
                 self.sefit_controller.set_xyzin(Path(path))
                 self.trinity_controller.set_xyzin(Path(path))
                 self.refresh()
@@ -217,6 +226,7 @@ def _run_qt(initial_xyzin: Path | None) -> int:
             self._clear_structure_tables()
             self._clear_gicforge_tables()
             self._clear_gf_tables()
+            self._clear_qm_jobs_tables()
             self._clear_sefit_tables()
             self._clear_trinity_tables()
             self._clear_workbench_tables()
@@ -224,6 +234,7 @@ def _run_qt(initial_xyzin: Path | None) -> int:
                 self.path_label.setText("No ORACLE project loaded")
                 self.gicforge_summary.setPlainText("No ORACLE project loaded")
                 self.gf_summary.setPlainText("No ORACLE project loaded")
+                self.qm_jobs_summary.setPlainText("No ORACLE project loaded")
                 self.sefit_summary.setPlainText("No ORACLE project loaded")
                 self.trinity_summary.setPlainText("No ORACLE project loaded")
                 self.contracts_summary.setPlainText("No ORACLE project loaded")
@@ -242,11 +253,13 @@ def _run_qt(initial_xyzin: Path | None) -> int:
             self.structure_controller.set_xyzin(state.xyzin)
             self.gicforge_controller.set_xyzin(state.xyzin)
             self.gf_controller.set_xyzin(state.xyzin)
+            self.qm_jobs_controller.set_xyzin(state.xyzin)
             self.sefit_controller.set_xyzin(state.xyzin)
             self.trinity_controller.set_xyzin(state.xyzin)
             self.structure_output_path.setText(str(state.xyzin))
             self._set_default_gicforge_outputs(state.xyzin)
             self._set_default_gf_outputs(state.xyzin)
+            self._set_default_qm_jobs_outputs(state.xyzin)
             self._set_default_sefit_outputs(state.xyzin)
             self._set_default_trinity_outputs(state.xyzin)
             self.path_label.setText(str(state.xyzin))
@@ -282,6 +295,7 @@ def _run_qt(initial_xyzin: Path | None) -> int:
             self._populate_structure_tables(state.xyzin)
             self._populate_gicforge_tables(state.xyzin)
             self._populate_gf_tables(state.xyzin)
+            self._populate_qm_jobs_tables(state.xyzin)
             self._populate_sefit_tables(state.xyzin)
             self._populate_trinity_tables(state.xyzin)
             self._populate_workbench_tables(state.xyzin)
@@ -490,6 +504,7 @@ def _run_qt(initial_xyzin: Path | None) -> int:
                 self.structure_controller.set_xyzin(self.pending_xyzin_after_run)
                 self.gicforge_controller.set_xyzin(self.pending_xyzin_after_run)
                 self.gf_controller.set_xyzin(self.pending_xyzin_after_run)
+                self.qm_jobs_controller.set_xyzin(self.pending_xyzin_after_run)
                 self.sefit_controller.set_xyzin(self.pending_xyzin_after_run)
                 self.trinity_controller.set_xyzin(self.pending_xyzin_after_run)
             self.pending_xyzin_after_run = None
@@ -1089,6 +1104,516 @@ def _run_qt(initial_xyzin: Path | None) -> int:
                 getattr(self, "gf_gic_table", None),
                 getattr(self, "gf_ped_table", None),
                 getattr(self, "gf_diagnostics_table", None),
+            ):
+                if table is not None:
+                    table.setRowCount(0)
+
+        def _build_qm_jobs_tab(self) -> QWidget:
+            tab = QWidget()
+            layout = QVBoxLayout(tab)
+
+            gaussian_input_row = QHBoxLayout()
+            gaussian_input_row.addWidget(QLabel("Gaussian input"))
+            self.qm_gaussian_input_output = QLineEdit()
+            gaussian_input_browse = QPushButton("Save As")
+            gaussian_input_browse.clicked.connect(self.browse_qm_gaussian_input_output)
+            self.qm_gaussian_route = QLineEdit("#p hf/sto-3g opt=GIC")
+            gaussian_input_button = QPushButton("Write Input")
+            gaussian_input_button.clicked.connect(self.run_qm_gaussian_input)
+            gaussian_input_row.addWidget(self.qm_gaussian_input_output, stretch=1)
+            gaussian_input_row.addWidget(gaussian_input_browse)
+            gaussian_input_row.addWidget(QLabel("Route"))
+            gaussian_input_row.addWidget(self.qm_gaussian_route, stretch=1)
+            gaussian_input_row.addWidget(gaussian_input_button)
+            layout.addLayout(gaussian_input_row)
+
+            job_row = QHBoxLayout()
+            job_row.addWidget(QLabel("Job dir"))
+            self.qm_gaussian_workdir = QLineEdit()
+            workdir_browse = QPushButton("Browse")
+            workdir_browse.clicked.connect(self.browse_qm_gaussian_workdir)
+            self.qm_gaussian_job_input = QLineEdit()
+            job_input_browse = QPushButton("Input")
+            job_input_browse.clicked.connect(self.browse_qm_gaussian_job_input)
+            self.qm_gaussian_executable = QLineEdit()
+            self.qm_gaussian_executable.setPlaceholderText("g16")
+            self.qm_gaussian_background = QCheckBox("Background")
+            self.qm_gaussian_timeout = QLineEdit()
+            self.qm_gaussian_timeout.setPlaceholderText("timeout")
+            status_button = QPushButton("Status")
+            status_button.clicked.connect(self.run_qm_gaussian_status)
+            run_button = QPushButton("Run")
+            run_button.clicked.connect(self.run_qm_gaussian_run)
+            job_row.addWidget(self.qm_gaussian_workdir, stretch=1)
+            job_row.addWidget(workdir_browse)
+            job_row.addWidget(QLabel("Input"))
+            job_row.addWidget(self.qm_gaussian_job_input, stretch=1)
+            job_row.addWidget(job_input_browse)
+            job_row.addWidget(QLabel("Exe"))
+            job_row.addWidget(self.qm_gaussian_executable)
+            job_row.addWidget(self.qm_gaussian_background)
+            job_row.addWidget(QLabel("Timeout"))
+            job_row.addWidget(self.qm_gaussian_timeout)
+            job_row.addWidget(status_button)
+            job_row.addWidget(run_button)
+            layout.addLayout(job_row)
+
+            formchk_row = QHBoxLayout()
+            formchk_row.addWidget(QLabel("CHK"))
+            self.qm_chk_path = QLineEdit()
+            chk_browse = QPushButton("Browse")
+            chk_browse.clicked.connect(self.browse_qm_chk_path)
+            self.qm_fchk_output = QLineEdit()
+            fchk_output_browse = QPushButton("Save As")
+            fchk_output_browse.clicked.connect(self.browse_qm_fchk_output)
+            self.qm_formchk_executable = QLineEdit()
+            self.qm_formchk_executable.setPlaceholderText("formchk")
+            self.qm_formchk_timeout = QLineEdit()
+            self.qm_formchk_timeout.setPlaceholderText("timeout")
+            formchk_button = QPushButton("Formchk")
+            formchk_button.clicked.connect(self.run_qm_gaussian_formchk)
+            formchk_row.addWidget(self.qm_chk_path, stretch=1)
+            formchk_row.addWidget(chk_browse)
+            formchk_row.addWidget(QLabel("FCHK out"))
+            formchk_row.addWidget(self.qm_fchk_output, stretch=1)
+            formchk_row.addWidget(fchk_output_browse)
+            formchk_row.addWidget(QLabel("Exe"))
+            formchk_row.addWidget(self.qm_formchk_executable)
+            formchk_row.addWidget(QLabel("Timeout"))
+            formchk_row.addWidget(self.qm_formchk_timeout)
+            formchk_row.addWidget(formchk_button)
+            layout.addLayout(formchk_row)
+
+            fchk_row = QHBoxLayout()
+            fchk_row.addWidget(QLabel("FCHK"))
+            self.qm_fchk_path = QLineEdit()
+            fchk_browse = QPushButton("Browse")
+            fchk_browse.clicked.connect(self.browse_qm_fchk_path)
+            self.qm_write_cartesian_hessian = QCheckBox("#CARTESIAN_HESSIAN")
+            self.qm_write_cartesian_hessian.setChecked(True)
+            self.qm_write_normal_modes = QCheckBox("#NORMAL_MODES")
+            self.qm_write_normal_modes.setChecked(True)
+            self.qm_write_qff = QCheckBox("#QFF")
+            self.qm_write_qff.setChecked(True)
+            fchk_summary_button = QPushButton("Summary")
+            fchk_summary_button.clicked.connect(self.run_qm_fchk_summary)
+            promote_fchk_button = QPushButton("Promote FCHK")
+            promote_fchk_button.clicked.connect(self.run_qm_promote_fchk)
+            fchk_row.addWidget(self.qm_fchk_path, stretch=1)
+            fchk_row.addWidget(fchk_browse)
+            fchk_row.addWidget(self.qm_write_cartesian_hessian)
+            fchk_row.addWidget(self.qm_write_normal_modes)
+            fchk_row.addWidget(self.qm_write_qff)
+            fchk_row.addWidget(fchk_summary_button)
+            fchk_row.addWidget(promote_fchk_button)
+            layout.addLayout(fchk_row)
+
+            rovib_row = QHBoxLayout()
+            rovib_row.addWidget(QLabel("Gaussian log"))
+            self.qm_log_path = QLineEdit()
+            log_browse = QPushButton("Browse")
+            log_browse.clicked.connect(self.browse_qm_log_path)
+            self.qm_write_vibrational = QCheckBox("#VIBRATIONAL")
+            self.qm_write_vibrational.setChecked(True)
+            self.qm_write_rotational = QCheckBox("#ROTATIONAL")
+            self.qm_write_rotational.setChecked(True)
+            self.qm_write_deltabvib = QCheckBox("#DELTABVIB")
+            self.qm_write_deltabvib.setChecked(True)
+            self.qm_invert_imaginary = QCheckBox("Invert imaginary")
+            self.qm_invert_imaginary.setChecked(True)
+            self.qm_exclude_modes = QLineEdit()
+            self.qm_exclude_modes.setPlaceholderText("exclude modes")
+            log_summary_button = QPushButton("Summary")
+            log_summary_button.clicked.connect(self.run_qm_log_summary)
+            promote_rovib_button = QPushButton("Promote Rovib")
+            promote_rovib_button.clicked.connect(self.run_qm_promote_rovib)
+            rovib_row.addWidget(self.qm_log_path, stretch=1)
+            rovib_row.addWidget(log_browse)
+            rovib_row.addWidget(self.qm_write_vibrational)
+            rovib_row.addWidget(self.qm_write_rotational)
+            rovib_row.addWidget(self.qm_write_deltabvib)
+            rovib_row.addWidget(self.qm_invert_imaginary)
+            rovib_row.addWidget(self.qm_exclude_modes)
+            rovib_row.addWidget(log_summary_button)
+            rovib_row.addWidget(promote_rovib_button)
+            layout.addLayout(rovib_row)
+
+            external_row = QHBoxLayout()
+            external_row.addWidget(QLabel("QM output"))
+            self.qm_external_kind = QComboBox()
+            self.qm_external_kind.addItems(("molpro", "mrcc"))
+            self.qm_external_output = QLineEdit()
+            external_browse = QPushButton("Browse")
+            external_browse.clicked.connect(self.browse_qm_external_output)
+            external_summary_button = QPushButton("Summary")
+            external_summary_button.clicked.connect(self.run_qm_external_summary)
+            external_promote_button = QPushButton("Promote")
+            external_promote_button.clicked.connect(self.run_qm_external_promote)
+            external_row.addWidget(self.qm_external_kind)
+            external_row.addWidget(self.qm_external_output, stretch=1)
+            external_row.addWidget(external_browse)
+            external_row.addWidget(external_summary_button)
+            external_row.addWidget(external_promote_button)
+            layout.addLayout(external_row)
+
+            self.qm_jobs_summary = QTextEdit()
+            self.qm_jobs_summary.setReadOnly(True)
+            self.qm_jobs_summary.setMaximumHeight(120)
+            layout.addWidget(self.qm_jobs_summary)
+
+            self.qm_jobs_table_tabs = QTabWidget()
+            self.qm_jobs_section_table = QTableWidget(0, 3)
+            self.qm_jobs_action_table = QTableWidget(0, 6)
+            self.qm_jobs_capability_table = QTableWidget(0, 1)
+            self.qm_jobs_export_table = QTableWidget(0, 2)
+            self.qm_jobs_table_tabs.addTab(self.qm_jobs_section_table, "Sections")
+            self.qm_jobs_table_tabs.addTab(self.qm_jobs_action_table, "Actions")
+            self.qm_jobs_table_tabs.addTab(self.qm_jobs_capability_table, "Capabilities")
+            self.qm_jobs_table_tabs.addTab(self.qm_jobs_export_table, "Viewers")
+            layout.addWidget(self.qm_jobs_table_tabs, stretch=1)
+            return tab
+
+        def browse_qm_gaussian_input_output(self) -> None:
+            path, _selected = QFileDialog.getSaveFileName(
+                self,
+                "Write Gaussian GIC input",
+                self.qm_gaussian_input_output.text().strip() or str(Path.cwd() / "oracle.gjf"),
+                "Gaussian input (*.gjf *.com);;All files (*)",
+            )
+            if path:
+                self.qm_gaussian_input_output.setText(path)
+
+        def browse_qm_gaussian_workdir(self) -> None:
+            path = QFileDialog.getExistingDirectory(
+                self,
+                "Select Gaussian job directory",
+                self.qm_gaussian_workdir.text().strip() or str(Path.cwd()),
+            )
+            if path:
+                self.qm_gaussian_workdir.setText(path)
+
+        def browse_qm_gaussian_job_input(self) -> None:
+            path, _selected = QFileDialog.getOpenFileName(
+                self,
+                "Select Gaussian input",
+                self.qm_gaussian_job_input.text().strip() or str(Path.cwd()),
+                "Gaussian input (*.gjf *.com *.inp);;All files (*)",
+            )
+            if path:
+                self.qm_gaussian_job_input.setText(path)
+
+        def browse_qm_chk_path(self) -> None:
+            path, _selected = QFileDialog.getOpenFileName(
+                self,
+                "Select Gaussian checkpoint",
+                self.qm_chk_path.text().strip() or str(Path.cwd()),
+                "Gaussian checkpoint (*.chk);;All files (*)",
+            )
+            if not path:
+                return
+            chk = Path(path)
+            self.qm_chk_path.setText(str(chk))
+            if not self.qm_fchk_output.text().strip():
+                self.qm_fchk_output.setText(str(default_qm_formchk_output(chk)))
+
+        def browse_qm_fchk_output(self) -> None:
+            path, _selected = QFileDialog.getSaveFileName(
+                self,
+                "Write Gaussian FCHK",
+                self.qm_fchk_output.text().strip() or str(Path.cwd() / "job.fchk"),
+                "Gaussian FCHK (*.fchk *.fch);;All files (*)",
+            )
+            if path:
+                self.qm_fchk_output.setText(path)
+                if not self.qm_fchk_path.text().strip():
+                    self.qm_fchk_path.setText(path)
+
+        def browse_qm_fchk_path(self) -> None:
+            path, _selected = QFileDialog.getOpenFileName(
+                self,
+                "Select Gaussian FCHK",
+                self.qm_fchk_path.text().strip() or str(Path.cwd()),
+                "Gaussian FCHK (*.fchk *.fch);;All files (*)",
+            )
+            if path:
+                self.qm_fchk_path.setText(path)
+
+        def browse_qm_log_path(self) -> None:
+            path, _selected = QFileDialog.getOpenFileName(
+                self,
+                "Select Gaussian log/output",
+                self.qm_log_path.text().strip() or str(Path.cwd()),
+                "Gaussian log (*.log *.out);;All files (*)",
+            )
+            if path:
+                self.qm_log_path.setText(path)
+
+        def browse_qm_external_output(self) -> None:
+            path, _selected = QFileDialog.getOpenFileName(
+                self,
+                "Select QM output",
+                self.qm_external_output.text().strip() or str(Path.cwd()),
+                "QM output (*.out *.log);;All files (*)",
+            )
+            if path:
+                self.qm_external_output.setText(path)
+
+        def run_qm_gaussian_input(self) -> None:
+            if not self._ensure_qm_project("Gaussian input"):
+                return
+            output = self._qm_required_path(
+                self.qm_gaussian_input_output,
+                "Gaussian input",
+                "Gaussian input output",
+            )
+            if output is None:
+                return
+            route = self.qm_gaussian_route.text().strip() or "#p hf/sto-3g opt=GIC"
+            command = self.qm_jobs_controller.gaussian_input_command(output, route=route)
+            self._start_command(command, command.label)
+
+        def run_qm_gaussian_status(self) -> None:
+            if not self._ensure_qm_idle("Gaussian status"):
+                return
+            workdir = self._qm_required_path(
+                self.qm_gaussian_workdir,
+                "Gaussian status",
+                "Gaussian job directory",
+            )
+            if workdir is None:
+                return
+            command = self.qm_jobs_controller.gaussian_status_command(workdir)
+            self._start_command(command, command.label)
+
+        def run_qm_gaussian_run(self) -> None:
+            if not self._ensure_qm_idle("Gaussian run"):
+                return
+            workdir = self._qm_required_path(
+                self.qm_gaussian_workdir,
+                "Gaussian run",
+                "Gaussian job directory",
+            )
+            if workdir is None:
+                return
+            timeout = self._optional_float_field(
+                self.qm_gaussian_timeout,
+                "Gaussian run",
+                "timeout",
+            )
+            if timeout is False:
+                return
+            command = self.qm_jobs_controller.gaussian_run_command(
+                workdir,
+                executable=self._qm_optional_text(self.qm_gaussian_executable),
+                input_path=self._qm_optional_path(self.qm_gaussian_job_input),
+                background=self.qm_gaussian_background.isChecked(),
+                timeout=timeout,
+            )
+            self._start_command(command, command.label)
+
+        def run_qm_gaussian_formchk(self) -> None:
+            if not self._ensure_qm_idle("Gaussian formchk"):
+                return
+            chk = self._qm_required_path(self.qm_chk_path, "Gaussian formchk", "CHK file")
+            if chk is None:
+                return
+            fchk = self._qm_optional_path(self.qm_fchk_output)
+            if fchk is None:
+                fchk = default_qm_formchk_output(chk)
+                self.qm_fchk_output.setText(str(fchk))
+            timeout = self._optional_float_field(
+                self.qm_formchk_timeout,
+                "Gaussian formchk",
+                "timeout",
+            )
+            if timeout is False:
+                return
+            self.qm_fchk_path.setText(str(fchk))
+            command = self.qm_jobs_controller.gaussian_formchk_command(
+                chk,
+                fchk,
+                executable=self._qm_optional_text(self.qm_formchk_executable),
+                timeout=timeout,
+            )
+            self._start_command(command, command.label)
+
+        def run_qm_fchk_summary(self) -> None:
+            if not self._ensure_qm_idle("Gaussian FCHK summary"):
+                return
+            fchk = self._qm_required_path(
+                self.qm_fchk_path,
+                "Gaussian FCHK summary",
+                "FCHK file",
+            )
+            if fchk is None:
+                return
+            command = self.qm_jobs_controller.gaussian_fchk_summary_command(fchk)
+            self._start_command(command, command.label)
+
+        def run_qm_promote_fchk(self) -> None:
+            if not self._ensure_qm_project("Promote Gaussian FCHK"):
+                return
+            fchk = self._qm_required_path(
+                self.qm_fchk_path,
+                "Promote Gaussian FCHK",
+                "FCHK file",
+            )
+            if fchk is None:
+                return
+            command = self.qm_jobs_controller.gaussian_promote_fchk_command(
+                fchk,
+                cartesian_hessian=self.qm_write_cartesian_hessian.isChecked(),
+                normal_modes=self.qm_write_normal_modes.isChecked(),
+                qff=self.qm_write_qff.isChecked(),
+            )
+            self.pending_xyzin_after_run = self.controller.xyzin
+            self._start_command(command, command.label)
+
+        def run_qm_log_summary(self) -> None:
+            if not self._ensure_qm_idle("Gaussian log summary"):
+                return
+            log = self._qm_required_path(self.qm_log_path, "Gaussian log summary", "Gaussian log")
+            if log is None:
+                return
+            command = self.qm_jobs_controller.gaussian_log_summary_command(log)
+            self._start_command(command, command.label)
+
+        def run_qm_promote_rovib(self) -> None:
+            if not self._ensure_qm_project("Promote Gaussian rovib"):
+                return
+            log = self._qm_required_path(self.qm_log_path, "Promote Gaussian rovib", "Gaussian log")
+            if log is None:
+                return
+            exclude_modes = self._qm_exclude_modes()
+            if exclude_modes is None:
+                return
+            command = self.qm_jobs_controller.gaussian_promote_rovib_command(
+                log,
+                vibrational=self.qm_write_vibrational.isChecked(),
+                rotational=self.qm_write_rotational.isChecked(),
+                deltabvib=self.qm_write_deltabvib.isChecked(),
+                invert_imaginary=self.qm_invert_imaginary.isChecked(),
+                exclude_modes=exclude_modes,
+            )
+            self.pending_xyzin_after_run = self.controller.xyzin
+            self._start_command(command, command.label)
+
+        def run_qm_external_summary(self) -> None:
+            if not self._ensure_qm_idle("QM output summary"):
+                return
+            output = self._qm_required_path(
+                self.qm_external_output,
+                "QM output summary",
+                "QM output file",
+            )
+            if output is None:
+                return
+            if self.qm_external_kind.currentText() == "molpro":
+                command = self.qm_jobs_controller.molpro_summary_command(output)
+            else:
+                command = self.qm_jobs_controller.mrcc_summary_command(output)
+            self._start_command(command, command.label)
+
+        def run_qm_external_promote(self) -> None:
+            if not self._ensure_qm_project("Promote QM output"):
+                return
+            output = self._qm_required_path(
+                self.qm_external_output,
+                "Promote QM output",
+                "QM output file",
+            )
+            if output is None:
+                return
+            if self.qm_external_kind.currentText() == "molpro":
+                command = self.qm_jobs_controller.molpro_promote_command(output)
+            else:
+                command = self.qm_jobs_controller.mrcc_promote_command(output)
+            self.pending_xyzin_after_run = self.controller.xyzin
+            self._start_command(command, command.label)
+
+        def _ensure_qm_project(self, title: str) -> bool:
+            if self.controller.xyzin is None:
+                QMessageBox.warning(self, title, "Open or preprocess an ORACLE xyzin first.")
+                return False
+            if not self._ensure_qm_idle(title):
+                return False
+            self.qm_jobs_controller.set_xyzin(self.controller.xyzin)
+            return True
+
+        def _ensure_qm_idle(self, title: str) -> bool:
+            if self.process is not None:
+                QMessageBox.information(self, "ORACLE", "A command is already running.")
+                return False
+            return True
+
+        def _qm_required_path(
+            self,
+            field: QLineEdit,
+            title: str,
+            label: str,
+        ) -> Path | None:
+            text = field.text().strip()
+            if not text:
+                QMessageBox.warning(self, title, f"Select {label} first.")
+                return None
+            return Path(text)
+
+        def _qm_optional_path(self, field: QLineEdit) -> Path | None:
+            text = field.text().strip()
+            return Path(text) if text else None
+
+        def _qm_optional_text(self, field: QLineEdit) -> str | None:
+            text = field.text().strip()
+            return text or None
+
+        def _qm_exclude_modes(self) -> tuple[int, ...] | None:
+            text = self.qm_exclude_modes.text().strip()
+            if not text:
+                return ()
+            modes: list[int] = []
+            for token in text.replace(",", " ").replace(";", " ").split():
+                try:
+                    value = int(token)
+                except ValueError:
+                    QMessageBox.warning(
+                        self,
+                        "Promote Gaussian rovib",
+                        f"Invalid excluded mode index: {token}",
+                    )
+                    return None
+                if value <= 0:
+                    QMessageBox.warning(
+                        self,
+                        "Promote Gaussian rovib",
+                        "Excluded mode indices must be positive.",
+                    )
+                    return None
+                modes.append(value)
+            return tuple(modes)
+
+        def _set_default_qm_jobs_outputs(self, xyzin: Path) -> None:
+            self.qm_gaussian_input_output.setText(str(default_qm_gaussian_input_output(xyzin)))
+            self.qm_gaussian_workdir.setText(str(default_qm_gaussian_workdir(xyzin)))
+            if not self.qm_gaussian_job_input.text().strip():
+                self.qm_gaussian_job_input.setText(str(default_qm_gaussian_input_output(xyzin)))
+
+        def _populate_qm_jobs_tables(self, xyzin: Path) -> None:
+            state = load_workbench_gui_state(xyzin, "qm_jobs")
+            self.qm_jobs_summary.setPlainText("\n".join(workbench_gui_state_lines(state)))
+            self._fill_table(self.qm_jobs_section_table, state.sections)
+            self._fill_table(self.qm_jobs_action_table, state.actions)
+            self._fill_table(self.qm_jobs_capability_table, state.capabilities)
+            self._fill_table(self.qm_jobs_export_table, state.exports)
+
+        def _clear_qm_jobs_tables(self) -> None:
+            summary = getattr(self, "qm_jobs_summary", None)
+            if summary is not None:
+                summary.clear()
+            for table in (
+                getattr(self, "qm_jobs_section_table", None),
+                getattr(self, "qm_jobs_action_table", None),
+                getattr(self, "qm_jobs_capability_table", None),
+                getattr(self, "qm_jobs_export_table", None),
             ):
                 if table is not None:
                     table.setRowCount(0)

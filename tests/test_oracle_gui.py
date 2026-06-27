@@ -19,6 +19,7 @@ from oracle_gui import (
     OracleGICForgeController,
     OracleGFController,
     OracleGuiCommand,
+    OracleQMJobsController,
     OracleSEFitController,
     OracleStructureController,
     OracleTrinityController,
@@ -30,11 +31,19 @@ from oracle_gui import (
     default_gicforge_bmatrix_output,
     default_gicforge_gaussian_output,
     default_gicforge_report_output,
+    default_qm_formchk_output,
+    default_qm_gaussian_input_output,
+    default_qm_gaussian_workdir,
     dvr_gui_state_lines,
     default_sefit_outdir,
     default_trinity_run_dir,
     gaussian_promote_fchk_command,
     gaussian_promote_rovib_command,
+    gaussian_fchk_summary_command,
+    gaussian_formchk_command,
+    gaussian_run_command,
+    gaussian_status_command,
+    gaussian_summary_command,
     gf_command,
     gf_gui_state_lines,
     gicforge_gui_state_lines,
@@ -49,6 +58,10 @@ from oracle_gui import (
     load_workbench_gui_state,
     missing_sections_message,
     molden_command,
+    molpro_promote_command,
+    molpro_summary_command,
+    mrcc_promote_command,
+    mrcc_summary_command,
     preprocess_command,
     project_state_lines,
     rovib_density_command,
@@ -608,6 +621,67 @@ def test_gf_controller_builds_run_command_with_options(tmp_path):
     assert "--subtract-uff-vdw" in command.argv
     assert command.argv[command.argv.index("--nonbonded-14-scale") + 1] == "0.25"
     assert "--no-write-section" in command.argv
+
+
+def test_qm_jobs_controller_builds_adapter_commands(tmp_path):
+    xyzin = tmp_path / "molecule.xyzin"
+    controller = OracleQMJobsController(xyzin)
+    gaussian_input_path = default_qm_gaussian_input_output(xyzin)
+    workdir = default_qm_gaussian_workdir(xyzin)
+    chk = tmp_path / "job.chk"
+    fchk = default_qm_formchk_output(chk)
+    log = tmp_path / "job.log"
+    molpro_output = tmp_path / "molpro.out"
+    mrcc_output = tmp_path / "mrcc.out"
+
+    gaussian_input = controller.gaussian_input_command(
+        gaussian_input_path,
+        route="#p b3lyp/def2svp opt=GIC",
+    )
+    status = controller.gaussian_status_command(workdir)
+    run = controller.gaussian_run_command(
+        workdir,
+        executable="g16",
+        input_path=gaussian_input_path,
+        background=True,
+        timeout=30.0,
+    )
+    formchk = controller.gaussian_formchk_command(
+        chk,
+        fchk,
+        executable="formchk-test",
+        timeout=5.0,
+    )
+    fchk_summary = controller.gaussian_fchk_summary_command(fchk)
+    fchk_promote = controller.gaussian_promote_fchk_command(fchk, qff=False)
+    rovib = controller.gaussian_promote_rovib_command(log, exclude_modes=(1, 3))
+    molpro = controller.molpro_promote_command(molpro_output)
+    molpro_summary = controller.molpro_summary_command(molpro_output)
+    mrcc = controller.mrcc_promote_command(mrcc_output)
+    mrcc_summary = controller.mrcc_summary_command(mrcc_output)
+
+    assert gaussian_input.required_sections == ("GIC",)
+    assert gaussian_input.argv[3:5] == ("gicforge", "gaussian-input")
+    assert gaussian_input.argv[-2:] == ("--route", "#p b3lyp/def2svp opt=GIC")
+    assert status.argv[3:5] == ("gaussian", "status")
+    assert run.argv[3:5] == ("gaussian", "run")
+    assert run.argv[run.argv.index("--executable") + 1] == "g16"
+    assert run.argv[run.argv.index("--input") + 1] == str(gaussian_input_path)
+    assert "--background" in run.argv
+    assert run.argv[run.argv.index("--timeout") + 1] == "30.0"
+    assert formchk.argv[3:5] == ("gaussian", "formchk")
+    assert formchk.argv[5:7] == (str(chk), str(fchk))
+    assert formchk.produced_sections == ("FCHK",)
+    assert fchk_summary.argv[3:5] == ("gaussian", "fchk-summary")
+    assert fchk_promote.produced_sections == ("CARTESIAN_HESSIAN", "NORMAL_MODES")
+    assert rovib.argv[-4:] == ("--exclude-mode", "1", "--exclude-mode", "3")
+    assert rovib.produced_sections == ("VIBRATIONAL", "ROTATIONAL", "DELTABVIB")
+    assert molpro.argv[3:5] == ("molpro", "promote")
+    assert molpro.produced_sections == ("SOURCE", "BASIC", "SYMMETRY", "TOPOLOGY", "SYNTHONS")
+    assert molpro_summary.argv[3:5] == ("molpro", "summary")
+    assert mrcc.argv[3:5] == ("mrcc", "promote")
+    assert mrcc.produced_sections == ("SOURCE", "BASIC", "SYMMETRY", "TOPOLOGY", "SYNTHONS")
+    assert mrcc_summary.argv[3:5] == ("mrcc", "summary")
 
 
 def test_sefit_gui_state_reports_missing_morpheus_without_crashing(tmp_path):
