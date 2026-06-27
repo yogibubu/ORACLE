@@ -2,6 +2,15 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 import json
+from pathlib import Path
+
+from .sectioned_xyz import is_section_header_line, read_sectioned_lines, xyz_tail_start
+
+
+PLANNED_FRAMEWORK_NAME = "MATRIX"
+PLANNED_FRAMEWORK_EXPANSION = (
+    "Molecular Analysis Toolkit for Reusable Integrated eXperiments"
+)
 
 
 @dataclass(frozen=True)
@@ -16,10 +25,35 @@ class ToolContract:
     owned_sections: tuple[str, ...] = ()
     status: str = "implemented"
     planned_name: str = ""
+    expanded_name: str = ""
     notes: str = ""
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class ToolReadiness:
+    contract: ToolContract
+    xyzin_path: Path
+    present_sections: tuple[str, ...]
+    missing_required_sections: tuple[str, ...]
+
+    @property
+    def ready(self) -> bool:
+        return not self.missing_required_sections
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "key": self.contract.key,
+            "display_name": self.contract.display_name,
+            "planned_name": self.contract.planned_name,
+            "xyzin_path": str(self.xyzin_path),
+            "ready": self.ready,
+            "required_sections": self.contract.required_sections,
+            "present_sections": self.present_sections,
+            "missing_required_sections": self.missing_required_sections,
+        }
 
 
 TOOL_CONTRACTS: tuple[ToolContract, ...] = (
@@ -52,6 +86,7 @@ TOOL_CONTRACTS: tuple[ToolContract, ...] = (
         produced_sections=("GIC", "SYCART"),
         owned_sections=("GIC", "SYCART"),
         planned_name="NEO",
+        expanded_name="Nonredundant Equivariant Orthogonalizer",
         notes="Runtime name stays GICForge until the refactory is stable; final tool name should be NEO.",
     ),
     ToolContract(
@@ -137,6 +172,7 @@ TOOL_CONTRACTS: tuple[ToolContract, ...] = (
         optional_sections=("BASIC", "GIC", "GF_PED", "MORPHEUS", "TRINITY", "VPT2_VCI", "DVR"),
         status="orchestrator",
         planned_name="ORACLE",
+        expanded_name="Operator for Routing, Analysis, Control, Launch and Exploration",
         notes="The GUI remains the user-facing ORACLE application; it must not own scientific parsers.",
     ),
 )
@@ -171,6 +207,8 @@ def tool_contract_lines(
         lines.append(f"{contract.key}: {contract.display_name}")
         if contract.planned_name:
             lines.append(f"  planned_name: {contract.planned_name}")
+        if contract.expanded_name:
+            lines.append(f"  expanded_name: {contract.expanded_name}")
         lines.append(f"  package: {contract.current_package}")
         lines.append(f"  command: {contract.standalone_command}")
         lines.append(f"  required: {_join_sections(contract.required_sections)}")
@@ -186,8 +224,9 @@ def tool_contract_lines(
 def tool_contract_markdown_table(contracts: tuple[ToolContract, ...] | None = None) -> str:
     rows = tool_contracts() if contracts is None else contracts
     lines = [
-        "| Key | Current name | Planned name | Package | Required sections | Produced sections | Status |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
+        "| Key | Current name | Planned name | Expanded name | Package | "
+        "Required sections | Produced sections | Status |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for contract in rows:
         lines.append(
@@ -197,6 +236,7 @@ def tool_contract_markdown_table(contracts: tuple[ToolContract, ...] | None = No
                     contract.key,
                     contract.display_name,
                     contract.planned_name or "",
+                    contract.expanded_name or "",
                     contract.current_package,
                     ", ".join(contract.required_sections) or "none",
                     ", ".join(contract.produced_sections) or "none",
@@ -213,6 +253,77 @@ def tool_contracts_json(contracts: tuple[ToolContract, ...] | None = None) -> st
     return json.dumps([contract.to_dict() for contract in rows], indent=2, sort_keys=True)
 
 
+def xyzin_section_names(path: Path | str) -> tuple[str, ...]:
+    lines = read_sectioned_lines(Path(path))
+    names: list[str] = []
+    for raw in lines[xyz_tail_start(lines) :]:
+        if is_section_header_line(raw):
+            names.append(raw.strip()[1:].strip().upper())
+    return tuple(names)
+
+
+def tool_contract_readiness(path: Path | str, contract: ToolContract | str) -> ToolReadiness:
+    target = Path(path)
+    resolved = tool_contract(contract) if isinstance(contract, str) else contract
+    present = xyzin_section_names(target)
+    present_set = set(present)
+    missing = tuple(section for section in resolved.required_sections if section not in present_set)
+    return ToolReadiness(
+        contract=resolved,
+        xyzin_path=target,
+        present_sections=present,
+        missing_required_sections=missing,
+    )
+
+
+def tool_contract_readinesses(
+    path: Path | str,
+    contracts: tuple[ToolContract, ...] | None = None,
+) -> tuple[ToolReadiness, ...]:
+    rows = tool_contracts() if contracts is None else contracts
+    return tuple(tool_contract_readiness(path, contract) for contract in rows)
+
+
+def tool_readiness_lines(readinesses: tuple[ToolReadiness, ...]) -> list[str]:
+    lines: list[str] = []
+    for readiness in readinesses:
+        missing = _join_sections(readiness.missing_required_sections)
+        lines.append(
+            f"{readiness.contract.key}: ready={int(readiness.ready)} "
+            f"missing={missing}"
+        )
+    return lines
+
+
+def tool_readiness_markdown_table(readinesses: tuple[ToolReadiness, ...]) -> str:
+    lines = [
+        "| Key | Current name | Planned name | Ready | Missing required sections |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for readiness in readinesses:
+        lines.append(
+            "| "
+            + " | ".join(
+                (
+                    readiness.contract.key,
+                    readiness.contract.display_name,
+                    readiness.contract.planned_name or "",
+                    str(int(readiness.ready)),
+                    ", ".join(readiness.missing_required_sections) or "none",
+                )
+            )
+            + " |"
+        )
+    return "\n".join(lines)
+
+
+def tool_readiness_json(readinesses: tuple[ToolReadiness, ...]) -> str:
+    return json.dumps(
+        [readiness.to_dict() for readiness in readinesses],
+        indent=2,
+        sort_keys=True,
+    )
+
+
 def _join_sections(sections: tuple[str, ...]) -> str:
     return ", ".join(sections) if sections else "none"
-

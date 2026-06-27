@@ -49,6 +49,12 @@ def build_parser(*, repo_root: Path | None = None) -> argparse.ArgumentParser:
 
     contracts = sub.add_parser("contracts", help="List standalone xyzin tool contracts")
     contracts.add_argument("--tool", help="Show one tool contract by key or planned name")
+    contracts.add_argument("--framework", action="store_true", help="Show the planned MATRIX name")
+    contracts.add_argument(
+        "--check-xyzin",
+        type=Path,
+        help="Check whether an xyzin contains the required sections for selected contracts",
+    )
     contracts.add_argument(
         "--format",
         choices=("text", "json", "markdown"),
@@ -572,14 +578,50 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
         return 0
     if args.command == "contracts":
         from oracle_core import (
+            PLANNED_FRAMEWORK_EXPANSION,
+            PLANNED_FRAMEWORK_NAME,
             tool_contract,
             tool_contract_lines,
             tool_contract_markdown_table,
+            tool_contract_readinesses,
             tool_contracts,
             tool_contracts_json,
+            tool_readiness_json,
+            tool_readiness_lines,
+            tool_readiness_markdown_table,
         )
 
+        if args.framework:
+            if args.format == "json":
+                print(
+                    json.dumps(
+                        {
+                            "planned_name": PLANNED_FRAMEWORK_NAME,
+                            "expanded_name": PLANNED_FRAMEWORK_EXPANSION,
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+            elif args.format == "markdown":
+                print("| Planned name | Expanded name |")
+                print("| --- | --- |")
+                print(f"| {PLANNED_FRAMEWORK_NAME} | {PLANNED_FRAMEWORK_EXPANSION} |")
+            else:
+                print(f"framework: {PLANNED_FRAMEWORK_NAME}")
+                print(f"  expanded_name: {PLANNED_FRAMEWORK_EXPANSION}")
+            return 0
+
         rows = (tool_contract(args.tool),) if args.tool else tool_contracts(include_gui=not args.no_gui)
+        if args.check_xyzin is not None:
+            readinesses = tool_contract_readinesses(args.check_xyzin, rows)
+            if args.format == "json":
+                print(tool_readiness_json(readinesses))
+            elif args.format == "markdown":
+                print(tool_readiness_markdown_table(readinesses))
+            else:
+                print("\n".join(tool_readiness_lines(readinesses)))
+            return 0 if all(readiness.ready for readiness in readinesses) else 2
         if args.format == "json":
             print(tool_contracts_json(rows))
         elif args.format == "markdown":

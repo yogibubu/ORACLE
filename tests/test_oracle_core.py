@@ -4,6 +4,8 @@ from oracle_core import (
     ORACLE_MANIFEST_SCHEMA,
     ORACLE_XYZ_ISOTOPOLOGUES_SCHEMA,
     MERLINO_XYZIN_ISOTOPOLOGUES_SCHEMA,
+    PLANNED_FRAMEWORK_EXPANSION,
+    PLANNED_FRAMEWORK_NAME,
     XyzinIsotopologueRecord,
     build_run_manifest,
     BasicSection,
@@ -16,6 +18,7 @@ from oracle_core import (
     section_content,
     tool_contract,
     tool_contract_markdown_table,
+    tool_contract_readiness,
     tool_contracts,
     validate_xyzin_isotopologue_records,
     write_basic_section,
@@ -38,13 +41,50 @@ def test_manifest_schema(tmp_path):
 def test_tool_contract_registry_records_standalone_sections_and_future_names():
     contracts = {contract.key: contract for contract in tool_contracts()}
 
+    assert PLANNED_FRAMEWORK_NAME == "MATRIX"
+    assert PLANNED_FRAMEWORK_EXPANSION == (
+        "Molecular Analysis Toolkit for Reusable Integrated eXperiments"
+    )
     assert contracts["gicforge"].planned_name == "NEO"
+    assert contracts["gicforge"].expanded_name == "Nonredundant Equivariant Orthogonalizer"
     assert contracts["gicforge"].produced_sections == ("GIC", "SYCART")
     assert contracts["gui"].planned_name == "ORACLE"
+    assert contracts["gui"].expanded_name == (
+        "Operator for Routing, Analysis, Control, Launch and Exploration"
+    )
     assert contracts["trinity"].status == "prepare-only"
     assert contracts["trinity"].produced_sections == ("TRINITY",)
     assert tool_contract("NEO").key == "gicforge"
     assert "TRINITY" in tool_contract_markdown_table()
+
+
+def test_tool_contract_readiness_checks_required_xyzin_sections(tmp_path):
+    path = tmp_path / "molecule.xyzin"
+    path.write_text(
+        "\n".join(
+            [
+                "1",
+                "h",
+                "H 0.0 0.0 0.0",
+                "",
+                "#BASIC",
+                "SCHEMA oracle.xyz.basic.v1",
+                "",
+                "#ROTATIONAL",
+                "SCHEMA oracle.xyz.rotational.v1",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    thermo = tool_contract_readiness(path, "thermo")
+    gf = tool_contract_readiness(path, "gf")
+
+    assert thermo.ready
+    assert thermo.missing_required_sections == ()
+    assert not gf.ready
+    assert gf.missing_required_sections == ("GIC", "CARTESIAN_HESSIAN")
 
 
 def test_basic_section_accepts_merlino_aligned_key_values():

@@ -27,6 +27,7 @@ is visible with:
 python -m oracle contracts
 python -m oracle contracts --format markdown
 python -m oracle contracts --tool NEO
+python -m oracle contracts --tool gf --check-xyzin molecule.xyzin
 ```
 
 Standalone tools must:

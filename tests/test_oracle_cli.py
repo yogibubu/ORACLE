@@ -100,6 +100,7 @@ def test_contracts_cli_lists_standalone_tool_registry(capsys):
     assert rc == 0
     assert "gicforge: GICForge" in out
     assert "planned_name: NEO" in out
+    assert "expanded_name: Nonredundant Equivariant Orthogonalizer" in out
     assert "produced: GIC, SYCART" in out
 
 
@@ -111,6 +112,46 @@ def test_contracts_cli_json_can_omit_gui(capsys):
     assert '"key": "gicforge"' in out
     assert '"planned_name": "NEO"' in out
     assert '"key": "gui"' not in out
+
+
+def test_contracts_cli_prints_framework_acronym(capsys):
+    rc = oracle_run.main(["contracts", "--framework"])
+    out = capsys.readouterr().out
+
+    assert rc == 0
+    assert "framework: MATRIX" in out
+    assert "Molecular Analysis Toolkit for Reusable Integrated eXperiments" in out
+
+
+def test_contracts_cli_checks_xyzin_readiness(tmp_path, capsys):
+    xyzin = tmp_path / "molecule.xyzin"
+    xyzin.write_text(
+        "\n".join(
+            [
+                "1",
+                "h",
+                "H 0.0 0.0 0.0",
+                "",
+                "#BASIC",
+                "SCHEMA oracle.xyz.basic.v1",
+                "",
+                "#ROTATIONAL",
+                "SCHEMA oracle.xyz.rotational.v1",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    rc = oracle_run.main(["contracts", "--tool", "thermo", "--check-xyzin", str(xyzin)])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "thermo: ready=1 missing=none" in out
+
+    rc = oracle_run.main(["contracts", "--tool", "gf", "--check-xyzin", str(xyzin)])
+    out = capsys.readouterr().out
+    assert rc == 2
+    assert "gf: ready=0 missing=GIC, CARTESIAN_HESSIAN" in out
 
 
 def test_babel_preprocess_cli_calls_shared_pipeline(tmp_path, monkeypatch, capsys):

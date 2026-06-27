@@ -17,11 +17,20 @@ separate the framework, user-facing GUI and scientific tools more clearly.
 
 After the refactory is stable:
 
-- **MATRIX** becomes the framework/package family name.
-- **ORACLE** remains the user-facing GUI/application name.
-- **GICForge** is renamed to **NEO**.
+- **MATRIX** becomes the framework/package family name:
+  **Molecular Analysis Toolkit for Reusable Integrated eXperiments**.
+- **ORACLE** remains the user-facing GUI/application name:
+  **Operator for Routing, Analysis, Control, Launch and Exploration**.
+- **GICForge** is renamed to **NEO**:
+  **Nonredundant Equivariant Orthogonalizer**.
 - Other tools should use Matrix-saga character names when a rename is useful
   and does not obscure the scientific contract.
+
+NEO is assigned to GICForge rather than to the GUI because that tool is the
+coordinate engine that builds, projects, symmetrizes and reduces the molecular
+internal-coordinate representation. ORACLE is a better GUI name because the GUI
+routes users through project state, launches tools and exposes the scientific
+state without owning parser or kernel logic.
 
 No runtime package is renamed immediately. Current imports, CLIs, docs and
 tests keep their existing names until the compatibility surface is stable.
@@ -37,4 +46,3 @@ performed.
 - Future docs can introduce tools as, for example, "NEO, formerly GICForge",
   only after compatibility aliases are in place.
 - The GUI may be branded ORACLE while running on the MATRIX framework.
-

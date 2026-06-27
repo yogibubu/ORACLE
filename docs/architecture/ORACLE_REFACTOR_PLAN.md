@@ -7,13 +7,16 @@ Date: 2026-06-26
 Create a clean ORACLE repository from the legacy workspace without losing the
 working scientific code, manuals, regression fixtures or GUI workflows.
 
-ORACLE means **Operational Recognition of Atomistic Connectivity and Local
-Environments**. During the active refactory it remains the suite-level project
+ORACLE historically meant **Operational Recognition of Atomistic Connectivity
+and Local Environments**. During the active refactory it remains the repository
 and GUI/application name. After the refactory is stable, the framework/package
-family should be renamed **MATRIX**, GICForge should become **NEO**, and ORACLE
-should remain the GUI/user-facing application. Existing module names remain
-compatibility aliases until the package boundaries are stable and covered by
-tests. See `ADR-0009-MATRIX-NAMING-TRANSITION.md`.
+family should be renamed **MATRIX** (**Molecular Analysis Toolkit for Reusable
+Integrated eXperiments**), GICForge should become **NEO** (**Nonredundant
+Equivariant Orthogonalizer**), and ORACLE should remain the GUI/user-facing
+application (**Operator for Routing, Analysis, Control, Launch and
+Exploration**). Existing module names remain compatibility aliases until the
+package boundaries are stable and covered by tests. See
+`ADR-0009-MATRIX-NAMING-TRANSITION.md`.
 
 ## Current Situation
 
