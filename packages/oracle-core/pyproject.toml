@@ -10,6 +10,8 @@ requires-python = ">=3.11"
 
 [project.scripts]
 oracle = "oracle_core.cli:main"
+matrix = "oracle_core.cli:matrix_main"
+neo = "oracle_core.cli:neo_main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

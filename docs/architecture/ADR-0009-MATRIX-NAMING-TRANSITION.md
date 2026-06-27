@@ -4,7 +4,8 @@ Date: 2026-06-27
 
 ## Status
 
-Accepted as a future refactory constraint.
+Accepted. Compatibility aliases are active; physical package renames remain
+deferred until the scientific contracts are fully stable.
 
 ## Context
 
@@ -35,6 +36,13 @@ state without owning parser or kernel logic.
 No runtime package is renamed immediately. Current imports, CLIs, docs and
 tests keep their existing names until the compatibility surface is stable.
 
+The first compatibility layer is active:
+
+- `matrix` is an installable console alias for the framework CLI.
+- `oracle neo ...` is an alias for `oracle gicforge ...`.
+- `neo ...` is an installable console alias for the GICForge/NEO coordinate
+  tool.
+
 `oracle_core.tool_contracts` records both current names and planned names. This
 is the source of truth for migration planning until actual package renames are
 performed.
@@ -46,3 +54,5 @@ performed.
 - Future docs can introduce tools as, for example, "NEO, formerly GICForge",
   only after compatibility aliases are in place.
 - The GUI may be branded ORACLE while running on the MATRIX framework.
+- Internal Python packages keep their `oracle_*` import names for now, so the
+  migration does not break downstream scripts or tests.

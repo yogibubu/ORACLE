@@ -7,6 +7,7 @@ import sys
 from types import SimpleNamespace
 
 from oracle_babel import rdkit_available
+from oracle_core import cli as oracle_cli
 from oracle_gf import read_gf_ped_section
 from tools import oracle_run
 
@@ -50,7 +51,7 @@ def test_python_module_entrypoint_prints_help():
         text=True,
     )
 
-    assert "ORACLE workflow CLI" in result.stdout
+    assert "ORACLE/MATRIX workflow CLI" in result.stdout
     assert "babel" in result.stdout
     assert "gicforge" in result.stdout
 
@@ -121,6 +122,14 @@ def test_contracts_cli_prints_framework_acronym(capsys):
     assert rc == 0
     assert "framework: MATRIX" in out
     assert "Molecular Analysis Toolkit for Reusable Integrated eXperiments" in out
+
+
+def test_matrix_cli_alias_prints_framework_acronym(capsys):
+    rc = oracle_cli.matrix_main(["contracts", "--framework"])
+    out = capsys.readouterr().out
+
+    assert rc == 0
+    assert "framework: MATRIX" in out
 
 
 def test_contracts_cli_checks_xyzin_readiness(tmp_path, capsys):
@@ -1003,6 +1012,29 @@ def test_gicforge_build_cli_calls_writer(tmp_path, monkeypatch, capsys):
     assert "Built GICForge definition" in capsys.readouterr().out
 
 
+def test_neo_cli_alias_calls_gicforge_build_writer(tmp_path, monkeypatch, capsys):
+    calls = {}
+    path = tmp_path / "molecule.xyzin"
+
+    class FakeDefinition:
+        gics = (object(),)
+        rank = 1
+
+    def fake_write(target, *, symmetrize=False, sycart=False):
+        calls["target"] = target
+        calls["symmetrize"] = symmetrize
+        calls["sycart"] = sycart
+        return FakeDefinition()
+
+    monkeypatch.setattr("oracle_gicforge.write_gicforge_build_sections", fake_write)
+
+    rc = oracle_run.main(["neo", "build", str(path), "--symmetrize"])
+
+    assert rc == 0
+    assert calls == {"target": path, "symmetrize": True, "sycart": False}
+    assert "Built GICForge definition" in capsys.readouterr().out
+
+
 def test_gicforge_cli_passes_improper_dihedrals_flag(tmp_path, monkeypatch, capsys):
     calls = {}
     path = tmp_path / "molecule.xyzin"
@@ -1282,7 +1314,9 @@ def test_gicforge_fortran_audit_cli_prints_summary(tmp_path, monkeypatch, capsys
     assert calls["molecules"] == ["naphtalene.inp"]
     assert calls["tolerance"] == 1.0e-7
     assert "PASS 1" in out
+    assert "MIXED_SYMMETRY_GROUPS 0" in out
     assert "CASE PASS naphtalene.inp" in out
+    assert "mixed_symmetry_groups=0" in out
 
 
 def test_semiexp_benchmark_cli_calls_paper_artifact_generator(tmp_path, monkeypatch, capsys):

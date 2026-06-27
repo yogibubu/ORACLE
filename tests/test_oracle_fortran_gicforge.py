@@ -18,7 +18,14 @@ from oracle_engines import (
     run_legacy_gicforge,
     validate_legacy_gicforge_sources,
 )
-from oracle_gicforge import build_gic_b_matrix, write_gicforge_build_sections
+from oracle_gicforge import (
+    GICForgeFortranAudit,
+    GICForgeFortranAuditResult,
+    build_gic_b_matrix,
+    format_gicforge_fortran_audit_cases,
+    format_gicforge_fortran_audit_summary,
+    write_gicforge_build_sections,
+)
 
 
 def _test_molecule_path(name: str) -> Path:
@@ -55,6 +62,40 @@ def test_legacy_merlino_gicforge_sources_are_vendored():
     assert missing == ()
     assert "dina25.f" in LEGACY_GICFORGE_FILES
     assert "gicprune.f" in LEGACY_GICFORGE_FILES
+
+
+def test_fortran_audit_report_includes_projector_diagnostics(tmp_path):
+    audit = GICForgeFortranAudit(
+        root=tmp_path,
+        workdir=tmp_path / "audit",
+        tolerance=2.0e-8,
+        results=(
+            GICForgeFortranAuditResult(
+                molecule="case.inp",
+                source=tmp_path / "case.inp",
+                status="PASS",
+                oracle_rank=6,
+                fortran_rank=6,
+                oracle_row_rank=6,
+                fortran_row_rank=6,
+                row_space_residual=1.0e-12,
+                projector_status="POINT_GROUP_PROJECTOR",
+                symmetry_group_count=4,
+                special_symmetry_group_count=1,
+                mixed_symmetry_group_count=0,
+                total_symmetric_gic_count=2,
+            ),
+        ),
+    )
+
+    summary = "\n".join(format_gicforge_fortran_audit_summary(audit))
+    cases = "\n".join(format_gicforge_fortran_audit_cases(audit))
+
+    assert "MIXED_SYMMETRY_GROUPS 0" in summary
+    assert "projector_status=POINT_GROUP_PROJECTOR" in cases
+    assert "symmetry_groups=4" in cases
+    assert "special_symmetry_groups=1" in cases
+    assert "total_symmetric_gics=2" in cases
 
 
 def test_legacy_merlino_group_dispatch_matches_classifier_families():

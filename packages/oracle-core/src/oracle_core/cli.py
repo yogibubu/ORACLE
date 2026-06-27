@@ -35,9 +35,13 @@ def add_repo_packages_to_path(repo_root: Path | None = None) -> None:
             sys.path.insert(0, text)
 
 
-def build_parser(*, repo_root: Path | None = None) -> argparse.ArgumentParser:
+def build_parser(
+    *,
+    repo_root: Path | None = None,
+    prog: str = "oracle",
+) -> argparse.ArgumentParser:
     root = find_repo_root() if repo_root is None else Path(repo_root)
-    parser = argparse.ArgumentParser(prog="oracle", description="ORACLE workflow CLI")
+    parser = argparse.ArgumentParser(prog=prog, description="ORACLE/MATRIX workflow CLI")
     sub = parser.add_subparsers(dest="command")
 
     init = sub.add_parser("init", help="Create an ORACLE project workspace")
@@ -469,7 +473,11 @@ def build_parser(*, repo_root: Path | None = None) -> argparse.ArgumentParser:
     reference_build.add_argument("--ring-weight", type=float, default=0.25)
     reference_build.add_argument("--no-ring-comparison", action="store_true")
 
-    gicforge = sub.add_parser("gicforge", help="Plan GICForge post-validation sections")
+    gicforge = sub.add_parser(
+        "gicforge",
+        aliases=("neo",),
+        help="Plan NEO/GICForge post-validation sections",
+    )
     gicforge_sub = gicforge.add_subparsers(dest="gicforge_command")
     gic_plan = gicforge_sub.add_parser("plan", help="Write planned #GIC/#SYCART sections")
     gic_plan.add_argument("xyzin", type=Path)
@@ -559,10 +567,15 @@ def build_parser(*, repo_root: Path | None = None) -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int:
+def main(
+    argv: list[str] | None = None,
+    *,
+    repo_root: Path | None = None,
+    prog: str = "oracle",
+) -> int:
     root = find_repo_root() if repo_root is None else Path(repo_root)
     add_repo_packages_to_path(root)
-    parser = build_parser(repo_root=root)
+    parser = build_parser(repo_root=root, prog=prog)
     args = parser.parse_args(argv)
     if args.command == "init":
         from oracle_core.workspace import ensure_workspace
@@ -1554,7 +1567,7 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
         print(f"rms_target_residual_final: {result.rms_target_residual_final:.8g}")
         print(f"outputs: {args.outdir}")
         return 0
-    if args.command == "gicforge" and args.gicforge_command == "plan":
+    if _is_neo_command(args) and args.gicforge_command == "plan":
         from oracle_gicforge import write_gicforge_plan_sections
 
         plan_kwargs = {
@@ -1569,7 +1582,7 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
         )
         print(f"Planned GICForge workflow: {args.xyzin}")
         return 0
-    if args.command == "gicforge" and args.gicforge_command == "build":
+    if _is_neo_command(args) and args.gicforge_command == "build":
         from oracle_gicforge import write_gicforge_build_sections
 
         build_kwargs = {
@@ -1587,7 +1600,7 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
             f"{args.xyzin} (GICs={len(definition.gics)}, rank={definition.rank})"
         )
         return 0
-    if args.command == "gicforge" and args.gicforge_command == "bmatrix":
+    if _is_neo_command(args) and args.gicforge_command == "bmatrix":
         from oracle_gicforge import (
             build_gic_b_matrix_from_xyzin,
             gic_b_matrix_lines,
@@ -1605,7 +1618,7 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
             f"columns={len(matrix.cartesian_columns)})"
         )
         return 0
-    if args.command == "gicforge" and args.gicforge_command == "report":
+    if _is_neo_command(args) and args.gicforge_command == "report":
         from oracle_gicforge import gic_report_from_xyzin, write_gic_report
 
         if args.output is None:
@@ -1614,7 +1627,7 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
         output = write_gic_report(args.xyzin, args.output)
         print(f"Wrote GICForge report: {output}")
         return 0
-    if args.command == "gicforge" and args.gicforge_command == "corpus":
+    if _is_neo_command(args) and args.gicforge_command == "corpus":
         from oracle_gicforge import (
             default_gic_corpus_root,
             format_gic_corpus_paths,
@@ -1640,7 +1653,7 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
             return 0
         print("\n".join(format_gic_corpus_summary(summary)))
         return 0
-    if args.command == "gicforge" and args.gicforge_command == "corpus-audit":
+    if _is_neo_command(args) and args.gicforge_command == "corpus-audit":
         from oracle_gicforge import (
             audit_gic_corpus_geometry,
             default_gic_corpus_root,
@@ -1676,7 +1689,7 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
             return 0
         print("\n".join(format_gic_corpus_geometry_audit_summary(audit)))
         return 0
-    if args.command == "gicforge" and args.gicforge_command == "fortran-audit":
+    if _is_neo_command(args) and args.gicforge_command == "fortran-audit":
         from oracle_gicforge import (
             audit_gicforge_fortran_corpus,
             default_gic_corpus_root,
@@ -1719,7 +1732,7 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
             return 0
         print("\n".join(format_gicforge_fortran_audit_summary(audit)))
         return 0
-    if args.command == "gicforge" and args.gicforge_command == "gaussian-input":
+    if _is_neo_command(args) and args.gicforge_command == "gaussian-input":
         from oracle_gicforge import write_gicforge_gaussian_input
 
         output = write_gicforge_gaussian_input(
@@ -1734,6 +1747,21 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
         return 0
     parser.print_help()
     return 0
+
+
+def matrix_main(argv: list[str] | None = None) -> int:
+    """Console-script alias for the MATRIX framework CLI."""
+    return main(argv, prog="matrix")
+
+
+def neo_main(argv: list[str] | None = None) -> int:
+    """Console-script alias for the NEO/GICForge coordinate tool."""
+    command_args = sys.argv[1:] if argv is None else argv
+    return main(["neo", *command_args], prog="neo")
+
+
+def _is_neo_command(args: argparse.Namespace) -> bool:
+    return args.command in {"gicforge", "neo"}
 
 
 def _parse_fixed_parameters(raw: str) -> tuple[str, ...]:

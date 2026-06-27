@@ -12,7 +12,13 @@ from oracle_chem import preprocess_to_enriched_xyz, read_enriched_xyz, write_val
 from oracle_engines import gicforge_fortran_layout, run_legacy_gicforge
 
 from .corpus import default_gic_corpus_root
-from .definition import build_gic_b_matrix, write_gicforge_build_sections
+from .definition import (
+    GICDefinition,
+    build_gic_b_matrix,
+    build_gic_definition_from_xyzin,
+    write_gicforge_build_sections,
+)
+from .policy import SPECIAL_REDUCTION_CLASS, primitive_reduction_class
 
 
 DEFAULT_FORTRAN_AUDIT_MOLECULES = ("naphtalene.inp", "phenantrene.inp", "pyrene.inp")
@@ -32,6 +38,11 @@ class GICForgeFortranAuditResult:
     row_space_residual: float | None = None
     oracle_ring_pucker_components: int = 0
     fortran_label_prefixes: tuple[str, ...] = ()
+    projector_status: str = "UNKNOWN"
+    symmetry_group_count: int = 0
+    special_symmetry_group_count: int = 0
+    mixed_symmetry_group_count: int = 0
+    total_symmetric_gic_count: int = 0
     message: str = ""
     workdir: Path | None = None
 
@@ -77,6 +88,10 @@ class GICForgeFortranAudit:
             if result.row_space_residual is not None and np.isfinite(result.row_space_residual)
         ]
         return max(values) if values else None
+
+    @property
+    def mixed_symmetry_groups(self) -> int:
+        return sum(result.mixed_symmetry_group_count for result in self.results)
 
 
 def audit_gicforge_fortran_corpus(
@@ -155,6 +170,7 @@ def format_gicforge_fortran_audit_summary(audit: GICForgeFortranAudit) -> list[s
         f"SKIP {audit.skipped}",
         "MAX_ROW_SPACE_RESIDUAL "
         + ("NONE" if max_residual is None else f"{max_residual:.12g}"),
+        f"MIXED_SYMMETRY_GROUPS {audit.mixed_symmetry_groups}",
     ]
     lines.extend(format_gicforge_fortran_audit_cases(audit))
     return lines
@@ -181,7 +197,12 @@ def format_gicforge_fortran_audit_cases(
             f"fortran_rank={result.fortran_rank} "
             f"oracle_row_rank={result.oracle_row_rank} "
             f"fortran_row_rank={result.fortran_row_rank} "
-            f"row_space_residual={residual}"
+            f"row_space_residual={residual} "
+            f"projector_status={result.projector_status} "
+            f"symmetry_groups={result.symmetry_group_count} "
+            f"special_symmetry_groups={result.special_symmetry_group_count} "
+            f"mixed_symmetry_groups={result.mixed_symmetry_group_count} "
+            f"total_symmetric_gics={result.total_symmetric_gic_count}"
             + (f" message={result.message}" if result.message else "")
         )
     return lines
@@ -221,6 +242,8 @@ def _audit_one(
         preprocess_to_enriched_xyz(source, xyzin)
         write_validation_section(xyzin)
         definition = write_gicforge_build_sections(xyzin)
+        symmetrized = build_gic_definition_from_xyzin(xyzin, symmetrize=True)
+        projector = _projector_audit(definition, symmetrized)
         geometry = read_enriched_xyz(xyzin)
         oracle_b = np.asarray(build_gic_b_matrix(definition).rows, dtype=float)
         legacy = run_legacy_gicforge(
@@ -243,6 +266,7 @@ def _audit_one(
             and oracle_row_rank == fortran_row_rank == oracle_rank
             and oracle_b.shape == fortran_b.shape
             and residual <= tolerance
+            and projector["mixed_symmetry_group_count"] == 0
         )
         return GICForgeFortranAuditResult(
             molecule=molecule,
@@ -259,7 +283,12 @@ def _audit_one(
                 1 for gic in definition.gics if gic.family == "RING_PUCKER_COMPONENT"
             ),
             fortran_label_prefixes=tuple(sorted({label[:4] for label in legacy.gic_labels})),
-            message="" if passed else "rank, shape or row-space residual mismatch",
+            projector_status=str(projector["projector_status"]),
+            symmetry_group_count=int(projector["symmetry_group_count"]),
+            special_symmetry_group_count=int(projector["special_symmetry_group_count"]),
+            mixed_symmetry_group_count=int(projector["mixed_symmetry_group_count"]),
+            total_symmetric_gic_count=int(projector["total_symmetric_gic_count"]),
+            message="" if passed else _failure_message(residual, tolerance, projector),
             workdir=case_dir,
         )
     except Exception as exc:
@@ -270,6 +299,56 @@ def _audit_one(
             message=f"{type(exc).__name__}: {exc}",
             workdir=workdir,
         )
+
+
+def _projector_audit(
+    source_definition: GICDefinition,
+    symmetrized_definition: GICDefinition,
+) -> dict[str, object]:
+    diagnostics = symmetrized_definition.symmetry_diagnostics
+    if diagnostics is None:
+        return {
+            "projector_status": "MISSING",
+            "symmetry_group_count": 0,
+            "special_symmetry_group_count": 0,
+            "mixed_symmetry_group_count": 0,
+            "total_symmetric_gic_count": 0,
+        }
+    source_family_by_name = {gic.name: gic.family for gic in source_definition.gics}
+    mixed_groups = 0
+    special_groups = 0
+    for group in diagnostics.groups:
+        source_families = {
+            source_family_by_name[name]
+            for name in group.source_gics
+            if name in source_family_by_name
+        }
+        if source_families and source_families != {group.family}:
+            mixed_groups += 1
+        if primitive_reduction_class(group.family) == SPECIAL_REDUCTION_CLASS:
+            special_groups += 1
+    return {
+        "projector_status": diagnostics.status,
+        "symmetry_group_count": len(diagnostics.groups),
+        "special_symmetry_group_count": special_groups,
+        "mixed_symmetry_group_count": mixed_groups,
+        "total_symmetric_gic_count": len(diagnostics.total_symmetric_gics),
+    }
+
+
+def _failure_message(
+    residual: float,
+    tolerance: float,
+    projector: dict[str, object],
+) -> str:
+    reasons: list[str] = []
+    if residual > tolerance:
+        reasons.append("row-space residual exceeds tolerance")
+    if int(projector["mixed_symmetry_group_count"]):
+        reasons.append("symmetry projector mixed coordinate families")
+    if not reasons:
+        reasons.append("rank, shape or row-space residual mismatch")
+    return "; ".join(reasons)
 
 
 def _row_space_basis(matrix: np.ndarray) -> tuple[np.ndarray, int]:
