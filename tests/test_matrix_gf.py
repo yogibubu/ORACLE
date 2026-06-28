@@ -12,6 +12,7 @@ from matrix_gf import (
     gf_csv_tables,
     gf_scaling_preview_from_xyzin,
     gf_from_cartesian_hessian_and_gic_b_matrix,
+    large_amplitude_analysis_from_gf_matrices,
     nonbonded_cartesian_hessian_correction,
     pulay_scaling_factors,
     pulay_scaling_preview,
@@ -119,6 +120,42 @@ def test_gf_large_amplitude_subspaces_use_existing_gic_blocks_without_projection
     assert large.blocks[0].max_f_coupling_to_rest == 0.0
     assert large.mode_contributions[1].ped_percent == pytest.approx(100.0)
     assert large.mode_contributions[2].ped_percent == pytest.approx(100.0)
+
+
+def test_large_amplitude_coupling_diagnostic_uses_both_f_and_g():
+    base_kwargs = {
+        "frequencies_cm": np.asarray([100.0, 200.0, 300.0], dtype=float),
+        "ped": np.eye(3) * 100.0,
+        "gic_labels": ("GIC001 R(1,2)", "GIC002 D(1,2,3,4)", "GIC003 U(1,2,3,4)"),
+        "gic_names": ("A1Str001", "A2Tors001", "B1OuPl001"),
+        "gic_irreps": ("A1", "A2", "B1"),
+    }
+
+    f_dominated = large_amplitude_analysis_from_gf_matrices(
+        force_constants=np.asarray(
+            [[9.0, 3.0, 0.0], [3.0, 4.0, 0.0], [0.0, 0.0, 1.0]],
+            dtype=float,
+        ),
+        g_matrix=np.eye(3),
+        **base_kwargs,
+    )
+    f_block = next(block for block in f_dominated.blocks if block.label == "torsion")
+    assert f_block.relative_f_coupling_to_rest == pytest.approx(3.0 / 9.0)
+    assert f_block.relative_g_coupling_to_rest == pytest.approx(0.0)
+    assert f_block.relative_fg_coupling_to_rest == pytest.approx(3.0 / 9.0)
+
+    g_dominated = large_amplitude_analysis_from_gf_matrices(
+        force_constants=np.diag([9.0, 4.0, 1.0]),
+        g_matrix=np.asarray(
+            [[1.0, 0.0, 0.0], [0.0, 1.0, 0.25], [0.0, 0.25, 1.0]],
+            dtype=float,
+        ),
+        **base_kwargs,
+    )
+    g_block = next(block for block in g_dominated.blocks if block.label == "torsion")
+    assert g_block.relative_f_coupling_to_rest == pytest.approx(0.0)
+    assert g_block.relative_g_coupling_to_rest == pytest.approx(0.25)
+    assert g_block.relative_fg_coupling_to_rest == pytest.approx(0.25)
 
 
 def test_gf_rejects_cross_irrep_couplings_when_symmetry_blocks_requested():

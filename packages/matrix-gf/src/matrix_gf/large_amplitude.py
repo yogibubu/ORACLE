@@ -38,6 +38,11 @@ class LargeAmplitudeBlock:
     relative_f_coupling_to_rest: float
     relative_g_coupling_to_rest: float
 
+    @property
+    def relative_fg_coupling_to_rest(self) -> float:
+        """Dimensionless diagnostic that treats F and G couplings symmetrically."""
+        return max(self.relative_f_coupling_to_rest, self.relative_g_coupling_to_rest)
+
 
 @dataclass(frozen=True)
 class LargeAmplitudeModeContribution:

@@ -157,6 +157,11 @@ subspace and the remaining coordinates, plus the total large-amplitude PED
 contribution to every GF mode.  These diagnostics decide whether a
 one-dimensional, coupled multidimensional, DVR or perturbative treatment is
 appropriate downstream.
+The operational isolation test uses both matrices: a large-amplitude subspace
+is independent only when the relative off-subspace coupling is small in \(F\)
+and in \(G\).  MATRIX therefore reports the two values separately and also
+exports \(\max(F_{\mathrm{rel}},G_{\mathrm{rel}})\) as the combined
+\texttt{FG} diagnostic used by downstream rotor/DVR planning.
 
 \section{Input Contracts}
 
@@ -445,7 +450,8 @@ after optional scaling. \\
 selection with family labels. \\
 \texttt{\detokenize{*_large_amplitude_blocks.csv}} & Mono- and
 poly-dimensional direct \(F/G\) subspace frequencies and coupling
-diagnostics. \\
+diagnostics, including the combined \(\max(F_{\mathrm{rel}},G_{\mathrm{rel}})\)
+criterion. \\
 \texttt{\detokenize{*_large_amplitude_mode_ped.csv}} & Total large-amplitude
 PED contribution for each GF mode. \\
 \bottomrule

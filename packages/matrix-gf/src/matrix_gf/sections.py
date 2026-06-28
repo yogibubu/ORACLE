@@ -55,6 +55,10 @@ class GFLargeAmplitudeBlockRow:
     max_g_coupling_to_rest: float = 0.0
     relative_g_coupling_to_rest: float = 0.0
 
+    @property
+    def relative_fg_coupling_to_rest(self) -> float:
+        return max(self.relative_f_coupling_to_rest, self.relative_g_coupling_to_rest)
+
 
 @dataclass(frozen=True)
 class GFLargeAmplitudeModeRow:
@@ -298,7 +302,8 @@ def gf_ped_section_lines(section: GFPEDSection) -> list[str]:
                 f"F_COUPLE_MAX={_format_float(block.max_f_coupling_to_rest)} "
                 f"F_COUPLE_REL={_format_float(block.relative_f_coupling_to_rest)} "
                 f"G_COUPLE_MAX={_format_float(block.max_g_coupling_to_rest)} "
-                f"G_COUPLE_REL={_format_float(block.relative_g_coupling_to_rest)}"
+                f"G_COUPLE_REL={_format_float(block.relative_g_coupling_to_rest)} "
+                f"FG_COUPLE_REL={_format_float(block.relative_fg_coupling_to_rest)}"
             )
     else:
         lines.append("NONE")

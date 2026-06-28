@@ -346,7 +346,8 @@ def format_gf_report(
                 f"  {block.label}: dim={len(block.indices)} [{indices}] "
                 f"freqs=[{frequencies}] "
                 f"Fcouple={block.max_f_coupling_to_rest:.6g} "
-                f"Gcouple={block.max_g_coupling_to_rest:.6g}"
+                f"Gcouple={block.max_g_coupling_to_rest:.6g} "
+                f"FGrel={block.relative_fg_coupling_to_rest:.6g}"
             )
         dominant = [item for item in large.mode_contributions if item.ped_percent >= 50.0]
         if dominant:
@@ -986,6 +987,7 @@ def _large_amplitude_csv_tables(result: InternalGFResult) -> dict[str, str]:
             "relative_f_coupling_to_rest",
             "max_g_coupling_to_rest",
             "relative_g_coupling_to_rest",
+            "relative_fg_coupling_to_rest",
         ]
     ]
     block_rows.extend(
@@ -999,6 +1001,7 @@ def _large_amplitude_csv_tables(result: InternalGFResult) -> dict[str, str]:
             f"{block.relative_f_coupling_to_rest:.10g}",
             f"{block.max_g_coupling_to_rest:.10g}",
             f"{block.relative_g_coupling_to_rest:.10g}",
+            f"{block.relative_fg_coupling_to_rest:.10g}",
         ]
         for block in large.blocks
     )
