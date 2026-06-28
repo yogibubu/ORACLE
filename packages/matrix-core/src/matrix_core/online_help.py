@@ -119,15 +119,15 @@ SECTION_COMPLETION_HINTS: dict[str, SectionCompletionHint] = {
     "CARTESIAN_HESSIAN": SectionCompletionHint(
         "CARTESIAN_HESSIAN",
         "QM Jobs",
-        "Promote Gaussian FCHK",
-        "matrix gaussian promote-fchk",
+        "Promote Gaussian FCHK/log or ORCA output",
+        "matrix gaussian promote-fchk; matrix gaussian promote-log-hessian; matrix orca promote",
         "GF/PED can also accept an FCHK file directly",
     ),
     "NORMAL_MODES": SectionCompletionHint(
         "NORMAL_MODES",
         "QM Jobs",
-        "Promote Gaussian FCHK",
-        "matrix gaussian promote-fchk",
+        "Promote Gaussian FCHK/log",
+        "matrix gaussian promote-fchk; matrix gaussian promote-log-hessian",
     ),
     "QFF": SectionCompletionHint(
         "QFF",
@@ -293,12 +293,13 @@ QUICKSTART: dict[str, tuple[str, ...]] = {
         "matrix validate molecule.xyzin",
     ),
     "qm_adapters": (
-        "matrix qm remote-submit --engine gdv32 calc.gjf --host enzo@oracle",
+        "matrix qm remote-submit calc.gjf --engine gdv32 --host enzo@oracle",
         "matrix qm remote-status --host enzo@oracle",
         "matrix qm remote-fetch JOB --host enzo@oracle --dest runs",
         "matrix gaussian promote-fchk calc.fchk molecule.xyzin",
         "matrix gaussian promote-rovib calc.log molecule.xyzin",
         "matrix gaussian promote-electronic calc.log molecule.xyzin",
+        "matrix orca promote calc.out molecule.xyzin",
     ),
     "fragments": ("matrix fragments build molecule.xyzin",),
     "gicforge": (

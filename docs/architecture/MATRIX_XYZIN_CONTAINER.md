@@ -28,6 +28,7 @@ plain XYZ
   -> matrix-neo adds #GIC and optionally #SYCART
   -> branches:
        matrix-gaussian writes Gaussian inputs or imports QM outputs through matrix-qm
+       matrix-orca imports ORCA geometry/Hessian outputs through matrix-qm
        matrix-qm adds #CARTESIAN_HESSIAN, #NORMAL_MODES or #QFF
        matrix-gf adds #GF_PED from #CARTESIAN_HESSIAN plus frozen #GIC
        matrix-rovib adds #ROTATIONAL, #VIBRATIONAL, #DELTABVIB, #CORIOLIS or #QCENT
@@ -38,9 +39,11 @@ plain XYZ
        matrix-dvr adds #DVR
 ```
 
-Molpro and MRCC outputs enter the same flow through `matrix-molpro` and
-`matrix-mrcc`: their adapters normalize geometry, charge and multiplicity into
-`MolecularGeometry`, then LINK writes the shared sections.
+Molpro, ORCA and MRCC outputs enter the same flow through `matrix-molpro`,
+`matrix-orca` and `matrix-mrcc`: their adapters normalize geometry, charge and
+multiplicity into `MolecularGeometry`, then LINK writes the shared sections.
+ORCA additionally writes `#CARTESIAN_HESSIAN` when its output contains a
+readable Cartesian Hessian.
 
 The GUI should display and orchestrate this state, not own a parallel data
 model.
@@ -141,9 +144,11 @@ finished parsing:
 - `#QFF` stores harmonic and anharmonic frequencies plus indexed cubic and
   quartic normal-coordinate force constants.
 
-`matrix gaussian promote-fchk` writes these sections from Gaussian FCHK data.
-GF/PED can then run from `matrix gf --xyzin molecule.xyzin` without reparsing the
-FCHK. VPT2/VCI loaders can read `#QFF` directly from the same container.
+`matrix gaussian promote-fchk`, `matrix gaussian promote-log-hessian` and
+`matrix orca promote` write these sections from supported external outputs.
+GF/PED can then run from `matrix gf --xyzin molecule.xyzin` without reparsing
+Gaussian FCHK/log or ORCA text. VPT2/VCI loaders can read `#QFF` directly from
+the same container.
 
 `matrix-qm` also owns the normalized electronic sections:
 

@@ -17,8 +17,8 @@ they must not define their own incompatible geometry containers.
 - Geometry parsers live in shared libraries, not GUI classes or workflow
   scripts.
 - QM-program adapters live in program-specific packages such as
-  `matrix-gaussian`, `matrix-molpro` or `matrix-mrcc`, but return shared MATRIX
-  models.
+  `matrix-gaussian`, `matrix-molpro`, `matrix-orca` or `matrix-mrcc`, but
+  return shared MATRIX models.
 - The enriched XYZ container remains the canonical handoff file.
 - Parser diagnostics should be explicit and user-facing.
 - A parser may preserve program-specific metadata, but coordinates, atom labels,
@@ -36,6 +36,8 @@ they must not define their own incompatible geometry containers.
   summaries, Gaussian Z-matrix input through the shared Z-matrix parser and
   FCHK/QFF adapters.
 - `matrix-molpro`: Molpro output geometry, charge and multiplicity adapters.
+- `matrix-orca`: ORCA output geometry, charge, multiplicity, energy,
+  frequencies and Cartesian Hessian adapters when the output prints those data.
 - `matrix-mrcc`: MRCC output geometry, charge and multiplicity adapters.
 - Future program packages must consume the same shared data model and must not
   add workflow-local parsers.

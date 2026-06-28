@@ -96,7 +96,7 @@ another reorganization.
 
 The central object is the enriched \xyzin{} file.  Each tool appends or updates
 sections instead of passing private scratch formats between modules.  A tool
-must not reparse Gaussian, Molpro, MRCC, SMILES or geometry data if the
+must not reparse Gaussian, Molpro, ORCA, MRCC, SMILES or geometry data if the
 corresponding shared section is already present.
 
 \begin{longtable}{
@@ -154,15 +154,16 @@ view and all later tasks work from the enriched \xyzin{} state.
 \section{QM Adapters}
 
 QM adapters are the only code allowed to understand external program outputs.
-Gaussian, Molpro and MRCC data are promoted into shared sections.  Scientific
-tools consume these sections and never scan log files privately.
+Gaussian, Molpro, ORCA and MRCC data are promoted into shared sections.
+Scientific tools consume these sections and never scan log files privately.
 
 \begin{lstlisting}[style=matrix]
 matrix gaussian promote-fchk calc.fchk molecule.xyzin
 matrix gaussian promote-rovib calc.log molecule.xyzin
 matrix gaussian promote-electronic calc.log molecule.xyzin
-matrix molpro promote-output molpro.out molecule.xyzin
-matrix mrcc promote-output mrcc.out molecule.xyzin
+matrix molpro promote molpro.out molecule.xyzin
+matrix orca promote orca.out molecule.xyzin
+matrix mrcc promote mrcc.out molecule.xyzin
 \end{lstlisting}
 
 The main promoted sections are \sectionname{CARTESIAN\_HESSIAN},

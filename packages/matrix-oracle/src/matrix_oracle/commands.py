@@ -335,6 +335,8 @@ def qm_remote_fetch_command(
         produced.extend(["ELECTRONIC", "TRANSITIONS"])
     elif promote == "gaussian-fchk":
         produced.extend(["CARTESIAN_HESSIAN", "NORMAL_MODES", "QFF", "ELECTRONIC", "ORBITALS"])
+    elif promote == "orca":
+        produced.extend(["SOURCE", "BASIC", "SYMMETRY", "TOPOLOGY", "SYNTHONS", "CARTESIAN_HESSIAN"])
     return OracleGuiCommand(
         "Fetch remote QM output",
         tuple(argv),
@@ -616,6 +618,41 @@ def orca_run_command(
     for arg in extra_args:
         argv.extend(["--extra-arg", str(arg)])
     return OracleGuiCommand("Run ORCA job", tuple(argv))
+
+
+def orca_summary_command(output: Path | str) -> OracleGuiCommand:
+    return OracleGuiCommand(
+        "Summarize ORCA output",
+        (*_matrix_cli(), "orca", "summary", str(Path(output))),
+    )
+
+
+def orca_promote_command(
+    output: Path | str,
+    xyzin: Path | str,
+    *,
+    symmetry_distance: float = 1.0e-3,
+    symmetry_inertia: float = 1.0e-3,
+    max_rotation_order: int = 6,
+) -> OracleGuiCommand:
+    argv = [
+        *_matrix_cli(),
+        "orca",
+        "promote",
+        str(Path(output)),
+        str(Path(xyzin)),
+        "--symmetry-distance",
+        str(symmetry_distance),
+        "--symmetry-inertia",
+        str(symmetry_inertia),
+        "--max-rotation-order",
+        str(max_rotation_order),
+    ]
+    return OracleGuiCommand(
+        "Promote ORCA output",
+        tuple(argv),
+        produced_sections=("SOURCE", "BASIC", "SYMMETRY", "TOPOLOGY", "SYNTHONS", "CARTESIAN_HESSIAN"),
+    )
 
 
 def mrcc_summary_command(output: Path | str) -> OracleGuiCommand:

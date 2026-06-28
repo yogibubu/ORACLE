@@ -186,10 +186,12 @@ module load orca/6.1.1
 orca molecule.inp > molecule.out
 \end{lstlisting}
 
-ORCA calculations can be launched on \host{} for electronic-structure data and
-future MATRIX adapters.  Until a given ORCA output quantity is normalized into
-a shared \xyzin{} section, scientific MATRIX tools should not depend on
-tool-local ORCA parsing.
+ORCA calculations can be launched on \host{} for electronic-structure data.
+The MATRIX ORCA adapter currently promotes the final Cartesian geometry and,
+when ORCA prints a Cartesian Hessian, the shared
+\texttt{\#CARTESIAN\_HESSIAN} section used by GF/PED.  Quantities not yet
+normalized into \xyzin{} remain external data and must not be parsed privately
+by downstream scientific tools.
 
 \section{Background Submission}
 
@@ -250,15 +252,16 @@ matrix qm remote-fetch JOB_NAME --host enzo@oracle \
 
 matrix qm remote-fetch JOB_NAME --host enzo@oracle \
   --dest runs --promote gaussian-log-hessian --xyzin molecule.xyzin
+
+matrix qm remote-fetch JOB_NAME --host enzo@oracle \
+  --dest runs --promote orca --xyzin molecule.xyzin
 \end{lstlisting}
 
-\texttt{--promote auto} promotes Molpro outputs because the Molpro geometry
-adapter is unambiguous.  Gaussian promotion is deliberately explicit because a
-single log can contain different useful sections; choose
+\texttt{--promote auto} promotes Molpro outputs and ORCA outputs because those
+promotion paths are unambiguous.  Gaussian promotion is deliberately explicit
+because a single log can contain different useful sections; choose
 \texttt{gaussian-log-hessian}, \texttt{gaussian-rovib},
-\texttt{gaussian-electronic} or \texttt{gaussian-fchk}.  ORCA outputs are
-fetched and recorded, but not promoted until an ORCA adapter for a specific
-\xyzin{} section is defined.
+\texttt{gaussian-electronic} or \texttt{gaussian-fchk}.
 
 \section{Copying Files}
 
@@ -304,7 +307,8 @@ matrix gaussian promote-fchk molecule.fchk molecule.xyzin
 matrix gaussian promote-log-hessian molecule.log molecule.xyzin
 matrix gaussian promote-rovib molecule.log molecule.xyzin
 matrix gaussian promote-electronic molecule.log molecule.xyzin
-matrix molpro promote-output molecule.out molecule.xyzin
+matrix molpro promote molecule.out molecule.xyzin
+matrix orca promote molecule.out molecule.xyzin
 \end{lstlisting}
 
 For Gaussian ReadAllGIC optimization checks, keep the coordinate definition and

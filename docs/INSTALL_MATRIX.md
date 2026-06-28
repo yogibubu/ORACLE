@@ -275,7 +275,7 @@ These tools are optional but used by specific MATRIX workflow and ORACLE GUIs:
 | Gaussian executable (`g16`, `gdv`, or site wrapper) | QM jobs, Hessians, FCHK, rovibrational logs | Configure in the QM Jobs GUI or CLI `--executable` |
 | `formchk` | Convert Gaussian checkpoint files to FCHK | Used by `matrix gaussian formchk` |
 | Molpro | External QM job launcher and output source | Launched by `matrix molpro run`; parsed only by `matrix-molpro` adapters |
-| ORCA | External QM job launcher | Launched by `matrix orca run`; output adapters are added only when normalized `xyzin` sections are defined |
+| ORCA | External QM job launcher and output source | Launched by `matrix orca run`; `matrix orca promote` writes final geometry and `#CARTESIAN_HESSIAN` when ORCA prints a Cartesian Hessian |
 | MRCC | External QM output source | Parsed only by `matrix-mrcc` adapters |
 | Browser | Opens MOrbVis and future HTML reports | Prefer Chrome/Edge/Safari versions with WebGPU support |
 
@@ -290,11 +290,14 @@ the remote `~/matrix/bin/matrix-submit` helper:
 matrix qm remote-submit job.gjf --engine gdv32 --host enzo@oracle
 matrix qm remote-status --host enzo@oracle
 matrix qm remote-fetch JOB_NAME --host enzo@oracle --dest runs
+matrix qm remote-fetch JOB_NAME --host enzo@oracle --dest runs --promote orca --xyzin molecule.xyzin
 ```
 
 `remote-fetch` copies the `native_output` recorded in the remote `metadata.txt`
 and writes a local `remote_qm_fetch_manifest.json`.  Promotion into `xyzin`
-remains adapter-based, for example `--promote molpro --xyzin molecule.xyzin`.
+remains adapter-based: `molpro`, `orca` and the explicit Gaussian modes
+(`gaussian-log-hessian`, `gaussian-rovib`, `gaussian-electronic`,
+`gaussian-fchk`) are the supported promotion choices.
 
 ## Post-install Checks
 

@@ -114,6 +114,7 @@ def build_parser(
             "gaussian-rovib",
             "gaussian-electronic",
             "gaussian-fchk",
+            "orca",
         ),
         default="none",
     )
@@ -241,6 +242,17 @@ def build_parser(
     orca_run.add_argument("--background", action="store_true")
     orca_run.add_argument("--timeout", type=float)
     orca_run.add_argument("--extra-arg", action="append", default=[])
+    orca_summary = orca_sub.add_parser("summary", help="Summarize an ORCA output")
+    orca_summary.add_argument("output", type=Path)
+    orca_promote = orca_sub.add_parser(
+        "promote",
+        help="Preprocess an ORCA output and optional Hessian into a MATRIX xyzin",
+    )
+    orca_promote.add_argument("output", type=Path)
+    orca_promote.add_argument("xyzin", type=Path)
+    orca_promote.add_argument("--symmetry-distance", type=float, default=1.0e-3)
+    orca_promote.add_argument("--symmetry-inertia", type=float, default=1.0e-3)
+    orca_promote.add_argument("--max-rotation-order", type=int, default=6)
 
     mrcc = sub.add_parser("mrcc", help="MRCC output adapter utilities")
     mrcc_sub = mrcc.add_subparsers(dest="mrcc_command")
@@ -1209,6 +1221,35 @@ def main(
             extra_args=tuple(args.extra_arg),
         )
         _print_external_qm_run_result(result)
+        return 0
+    if args.command == "orca" and args.orca_command == "summary":
+        from matrix_orca import summarize_orca_output
+
+        summary = summarize_orca_output(args.output)
+        print(f"path: {summary.path}")
+        print(f"atoms: {summary.geometry.natoms}")
+        print(f"charge: {summary.charge}")
+        print(f"multiplicity: {summary.multiplicity}")
+        if summary.final_energy_hartree is not None:
+            print(f"final_energy_hartree: {summary.final_energy_hartree:.12g}")
+        print(f"frequencies: {len(summary.frequencies_cm)}")
+        print(f"cartesian_hessian: {int(summary.cartesian_hessian is not None)}")
+        print(f"cartesian_coordinate_blocks: {summary.cartesian_coordinate_blocks}")
+        print(f"normal_termination: {int(summary.normal_termination)}")
+        return 0
+    if args.command == "orca" and args.orca_command == "promote":
+        from matrix_orca import promote_orca_output_to_xyzin
+
+        result = promote_orca_output_to_xyzin(
+            args.output,
+            args.xyzin,
+            symmetry_distance=args.symmetry_distance,
+            symmetry_inertia=args.symmetry_inertia,
+            max_rotation_order=args.max_rotation_order,
+        )
+        print(f"Promoted ORCA output: {result.output_path} -> {result.xyzin}")
+        print(f"wrote_geometry: {int(result.wrote_geometry)}")
+        print(f"wrote_cartesian_hessian: {int(result.wrote_cartesian_hessian)}")
         return 0
     if args.command == "mrcc" and args.mrcc_command == "summary":
         from matrix_mrcc import summarize_mrcc_output
@@ -2396,7 +2437,7 @@ def _add_preprocess_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("output", type=Path)
     parser.add_argument(
         "--source-kind",
-        choices=("auto", "xyz", "enriched_xyz", "gaussian", "molpro", "mrcc"),
+        choices=("auto", "xyz", "enriched_xyz", "gaussian", "molpro", "mrcc", "orca"),
         default="auto",
     )
     parser.add_argument("--symmetry-distance", type=float, default=1.0e-3)

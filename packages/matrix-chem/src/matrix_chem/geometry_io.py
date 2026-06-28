@@ -137,7 +137,15 @@ def read_enriched_xyz(path: Path) -> MolecularGeometry:
     )
 
 
-GeometrySourceKind = Literal["auto", "xyz", "enriched_xyz", "gaussian", "molpro", "mrcc"]
+GeometrySourceKind = Literal[
+    "auto",
+    "xyz",
+    "enriched_xyz",
+    "gaussian",
+    "molpro",
+    "mrcc",
+    "orca",
+]
 
 
 def read_geometry_with_kind(
@@ -190,6 +198,10 @@ def read_geometry_with_kind(
         from matrix_mrcc import read_mrcc_output_geometry
 
         return read_mrcc_output_geometry(target)
+    if kind == "orca":
+        from matrix_orca import read_orca_output_geometry
+
+        return read_orca_output_geometry(target)
     raise GeometryParseError(f"unsupported geometry source kind: {source_kind}")
 
 
@@ -197,9 +209,15 @@ def read_geometry(path: Path) -> MolecularGeometry:
     return read_geometry_with_kind(Path(path), "auto")
 
 
-def detect_qm_output_format(path: Path) -> Literal["gaussian", "molpro", "mrcc"] | None:
+def detect_qm_output_format(path: Path) -> Literal["gaussian", "molpro", "mrcc", "orca"] | None:
     text = Path(path).read_text(encoding="utf-8", errors="replace")
     upper = text.upper()
+    if (
+        "PROGRAM ORCA" in upper
+        or "ORCA TERMINATED" in upper
+        or "FINAL SINGLE POINT ENERGY" in upper
+    ):
+        return "orca"
     if (
         "GAUSSIAN" in upper
         or "STANDARD ORIENTATION:" in upper
@@ -216,12 +234,12 @@ def detect_qm_output_format(path: Path) -> Literal["gaussian", "molpro", "mrcc"]
 
 def _try_qm_output_readers(path: Path) -> MolecularGeometry:
     errors: list[str] = []
-    for kind in ("gaussian", "molpro", "mrcc"):
+    for kind in ("gaussian", "molpro", "mrcc", "orca"):
         try:
             return read_geometry_with_kind(path, kind)  # type: ignore[arg-type]
         except Exception as exc:
             errors.append(f"{kind}: {exc}")
     raise GeometryParseError(
-        f"unsupported QM output format for {path}; tried Gaussian, Molpro and MRCC "
+        f"unsupported QM output format for {path}; tried Gaussian, Molpro, MRCC and ORCA "
         f"({'; '.join(errors)})"
     )

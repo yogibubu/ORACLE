@@ -27,8 +27,8 @@ manifest contracts.
   FCHK/QFF promotion and Gaussian log rovibrational promotion.
 - `matrix-molpro`: Molpro launch helpers and output adapters returning shared
   MATRIX geometry and enriched XYZ state.
-- `matrix-orca`: ORCA launch/status helpers. ORCA output parsing will be added
-  only through explicit shared MATRIX adapters.
+- `matrix-orca`: ORCA launch/status helpers and output adapters for final
+  geometry plus Cartesian Hessian data when printed by ORCA.
 - `matrix-mrcc`: MRCC output adapters returning shared MATRIX geometry and
   enriched XYZ state.
 - `matrix-link`: LINK preprocessing/import
@@ -117,6 +117,8 @@ python -m matrix molpro run molpro_workdir --input molecule.com
 python -m matrix molpro promote molpro.out molecule.xyzin
 python -m matrix orca status orca_workdir
 python -m matrix orca run orca_workdir --input molecule.inp
+python -m matrix orca summary orca.out
+python -m matrix orca promote orca.out molecule.xyzin
 python -m matrix mrcc promote mrcc.out molecule.xyzin
 ```
 
@@ -129,6 +131,8 @@ python -m matrix qm remote-status --host enzo@oracle
 python -m matrix qm remote-fetch JOB_NAME --host enzo@oracle --dest runs
 python -m matrix qm remote-fetch JOB_NAME --host enzo@oracle \
   --dest runs --promote molpro --xyzin molecule.xyzin
+python -m matrix qm remote-fetch JOB_NAME --host enzo@oracle \
+  --dest runs --promote orca --xyzin molecule.xyzin
 ```
 
 Thermo and rovibrational utilities run from the same enriched `xyzin` state:

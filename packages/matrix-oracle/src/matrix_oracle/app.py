@@ -1254,6 +1254,55 @@ def _run_qt(initial_xyzin: Path | None) -> int:
             job_row.addWidget(run_button)
             layout.addLayout(job_row)
 
+            remote_row = QHBoxLayout()
+            remote_row.addWidget(QLabel("Remote"))
+            self.qm_remote_input = QLineEdit()
+            remote_input_browse = QPushButton("Input")
+            remote_input_browse.clicked.connect(self.browse_qm_remote_input)
+            self.qm_remote_engine = QComboBox()
+            self.qm_remote_engine.addItems(("gdv32", "g16", "molpro", "orca"))
+            self.qm_remote_host = QLineEdit("oracle")
+            self.qm_remote_job = QLineEdit()
+            self.qm_remote_job.setPlaceholderText("job id")
+            self.qm_remote_destination = QLineEdit("remote_qm_runs")
+            remote_dest_browse = QPushButton("Dest")
+            remote_dest_browse.clicked.connect(self.browse_qm_remote_destination)
+            self.qm_remote_promote = QComboBox()
+            self.qm_remote_promote.addItems(
+                (
+                    "none",
+                    "auto",
+                    "molpro",
+                    "gaussian-log-hessian",
+                    "gaussian-rovib",
+                    "gaussian-electronic",
+                    "gaussian-fchk",
+                    "orca",
+                )
+            )
+            remote_submit_button = QPushButton("Submit")
+            remote_submit_button.clicked.connect(self.run_qm_remote_submit)
+            remote_status_button = QPushButton("Status")
+            remote_status_button.clicked.connect(self.run_qm_remote_status)
+            remote_fetch_button = QPushButton("Fetch")
+            remote_fetch_button.clicked.connect(self.run_qm_remote_fetch)
+            remote_row.addWidget(self.qm_remote_engine)
+            remote_row.addWidget(self.qm_remote_input, stretch=1)
+            remote_row.addWidget(remote_input_browse)
+            remote_row.addWidget(QLabel("Host"))
+            remote_row.addWidget(self.qm_remote_host)
+            remote_row.addWidget(QLabel("Job"))
+            remote_row.addWidget(self.qm_remote_job)
+            remote_row.addWidget(QLabel("Dest"))
+            remote_row.addWidget(self.qm_remote_destination)
+            remote_row.addWidget(remote_dest_browse)
+            remote_row.addWidget(QLabel("Promote"))
+            remote_row.addWidget(self.qm_remote_promote)
+            remote_row.addWidget(remote_submit_button)
+            remote_row.addWidget(remote_status_button)
+            remote_row.addWidget(remote_fetch_button)
+            layout.addLayout(remote_row)
+
             formchk_row = QHBoxLayout()
             formchk_row.addWidget(QLabel("CHK"))
             self.qm_chk_path = QLineEdit()
@@ -1367,7 +1416,7 @@ def _run_qt(initial_xyzin: Path | None) -> int:
             external_row = QHBoxLayout()
             external_row.addWidget(QLabel("QM output"))
             self.qm_external_kind = QComboBox()
-            self.qm_external_kind.addItems(("molpro", "mrcc"))
+            self.qm_external_kind.addItems(("molpro", "mrcc", "orca"))
             self.qm_external_output = QLineEdit()
             external_browse = QPushButton("Browse")
             external_browse.clicked.connect(self.browse_qm_external_output)
@@ -1509,6 +1558,25 @@ def _run_qt(initial_xyzin: Path | None) -> int:
             if path:
                 self.qm_external_output.setText(path)
 
+        def browse_qm_remote_input(self) -> None:
+            path, _selected = QFileDialog.getOpenFileName(
+                self,
+                "Select remote QM input",
+                self.qm_remote_input.text().strip() or str(Path.cwd()),
+                "QM input (*.gjf *.com *.inp);;All files (*)",
+            )
+            if path:
+                self.qm_remote_input.setText(path)
+
+        def browse_qm_remote_destination(self) -> None:
+            path = QFileDialog.getExistingDirectory(
+                self,
+                "Select remote fetch destination",
+                self.qm_remote_destination.text().strip() or str(Path.cwd()),
+            )
+            if path:
+                self.qm_remote_destination.setText(path)
+
         def run_qm_gaussian_input(self) -> None:
             if not self._ensure_qm_project("Gaussian input"):
                 return
@@ -1560,6 +1628,56 @@ def _run_qt(initial_xyzin: Path | None) -> int:
                 background=self.qm_gaussian_background.isChecked(),
                 timeout=timeout,
             )
+            self._start_command(command, command.label)
+
+        def run_qm_remote_submit(self) -> None:
+            if not self._ensure_qm_idle("Remote QM submit"):
+                return
+            input_path = self._qm_required_path(
+                self.qm_remote_input,
+                "Remote QM submit",
+                "remote QM input",
+            )
+            if input_path is None:
+                return
+            command = self.qm_jobs_controller.remote_submit_command(
+                input_path,
+                engine=self.qm_remote_engine.currentText(),
+                host=self.qm_remote_host.text().strip() or "oracle",
+            )
+            self._start_command(command, command.label)
+
+        def run_qm_remote_status(self) -> None:
+            if not self._ensure_qm_idle("Remote QM status"):
+                return
+            command = self.qm_jobs_controller.remote_status_command(
+                host=self.qm_remote_host.text().strip() or "oracle"
+            )
+            self._start_command(command, command.label)
+
+        def run_qm_remote_fetch(self) -> None:
+            promote = self.qm_remote_promote.currentText()
+            if promote == "none":
+                if not self._ensure_qm_idle("Remote QM fetch"):
+                    return
+                target_xyzin = None
+            else:
+                if not self._ensure_qm_project("Remote QM fetch"):
+                    return
+                target_xyzin = self.controller.xyzin
+            job = self.qm_remote_job.text().strip()
+            if not job:
+                QMessageBox.warning(self, "Remote QM fetch", "Enter a remote job id first.")
+                return
+            command = self.qm_jobs_controller.remote_fetch_command(
+                job,
+                host=self.qm_remote_host.text().strip() or "oracle",
+                destination=self.qm_remote_destination.text().strip() or "remote_qm_runs",
+                promote=promote,
+                xyzin=target_xyzin,
+            )
+            if target_xyzin is not None:
+                self.pending_xyzin_after_run = target_xyzin
             self._start_command(command, command.label)
 
         def run_qm_gaussian_formchk(self) -> None:
@@ -1683,8 +1801,10 @@ def _run_qt(initial_xyzin: Path | None) -> int:
                 return
             if self.qm_external_kind.currentText() == "molpro":
                 command = self.qm_jobs_controller.molpro_summary_command(output)
-            else:
+            elif self.qm_external_kind.currentText() == "mrcc":
                 command = self.qm_jobs_controller.mrcc_summary_command(output)
+            else:
+                command = self.qm_jobs_controller.orca_summary_command(output)
             self._start_command(command, command.label)
 
         def run_qm_external_promote(self) -> None:
@@ -1699,8 +1819,10 @@ def _run_qt(initial_xyzin: Path | None) -> int:
                 return
             if self.qm_external_kind.currentText() == "molpro":
                 command = self.qm_jobs_controller.molpro_promote_command(output)
-            else:
+            elif self.qm_external_kind.currentText() == "mrcc":
                 command = self.qm_jobs_controller.mrcc_promote_command(output)
+            else:
+                command = self.qm_jobs_controller.orca_promote_command(output)
             self.pending_xyzin_after_run = self.controller.xyzin
             self._start_command(command, command.label)
 

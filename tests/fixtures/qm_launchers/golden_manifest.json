@@ -1,0 +1,37 @@
+{
+  "schema": "matrix.qm_launcher_golden.v1",
+  "cases": [
+    {
+      "engine": "gdv32",
+      "input": "gdv32_h2.gjf",
+      "local_command": ["matrix", "gaussian", "run", "WORKDIR", "--executable", "gdv32"],
+      "remote_command": ["matrix", "qm", "remote-submit", "INPUT", "--engine", "gdv32"],
+      "native_output_suffix": ".log",
+      "promote_modes": ["gaussian-log-hessian", "gaussian-rovib", "gaussian-electronic", "gaussian-fchk"]
+    },
+    {
+      "engine": "g16",
+      "input": "g16_h2.gjf",
+      "local_command": ["matrix", "gaussian", "run", "WORKDIR", "--executable", "g16"],
+      "remote_command": ["matrix", "qm", "remote-submit", "INPUT", "--engine", "g16"],
+      "native_output_suffix": ".log",
+      "promote_modes": ["gaussian-log-hessian", "gaussian-rovib", "gaussian-electronic", "gaussian-fchk"]
+    },
+    {
+      "engine": "molpro",
+      "input": "molpro_h2.com",
+      "local_command": ["matrix", "molpro", "run", "WORKDIR", "--executable", "molpro"],
+      "remote_command": ["matrix", "qm", "remote-submit", "INPUT", "--engine", "molpro"],
+      "native_output_suffix": ".out",
+      "promote_modes": ["molpro"]
+    },
+    {
+      "engine": "orca",
+      "input": "orca_h2.inp",
+      "local_command": ["matrix", "orca", "run", "WORKDIR", "--executable", "orca"],
+      "remote_command": ["matrix", "qm", "remote-submit", "INPUT", "--engine", "orca"],
+      "native_output_suffix": ".out",
+      "promote_modes": ["orca"]
+    }
+  ]
+}

@@ -22,7 +22,9 @@ from .commands import (
     qm_remote_fetch_command,
     qm_remote_status_command,
     qm_remote_submit_command,
+    orca_promote_command,
     orca_run_command,
+    orca_summary_command,
     orca_status_command,
 )
 
@@ -255,6 +257,14 @@ class OracleQMJobsController:
             timeout=timeout,
             extra_args=extra_args,
         )
+
+    def orca_summary_command(self, output: Path | str) -> OracleGuiCommand:
+        return orca_summary_command(output)
+
+    def orca_promote_command(self, output: Path | str) -> OracleGuiCommand:
+        if self.xyzin is None:
+            raise ValueError("no MATRIX xyzin project is loaded")
+        return orca_promote_command(output, self.xyzin)
 
     def mrcc_summary_command(self, output: Path | str) -> OracleGuiCommand:
         return mrcc_summary_command(output)

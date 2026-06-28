@@ -71,10 +71,10 @@ TOOL_CONTRACTS: tuple[ToolContract, ...] = (
     ToolContract(
         key="qm_adapters",
         display_name="QM adapters",
-        current_package="matrix-gaussian / matrix-molpro / matrix-mrcc",
+        current_package="matrix-gaussian / matrix-molpro / matrix-mrcc / matrix-orca",
         standalone_command=(
             "matrix gaussian promote-fchk|promote-rovib|promote-electronic; "
-            "matrix molpro promote; matrix mrcc promote"
+            "matrix molpro promote; matrix mrcc promote; matrix orca promote"
         ),
         produced_sections=(
             "SOURCE",
@@ -105,7 +105,7 @@ TOOL_CONTRACTS: tuple[ToolContract, ...] = (
         ),
         notes=(
             "One adapter owns each external QM format. Scientific tools consume only "
-            "the normalized xyzin sections and never reparse Gaussian/Molpro/MRCC output."
+            "the normalized xyzin sections and never reparse Gaussian/Molpro/MRCC/ORCA output."
         ),
     ),
     ToolContract(

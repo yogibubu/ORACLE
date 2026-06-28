@@ -1,0 +1,9 @@
+%chk=gdv32_h2.chk
+#p hf/sto-3g sp
+
+MATRIX GDV32 launcher smoke H2
+
+0 1
+H 0.00000000 0.00000000 0.00000000
+H 0.00000000 0.00000000 0.74000000
+

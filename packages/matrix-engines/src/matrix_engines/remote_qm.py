@@ -24,6 +24,7 @@ PROMOTE_MODES = (
     "gaussian-rovib",
     "gaussian-electronic",
     "gaussian-fchk",
+    "orca",
 )
 
 
@@ -313,6 +314,18 @@ def promote_remote_qm_output(
             status="promoted",
             message=f"promoted Gaussian FCHK data to {result.xyzin}",
         )
+    if mode == "orca":
+        from matrix_orca import promote_orca_output_to_xyzin
+
+        result = promote_orca_output_to_xyzin(output, xyzin_path)
+        sections = ["geometry"]
+        if result.wrote_cartesian_hessian:
+            sections.append("Cartesian Hessian")
+        return RemoteQMPromotionResult(
+            mode=mode,
+            status="promoted",
+            message=f"promoted ORCA {' and '.join(sections)} to {result.xyzin}",
+        )
     return RemoteQMPromotionResult(
         mode=mode,
         status="skipped",
@@ -330,6 +343,8 @@ def _resolved_promote_mode(promote: str, metadata: RemoteQMMetadata) -> str:
         if suffix in {".fchk", ".fch"}:
             return "gaussian-fchk"
         return "none"
+    if metadata.engine == "orca":
+        return "orca"
     return "none"
 
 
@@ -432,6 +447,8 @@ def _sha256_file(path: Path) -> str:
 
 
 def remote_fetch_cli_hint(result: RemoteQMFetchResult) -> str:
+    if result.promotion is not None:
+        return result.promotion.message
     if result.engine in {"gdv32", "g16"}:
         return (
             "Gaussian output fetched. Use --promote gaussian-log-hessian, "
@@ -439,10 +456,11 @@ def remote_fetch_cli_hint(result: RemoteQMFetchResult) -> str:
             "--promote gaussian-fchk with --xyzin when the requested section is present."
         )
     if result.engine == "orca":
-        return "ORCA output fetched. No ORCA xyzin adapter is enabled yet."
-    if result.promotion is None:
-        return "Output fetched. No promotion was requested."
-    return result.promotion.message
+        return (
+            "ORCA output fetched. Use --promote orca --xyzin to normalize final geometry "
+            "and Cartesian Hessian when printed."
+        )
+    return "Output fetched. No promotion was requested."
 
 
 def python_cli_command() -> tuple[str, str, str]:
