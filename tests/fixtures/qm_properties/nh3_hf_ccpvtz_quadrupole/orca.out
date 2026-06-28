@@ -1,0 +1,19 @@
+Program ORCA
+
+Nucleus   0N : A  : Isotope=   14 I=  1.0 P= 38.5677 MHz/au**3
+               Q  : Isotope=   14 I=  1.0 Q=  0.0204 barn
+               EFG: fgrad=YES rho= NO
+
+Raw EFG matrix (all values in a.u.**-3):
+ ------------------------------------------------------
+             0.4970207      -0.0000000       0.0000000
+            -0.0000000       0.4961606       0.0001744
+             0.0000000       0.0001744      -0.9931813
+
+V(Tot)       0.4961606       0.4970207      -0.9931813
+
+Quadrupole tensor eigenvalues (in MHz;Q= 0.0204 I=  1.0)
+ e**2qQ            =    -4.769937 MHz
+ eta               =     0.000866
+
+****ORCA TERMINATED NORMALLY****

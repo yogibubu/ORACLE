@@ -1,0 +1,12 @@
+#p hf/cc-pVTZ scf=tight prop=efg output=pickett nosymm
+
+NH3 HF/cc-pVTZ EFG Pickett test
+
+Nuclear quadrupole coupling constants [Chi] (MHz):
+ 1  N(14)
+  aa=     2.3869   ba=    -0.0000   ca=    -0.0000
+  ab=    -0.0000   bb=     2.3828   cb=     0.0008
+  ac=    -0.0000   bc=     0.0008   cc=    -4.7697
+Dipole moment (Debye):
+
+Normal termination of Gaussian DV

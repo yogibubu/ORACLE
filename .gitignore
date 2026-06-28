@@ -46,4 +46,6 @@ data/lcb25/
 # Scientific regression fixtures kept in git even when they include logs.
 !tests/fixtures/test_molecules/**/*.log
 !tests/fixtures/test_molecules/**/*.out
+!tests/fixtures/qm_properties/**/*.log
+!tests/fixtures/qm_properties/**/*.out
 !examples/gaussian_readallgic/**/*.log
