@@ -91,6 +91,7 @@ TOOL_CONTRACTS: tuple[ToolContract, ...] = (
             "ELECTRONIC",
             "TRANSITIONS",
             "ORBITALS",
+            "PROPERTIES",
         ),
         owned_sections=(
             "CARTESIAN_HESSIAN",
@@ -102,10 +103,12 @@ TOOL_CONTRACTS: tuple[ToolContract, ...] = (
             "ELECTRONIC",
             "TRANSITIONS",
             "ORBITALS",
+            "PROPERTIES",
         ),
         notes=(
             "One adapter owns each external QM format. Scientific tools consume only "
-            "the normalized xyzin sections and never reparse Gaussian/Molpro/MRCC/ORCA output."
+            "the normalized xyzin sections and never reparse Gaussian/Molpro/MRCC/ORCA output. "
+            "#PROPERTIES stores program-dependent QM properties with unit/conversion metadata."
         ),
     ),
     ToolContract(
@@ -238,7 +241,16 @@ def tool_contract(key: str) -> ToolContract:
     normalized = key.strip().lower().replace("-", "_")
     if normalized in {"babel", "matrix_link", "oracle_babel"}:
         normalized = "link"
-    if normalized in {"gaussian", "molpro", "mrcc", "qm", "qm_jobs", "qm_adapters"}:
+    if normalized in {
+        "gaussian",
+        "molpro",
+        "mrcc",
+        "orca",
+        "properties",
+        "qm",
+        "qm_jobs",
+        "qm_adapters",
+    }:
         normalized = "qm_adapters"
     for contract in TOOL_CONTRACTS:
         if contract.key == normalized:

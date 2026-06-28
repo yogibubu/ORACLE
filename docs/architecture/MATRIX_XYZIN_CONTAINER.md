@@ -168,6 +168,23 @@ strengths from Gaussian logs and can register associated Molden/Cube/FCHK files.
 GUI and scientific tools consume these sections; they must not parse Gaussian
 logs or FCHK files privately.
 
+`matrix-qm` also owns `#PROPERTIES`, the generic property layer for data that
+is not naturally a Hessian, normal-mode block, QFF, electronic transition or
+orbital-file record. Each row records `NAME`, `TARGET`, `TARGET_ID`, `ATOM`,
+`ISOTOPE`, `VALUE`, `UNIT`, `AXES`, `PROGRAM`, `METHOD`, `LEVEL`, `STATUS`,
+`CONVERSION`, `UNCERTAINTY`, `SOURCE` and `COMMENT`. `TARGET` may identify a
+molecule, atom, bond, mode, transition or fragment; `ATOM` is one-based and is
+kept explicit for nuclear-spin properties. Vector and tensor properties are
+stored as comma-separated values with `AXES` documenting the frame/order.
+
+This section is intentionally designed for program-dependent quantities and
+unit conversions. For example, a Molpro parser may store a raw electric-field
+gradient tensor in atomic units and a converted nuclear quadrupole coupling
+constant in MHz as separate records. The converted record must keep the
+isotope, source program, method, basis/level and conversion label so downstream
+rotational or hyperfine tools can use the value without reparsing Molpro output
+or guessing the conversion.
+
 `matrix gf --xyzin molecule.xyzin` updates `#GF_PED` by default. The section
 uses schema `oracle.xyz.gf_ped.v1` and stores the Hessian source, coordinate
 source, point group, matrix model, nonbonded correction label, frequencies,

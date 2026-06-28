@@ -51,6 +51,6 @@ workflows belong to the next release and do not block this release.
 | Thermochemistry / Kinetics | Covered in release manual | Thermo tables, rovibrational DOS, current `#THERMO` outputs and planned `#KINETICS` extension boundary. |
 | VPT2/VCI | Covered in release manual | QFF input contract, VPT2/VCI run modes, CSV/report outputs and relation to the vibrational workbench. |
 | DVR | Covered in release manual | Direct DVR runs, post-run normalization, shared diagonalizer use and `#DVR` GUI state. |
-| QM Adapters | Covered in release manual | One-adapter-per-format policy, Gaussian/Molpro/MRCC promotion commands, shared `#CARTESIAN_HESSIAN`, `#NORMAL_MODES`, `#QFF`, electronic and orbital sections. |
+| QM Adapters | Covered in release manual | One-adapter-per-format policy, Gaussian/Molpro/MRCC/ORCA promotion commands, shared `#CARTESIAN_HESSIAN`, `#NORMAL_MODES`, `#QFF`, electronic, orbital and `#PROPERTIES` sections. |
 | Remote QM Execution on oracle | Specialist manual plus release manual | Remote directory layout, `matrix-submit`, `matrix-status`, GDV32/G16 policy, Molpro 2025.3, ORCA module use, file transfer and adapter promotion. |
 | ORACLE GUI | Covered in release manual | Project dashboard, spectroscopy workbenches, structure/synthon view, external viewers, missing-section guidance and export workflows. |

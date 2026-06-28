@@ -173,6 +173,15 @@ The main promoted sections are \sectionname{CARTESIAN\_HESSIAN},
 \sectionname{ORBITALS}.  Orbital files are passed to Molden, Avogadro or
 MOrbVis-compatible viewers through the GUI command layer.
 
+General QM properties are stored in \sectionname{PROPERTIES}.  This section is
+owned by \texttt{matrix-qm} and records the property name, target, atom or
+fragment selector, isotope, values, units, axes, source program, method, level
+and any conversion label.  It is meant for quantities whose availability and
+units depend on the external code, for example raw Molpro electric-field
+gradients and converted nuclear quadrupole coupling constants.  Downstream
+spectroscopic tools must read this normalized section instead of reparsing QM
+outputs.
+
 \subsection{Remote QM Execution}
 
 Heavy QM jobs can be launched on the private Linux host \texttt{oracle} and

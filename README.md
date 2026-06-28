@@ -21,8 +21,8 @@ manifest contracts.
 - `matrix-morpheus`: semiexperimental geometry refinement, constraints,
   predicates, parameter classes, diagnostics and ensemble refinement.
 - `matrix-gf`: frozen-GIC GF/PED analysis.
-- `matrix-qm`: shared QM data sections for Cartesian Hessians, normal modes and
-  QFF/anharmonic force fields.
+- `matrix-qm`: shared QM data sections for Cartesian Hessians, normal modes,
+  QFF/anharmonic force fields, electronic data and normalized QM properties.
 - `matrix-gaussian`: Gaussian input/output adapters, job status/run helpers,
   FCHK/QFF promotion and Gaussian log rovibrational promotion.
 - `matrix-molpro`: Molpro launch helpers and output adapters returning shared

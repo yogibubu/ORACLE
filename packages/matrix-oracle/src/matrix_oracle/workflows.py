@@ -281,6 +281,7 @@ ORACLE_GUI_WINDOWS: tuple[WindowSpec, ...] = (
             "ELECTRONIC",
             "TRANSITIONS",
             "ORBITALS",
+            "PROPERTIES",
         ),
         capabilities=(
             "write Gaussian GIC inputs from the frozen #GIC contract",
@@ -289,6 +290,7 @@ ORACLE_GUI_WINDOWS: tuple[WindowSpec, ...] = (
             "promote FCHK Hessian, normal-mode and QFF data",
             "promote rovibrational output sections from Gaussian logs",
             "promote electronic states, transitions and orbital file records from Gaussian outputs",
+            "promote QM properties with explicit unit and conversion metadata",
             "promote Molpro and MRCC geometries through the shared QM adapters",
         ),
         external_viewers=("Avogadro", "Molden"),

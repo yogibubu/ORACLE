@@ -172,6 +172,13 @@ SECTION_COMPLETION_HINTS: dict[str, SectionCompletionHint] = {
         "matrix gaussian promote-electronic --orbital-file FILE",
         "view with Molden, Avogadro or MOrbVis-browser where available",
     ),
+    "PROPERTIES": SectionCompletionHint(
+        "PROPERTIES",
+        "QM Jobs",
+        "Promote normalized QM properties",
+        "matrix properties summary molecule.xyzin; adapter-specific promote commands",
+        "stores program, method, level, unit and conversion metadata for QM properties",
+    ),
     "GF_PED": SectionCompletionHint(
         "GF_PED",
         "GF/PED",
@@ -300,6 +307,7 @@ QUICKSTART: dict[str, tuple[str, ...]] = {
         "matrix gaussian promote-rovib calc.log molecule.xyzin",
         "matrix gaussian promote-electronic calc.log molecule.xyzin",
         "matrix orca promote calc.out molecule.xyzin",
+        "matrix properties summary molecule.xyzin",
     ),
     "fragments": ("matrix fragments build molecule.xyzin",),
     "gicforge": (

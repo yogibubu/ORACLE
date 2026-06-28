@@ -82,6 +82,19 @@ def build_parser(
     )
     help_cmd.add_argument("--no-gui", action="store_true", help="Omit the GUI orchestrator")
 
+    properties = sub.add_parser("properties", help="Inspect normalized QM properties")
+    properties_sub = properties.add_subparsers(dest="properties_command")
+    properties_summary = properties_sub.add_parser("summary", help="Summarize #PROPERTIES")
+    properties_summary.add_argument("xyzin", type=Path)
+    properties_summary.add_argument("--name", help="Filter by normalized property name")
+    properties_summary.add_argument("--atom", type=int, help="Filter by one-based atom index")
+    properties_summary.add_argument(
+        "--format",
+        choices=("text", "json"),
+        default="text",
+        help="Output format",
+    )
+
     qm = sub.add_parser("qm", help="Remote QM job orchestration")
     qm_sub = qm.add_subparsers(dest="qm_command")
     remote_submit = qm_sub.add_parser("remote-submit", help="Submit a QM input on a remote host")
@@ -930,6 +943,40 @@ def main(
                         args.tool,
                         xyzin=args.xyzin,
                         include_gui=not args.no_gui,
+                    )
+                )
+            )
+        return 0
+    if args.command == "properties" and args.properties_command == "summary":
+        from matrix_qm import (
+            filtered_property_records,
+            properties_summary_lines,
+            property_record_to_dict,
+            read_properties_section,
+        )
+
+        section = read_properties_section(args.xyzin)
+        if args.format == "json":
+            records = filtered_property_records(section, name=args.name, atom=args.atom)
+            print(
+                json.dumps(
+                    {
+                        "xyzin": str(args.xyzin),
+                        "schema": section.schema,
+                        "count": len(records),
+                        "records": [property_record_to_dict(record) for record in records],
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+        else:
+            print(
+                "\n".join(
+                    properties_summary_lines(
+                        section,
+                        name=args.name,
+                        atom=args.atom,
                     )
                 )
             )

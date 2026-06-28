@@ -1174,6 +1174,7 @@ def test_gui_window_specs_cover_primary_oracle_workflows():
     assert "ELECTRONIC" in all_known_sections()
     assert "TRANSITIONS" in all_known_sections()
     assert "ORBITALS" in all_known_sections()
+    assert "PROPERTIES" in all_known_sections()
     assert "KINETICS" in all_known_sections()
     assert "TRINITY" in all_known_sections()
     assert "ROTATIONAL_SPECTRUM" in all_known_sections()

@@ -19,24 +19,34 @@ from matrix_qm import (
     ElectronicTransitionRecord,
     OrbitalFileRecord,
     OrbitalsSection,
+    PropertiesSection,
+    PropertyRecord,
     TransitionsSection,
     electronic_section_lines,
+    merge_properties_section,
     hessian_input_from_xyzin,
     orbital_file_record_from_path,
     parse_electronic_section,
     parse_orbitals_section,
+    parse_properties_section,
     parse_transitions_section,
+    properties_section_lines,
+    property_records_by_name,
+    property_records_for_atom,
     qff_section_from_quartic_force_field,
     quartic_force_field_from_qff_section,
     read_cartesian_hessian_section,
     read_electronic_section,
     read_normal_modes_section,
     read_orbitals_section,
+    read_properties_section,
     read_qff_section,
     read_transitions_section,
+    write_properties_section,
     write_qff_section,
 )
 from matrix_vpt2_vci import QuarticForceField, load_force_field
+from tools import matrix_run
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -124,6 +134,85 @@ def test_electronic_xyzin_sections_roundtrip(tmp_path):
     assert isinstance(orbitals.files[0], OrbitalFileRecord)
     assert orbitals.files[0] == orbital_file_record_from_path(molden, source="unit")
     assert orbitals.files[1].role == "density"
+
+
+def test_properties_section_roundtrip_preserves_conversion_metadata(tmp_path):
+    xyzin = tmp_path / "properties.xyzin"
+    xyzin.write_text("2\nnqcc\nN 0 0 0\nH 0 0 1\n", encoding="utf-8")
+    record = PropertyRecord(
+        name="NUCLEAR_QUADRUPOLE_COUPLING",
+        target="atom",
+        target_id="N1",
+        atom=1,
+        isotope="14N",
+        value=(-4.123456, 2.061728, 2.061728),
+        unit="MHz",
+        axes="PAS:chi_aa,chi_bb,chi_cc",
+        program="Molpro",
+        method="CCSD(T)",
+        level="cc-pVTZ",
+        source="molpro.out",
+        status="converted",
+        conversion="EFG_AU_TO_MHZ_WITH_14N_Q",
+        uncertainty=0.002,
+        comment="converted from Molpro EFG",
+    )
+
+    lines = properties_section_lines(PropertiesSection((record,)))
+    parsed = parse_properties_section(lines)
+    write_properties_section(xyzin, parsed)
+    restored = read_properties_section(xyzin)
+
+    assert restored.schema == "oracle.xyz.properties.v1"
+    assert restored.records == (record,)
+    assert restored.records[0].target == "ATOM"
+    assert property_records_by_name(restored, "nuclear_quadrupole_coupling") == (record,)
+    assert property_records_for_atom(restored, 1) == (record,)
+
+
+def test_properties_merge_and_cli_summary(tmp_path, capsys):
+    xyzin = tmp_path / "properties.xyzin"
+    xyzin.write_text("1\nnqcc\nN 0 0 0\n", encoding="utf-8")
+    raw = PropertyRecord(
+        name="EFG_TENSOR",
+        target="ATOM",
+        atom=1,
+        isotope="14N",
+        value=(-1.0, 0.5, 0.5),
+        unit="a.u.",
+        axes="PAS",
+        program="Molpro",
+        method="HF",
+        level="cc-pVDZ",
+        source="molpro.out",
+    )
+    converted = PropertyRecord(
+        name="EFG_TENSOR",
+        target="ATOM",
+        atom=1,
+        isotope="14N",
+        value=(-2.0, 1.0, 1.0),
+        unit="a.u.",
+        axes="PAS",
+        program="Molpro",
+        method="HF",
+        level="cc-pVDZ",
+        source="molpro-rerun.out",
+    )
+
+    merge_properties_section(xyzin, (raw,))
+    merge_properties_section(xyzin, (converted,))
+    section = read_properties_section(xyzin)
+
+    assert isinstance(section, PropertiesSection)
+    assert len(section.records) == 1
+    assert section.records[0].value == (-2.0, 1.0, 1.0)
+
+    rc = matrix_run.main(["properties", "summary", str(xyzin), "--atom", "1"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "properties: 1" in out
+    assert "EFG_TENSOR" in out
 
 
 def test_gaussian_electronic_log_promotion_writes_sections(tmp_path):

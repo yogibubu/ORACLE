@@ -92,6 +92,7 @@ def test_tool_contract_registry_records_standalone_sections_and_future_names():
     assert contracts["link"].expanded_name == "Loader for Interoperable Normalized Knowledge"
     assert contracts["qm_adapters"].display_name == "QM adapters"
     assert "CARTESIAN_HESSIAN" in contracts["qm_adapters"].owned_sections
+    assert "PROPERTIES" in contracts["qm_adapters"].owned_sections
     assert contracts["gicforge"].planned_name == "NEO"
     assert contracts["gicforge"].expanded_name == "Nonredundant Equivariant Orthogonalizer"
     assert contracts["gicforge"].produced_sections == ("GIC", "SYCART")
@@ -105,6 +106,7 @@ def test_tool_contract_registry_records_standalone_sections_and_future_names():
     assert tool_contract("babel").key == "link"
     assert tool_contract("gaussian").key == "qm_adapters"
     assert tool_contract("qm-jobs").key == "qm_adapters"
+    assert tool_contract("properties").key == "qm_adapters"
     assert tool_contract("NEO").key == "gicforge"
     assert "TRINITY" in tool_contract_markdown_table()
 
