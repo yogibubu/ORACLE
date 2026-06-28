@@ -19,6 +19,9 @@ from .commands import (
     molpro_status_command,
     mrcc_promote_command,
     mrcc_summary_command,
+    qm_remote_fetch_command,
+    qm_remote_status_command,
+    qm_remote_submit_command,
     orca_run_command,
     orca_status_command,
 )
@@ -41,6 +44,51 @@ class OracleQMJobsController:
         if self.xyzin is None:
             raise ValueError("no MATRIX xyzin project is loaded")
         return gicforge_gaussian_input_command(self.xyzin, output, route=route, title=title)
+
+    def remote_submit_command(
+        self,
+        input_path: Path | str,
+        *,
+        engine: str,
+        host: str = "oracle",
+        remote_root: str = "~/matrix",
+        extra_args: tuple[str, ...] = (),
+    ) -> OracleGuiCommand:
+        return qm_remote_submit_command(
+            input_path,
+            engine=engine,
+            host=host,
+            remote_root=remote_root,
+            extra_args=extra_args,
+        )
+
+    def remote_status_command(
+        self,
+        *,
+        host: str = "oracle",
+        remote_root: str = "~/matrix",
+    ) -> OracleGuiCommand:
+        return qm_remote_status_command(host=host, remote_root=remote_root)
+
+    def remote_fetch_command(
+        self,
+        job: str,
+        *,
+        host: str = "oracle",
+        remote_root: str = "~/matrix",
+        destination: Path | str = "remote_qm_runs",
+        promote: str = "none",
+        xyzin: Path | str | None = None,
+    ) -> OracleGuiCommand:
+        target_xyzin = xyzin if xyzin is not None else self.xyzin
+        return qm_remote_fetch_command(
+            job,
+            host=host,
+            remote_root=remote_root,
+            destination=destination,
+            promote=promote,
+            xyzin=target_xyzin,
+        )
 
     def gaussian_status_command(self, workdir: Path | str) -> OracleGuiCommand:
         return gaussian_status_command(workdir)

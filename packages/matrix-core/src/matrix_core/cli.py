@@ -82,6 +82,45 @@ def build_parser(
     )
     help_cmd.add_argument("--no-gui", action="store_true", help="Omit the GUI orchestrator")
 
+    qm = sub.add_parser("qm", help="Remote QM job orchestration")
+    qm_sub = qm.add_subparsers(dest="qm_command")
+    remote_submit = qm_sub.add_parser("remote-submit", help="Submit a QM input on a remote host")
+    remote_submit.add_argument("input", type=Path)
+    remote_submit.add_argument("--engine", choices=("gdv32", "g16", "molpro", "orca"), required=True)
+    remote_submit.add_argument("--host", default=os.environ.get("MATRIX_REMOTE_HOST", "oracle"))
+    remote_submit.add_argument("--remote-root", default=os.environ.get("MATRIX_REMOTE_ROOT", "~/matrix"))
+    remote_submit.add_argument("--extra-arg", action="append", default=[])
+    remote_submit.add_argument("--ssh", default="ssh")
+    remote_submit.add_argument("--scp", default="scp")
+    remote_status = qm_sub.add_parser("remote-status", help="List remote MATRIX QM jobs")
+    remote_status.add_argument("--host", default=os.environ.get("MATRIX_REMOTE_HOST", "oracle"))
+    remote_status.add_argument("--remote-root", default=os.environ.get("MATRIX_REMOTE_ROOT", "~/matrix"))
+    remote_status.add_argument("--ssh", default="ssh")
+    remote_fetch = qm_sub.add_parser(
+        "remote-fetch",
+        help="Fetch a remote MATRIX QM job output and optionally promote it",
+    )
+    remote_fetch.add_argument("job")
+    remote_fetch.add_argument("--host", default=os.environ.get("MATRIX_REMOTE_HOST", "oracle"))
+    remote_fetch.add_argument("--remote-root", default=os.environ.get("MATRIX_REMOTE_ROOT", "~/matrix"))
+    remote_fetch.add_argument("--dest", type=Path, default=Path("remote_qm_runs"))
+    remote_fetch.add_argument(
+        "--promote",
+        choices=(
+            "none",
+            "auto",
+            "molpro",
+            "gaussian-log-hessian",
+            "gaussian-rovib",
+            "gaussian-electronic",
+            "gaussian-fchk",
+        ),
+        default="none",
+    )
+    remote_fetch.add_argument("--xyzin", type=Path)
+    remote_fetch.add_argument("--ssh", default="ssh")
+    remote_fetch.add_argument("--scp", default="scp")
+
     link = sub.add_parser("link", help="Run LINK preprocessing/import")
     link_sub = link.add_subparsers(dest="link_command")
     link_preprocess = link_sub.add_parser("preprocess", help="Import a source into xyzin")
@@ -882,6 +921,65 @@ def main(
                     )
                 )
             )
+        return 0
+    if args.command == "qm" and args.qm_command == "remote-submit":
+        from matrix_engines import remote_qm_submit
+
+        result = remote_qm_submit(
+            args.input,
+            engine=args.engine,
+            host=args.host,
+            remote_root=args.remote_root,
+            extra_args=tuple(args.extra_arg),
+            ssh_executable=args.ssh,
+            scp_executable=args.scp,
+        )
+        print(f"host: {result.host}")
+        print(f"engine: {result.engine}")
+        print(f"job: {result.job}")
+        print(f"remote_input: {result.remote_input}")
+        print(f"workdir: {result.workdir}")
+        print(f"log: {result.log}")
+        if result.native_output:
+            print(f"native_output: {result.native_output}")
+        return 0
+    if args.command == "qm" and args.qm_command == "remote-status":
+        from matrix_engines import remote_qm_status
+
+        print(
+            remote_qm_status(
+                host=args.host,
+                remote_root=args.remote_root,
+                ssh_executable=args.ssh,
+            ),
+            end="",
+        )
+        return 0
+    if args.command == "qm" and args.qm_command == "remote-fetch":
+        from matrix_engines import remote_fetch_cli_hint, remote_qm_fetch
+
+        result = remote_qm_fetch(
+            args.job,
+            host=args.host,
+            destination=args.dest,
+            remote_root=args.remote_root,
+            promote=args.promote,
+            xyzin=args.xyzin,
+            ssh_executable=args.ssh,
+            scp_executable=args.scp,
+        )
+        print(f"host: {result.host}")
+        print(f"job: {result.job}")
+        print(f"engine: {result.engine}")
+        print(f"destination: {result.destination}")
+        print(f"native_output: {result.output_path}")
+        print(f"metadata: {result.metadata_path}")
+        print(f"manifest: {result.manifest_path}")
+        if result.promotion is not None:
+            print(f"promotion_mode: {result.promotion.mode}")
+            print(f"promotion_status: {result.promotion.status}")
+            print(f"promotion_message: {result.promotion.message}")
+        print(f"message: {remote_fetch_cli_hint(result)}")
         return 0
     if _is_link_command(args):
         from matrix_chem import SymmetryThresholds, preprocess_to_enriched_xyz

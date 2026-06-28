@@ -255,6 +255,93 @@ def gaussian_summary_command(log: Path | str) -> OracleGuiCommand:
     )
 
 
+def qm_remote_submit_command(
+    input_path: Path | str,
+    *,
+    engine: str,
+    host: str = "oracle",
+    remote_root: str = "~/matrix",
+    extra_args: Sequence[str] = (),
+) -> OracleGuiCommand:
+    argv = [
+        *_matrix_cli(),
+        "qm",
+        "remote-submit",
+        str(Path(input_path)),
+        "--engine",
+        engine,
+        "--host",
+        host,
+        "--remote-root",
+        remote_root,
+    ]
+    for arg in extra_args:
+        argv.extend(["--extra-arg", str(arg)])
+    return OracleGuiCommand("Submit remote QM job", tuple(argv))
+
+
+def qm_remote_status_command(
+    *,
+    host: str = "oracle",
+    remote_root: str = "~/matrix",
+) -> OracleGuiCommand:
+    return OracleGuiCommand(
+        "Inspect remote QM jobs",
+        (
+            *_matrix_cli(),
+            "qm",
+            "remote-status",
+            "--host",
+            host,
+            "--remote-root",
+            remote_root,
+        ),
+    )
+
+
+def qm_remote_fetch_command(
+    job: str,
+    *,
+    host: str = "oracle",
+    remote_root: str = "~/matrix",
+    destination: Path | str = "remote_qm_runs",
+    promote: str = "none",
+    xyzin: Path | str | None = None,
+) -> OracleGuiCommand:
+    argv = [
+        *_matrix_cli(),
+        "qm",
+        "remote-fetch",
+        job,
+        "--host",
+        host,
+        "--remote-root",
+        remote_root,
+        "--dest",
+        str(Path(destination)),
+        "--promote",
+        promote,
+    ]
+    if xyzin is not None:
+        argv.extend(["--xyzin", str(Path(xyzin))])
+    produced: list[str] = []
+    if promote == "molpro":
+        produced.extend(["SOURCE", "BASIC", "SYMMETRY", "TOPOLOGY", "SYNTHONS"])
+    elif promote == "gaussian-log-hessian":
+        produced.extend(["CARTESIAN_HESSIAN", "NORMAL_MODES"])
+    elif promote == "gaussian-rovib":
+        produced.extend(["VIBRATIONAL", "ROTATIONAL", "DELTABVIB"])
+    elif promote == "gaussian-electronic":
+        produced.extend(["ELECTRONIC", "TRANSITIONS"])
+    elif promote == "gaussian-fchk":
+        produced.extend(["CARTESIAN_HESSIAN", "NORMAL_MODES", "QFF", "ELECTRONIC", "ORBITALS"])
+    return OracleGuiCommand(
+        "Fetch remote QM output",
+        tuple(argv),
+        produced_sections=tuple(produced),
+    )
+
+
 def gaussian_status_command(workdir: Path | str) -> OracleGuiCommand:
     return OracleGuiCommand(
         "Inspect Gaussian job",

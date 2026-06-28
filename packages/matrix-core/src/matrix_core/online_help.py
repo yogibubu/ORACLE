@@ -233,6 +233,7 @@ MANUAL_PATHS: dict[str, tuple[str, ...]] = {
     ),
     "qm_adapters": (
         "docs/manuals/matrix_first_release_manual.pdf",
+        "docs/manuals/oracle_qm_remote_manual.pdf",
         "docs/architecture/ADR-0003-UNIFIED-GEOMETRY-AND-QM-PARSERS.md",
         "docs/architecture/MATRIX_XYZIN_CONTAINER.md",
     ),
@@ -292,6 +293,9 @@ QUICKSTART: dict[str, tuple[str, ...]] = {
         "matrix validate molecule.xyzin",
     ),
     "qm_adapters": (
+        "matrix qm remote-submit --engine gdv32 calc.gjf --host enzo@oracle",
+        "matrix qm remote-status --host enzo@oracle",
+        "matrix qm remote-fetch JOB --host enzo@oracle --dest runs",
         "matrix gaussian promote-fchk calc.fchk molecule.xyzin",
         "matrix gaussian promote-rovib calc.log molecule.xyzin",
         "matrix gaussian promote-electronic calc.log molecule.xyzin",

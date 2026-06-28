@@ -224,9 +224,46 @@ scheduling.  Each job writes \texttt{metadata.txt}; the fields
 stable log link, the scientific program output in the work directory and any
 launcher stdout/stderr stream.
 
+\section{Local MATRIX Remote Commands}
+
+The preferred local interface is the \framework{} remote QM wrapper.  It uses
+SSH and SCP only as transport, calls the same remote
+\texttt{matrix-submit} helper and never stores credentials.
+
+\begin{lstlisting}[style=matrix]
+matrix qm remote-submit molecule.gjf --engine gdv32 --host enzo@oracle
+matrix qm remote-submit molecule.com --engine molpro --host enzo@oracle
+matrix qm remote-submit molecule.inp --engine orca --host enzo@oracle
+
+matrix qm remote-status --host enzo@oracle
+matrix qm remote-fetch JOB_NAME --host enzo@oracle --dest runs
+\end{lstlisting}
+
+\texttt{remote-fetch} reads the remote \texttt{metadata.txt}, copies the
+\texttt{native\_output} file into a local job directory and writes
+\texttt{remote\_qm\_fetch\_manifest.json}.  When a safe adapter is already
+defined, fetching and promotion can be combined:
+
+\begin{lstlisting}[style=matrix]
+matrix qm remote-fetch JOB_NAME --host enzo@oracle \
+  --dest runs --promote molpro --xyzin molecule.xyzin
+
+matrix qm remote-fetch JOB_NAME --host enzo@oracle \
+  --dest runs --promote gaussian-log-hessian --xyzin molecule.xyzin
+\end{lstlisting}
+
+\texttt{--promote auto} promotes Molpro outputs because the Molpro geometry
+adapter is unambiguous.  Gaussian promotion is deliberately explicit because a
+single log can contain different useful sections; choose
+\texttt{gaussian-log-hessian}, \texttt{gaussian-rovib},
+\texttt{gaussian-electronic} or \texttt{gaussian-fchk}.  ORCA outputs are
+fetched and recorded, but not promoted until an ORCA adapter for a specific
+\xyzin{} section is defined.
+
 \section{Copying Files}
 
-Copy inputs from the local workstation to the remote input directory:
+Manual copying remains a fallback.  Copy inputs from the local workstation to
+the remote input directory:
 
 \begin{lstlisting}[style=matrix]
 scp molecule.gjf enzo@oracle:~/matrix/inputs/

@@ -120,6 +120,17 @@ python -m matrix orca run orca_workdir --input molecule.inp
 python -m matrix mrcc promote mrcc.out molecule.xyzin
 ```
 
+Remote QM jobs on `oracle` use the same launcher contract, with SSH/SCP used
+only as transport and no private parser on the remote machine:
+
+```bash
+python -m matrix qm remote-submit job.gjf --engine gdv32 --host enzo@oracle
+python -m matrix qm remote-status --host enzo@oracle
+python -m matrix qm remote-fetch JOB_NAME --host enzo@oracle --dest runs
+python -m matrix qm remote-fetch JOB_NAME --host enzo@oracle \
+  --dest runs --promote molpro --xyzin molecule.xyzin
+```
+
 Thermo and rovibrational utilities run from the same enriched `xyzin` state:
 
 ```bash

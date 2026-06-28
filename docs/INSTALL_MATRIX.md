@@ -283,6 +283,19 @@ All QM output parsing must go through the single adapter for that external
 format. Scientific tools consume normalized `xyzin` sections and must not parse
 Gaussian, Molpro, ORCA or MRCC output privately.
 
+For the private `oracle` Linux host, MATRIX provides SSH/SCP wrappers around
+the remote `~/matrix/bin/matrix-submit` helper:
+
+```bash
+matrix qm remote-submit job.gjf --engine gdv32 --host enzo@oracle
+matrix qm remote-status --host enzo@oracle
+matrix qm remote-fetch JOB_NAME --host enzo@oracle --dest runs
+```
+
+`remote-fetch` copies the `native_output` recorded in the remote `metadata.txt`
+and writes a local `remote_qm_fetch_manifest.json`.  Promotion into `xyzin`
+remains adapter-based, for example `--promote molpro --xyzin molecule.xyzin`.
+
 ## Post-install Checks
 
 Run:
