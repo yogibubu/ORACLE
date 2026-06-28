@@ -234,10 +234,13 @@ def test_large_amplitude_dvr_plan_uses_global_g_inverse_diagonal():
     full_inverse = np.linalg.inv(g_matrix)
     torsion_subblock_inverse = np.linalg.inv(g_matrix[:2, :2])
     plan = analysis.dvr_candidates[0]
+    torsion_block = next(block for block in analysis.blocks if block.family == "torsion")
 
     assert plan.g_inverse_diagonal == pytest.approx(full_inverse[0, 0])
     assert plan.g_inverse_diagonal != pytest.approx(torsion_subblock_inverse[0, 0])
     assert analysis.g_inverse[0][0] == pytest.approx(full_inverse[0, 0])
+    assert np.asarray(torsion_block.g_inverse_block) == pytest.approx(full_inverse[:2, :2])
+    assert not np.allclose(torsion_block.g_inverse_block, torsion_subblock_inverse)
 
 
 def test_large_amplitude_dvr_plan_excludes_high_frequency_and_double_bond_torsions():
@@ -465,8 +468,10 @@ def test_xyzin_gf_report_runs_from_fchk_and_frozen_gics(tmp_path):
     assert report.result.ped.values.shape == (definition.rank, definition.rank)
     assert (tmp_path / "csv" / "gic_gf_frequencies.csv").is_file()
     assert "ped.csv" in written
+    assert "g_inverse.csv" in written
     assert "large_amplitude_coordinates.csv" in written
     assert "large_amplitude_blocks.csv" in written
+    assert "large_amplitude_g_inverse_blocks.csv" in written
     assert section.source_kind == "fchk"
     assert reread.source_path == GF_FIXTURES / "h2o.fchk"
     assert reread.report_path == tmp_path / "gf.report"
@@ -496,10 +501,13 @@ def test_gf_report_and_csv_include_large_amplitude_ring_coordinates(tmp_path):
     assert any(coordinate.family == "oop" for coordinate in large.coordinates)
     assert "Large-amplitude block GF frequencies" in report.text
     assert "no projection" in report.text
+    assert "g_inverse.csv" in tables
     assert "large_amplitude_mode_ped.csv" in tables
+    assert "large_amplitude_g_inverse_blocks.csv" in tables
     assert section.large_amplitude_blocks
     assert reread.large_amplitude_coordinates == section.large_amplitude_coordinates
     assert any(block.family == "ring_puckering" for block in reread.large_amplitude_blocks)
+    assert all(block.g_inverse_block for block in reread.large_amplitude_blocks)
 
 
 def test_xyzin_gf_report_can_use_symmetry_blocks(tmp_path):

@@ -53,6 +53,8 @@ class GFLargeAmplitudeBlockRow:
     family: str
     gics: tuple[str, ...]
     frequencies_cm: tuple[float, ...]
+    g_inverse_block: tuple[tuple[float, ...], ...] = ()
+    g_inverse_source: str = ""
     max_f_coupling_to_rest: float = 0.0
     relative_f_coupling_to_rest: float = 0.0
     max_g_coupling_to_rest: float = 0.0
@@ -205,6 +207,8 @@ def gf_ped_section_from_report(
                 family=block.family,
                 gics=tuple(f"GIC{index:03d}" for index in block.indices),
                 frequencies_cm=block.frequencies_cm,
+                g_inverse_block=_section_matrix(block.g_inverse_block),
+                g_inverse_source=block.g_inverse_source,
                 max_f_coupling_to_rest=block.max_f_coupling_to_rest,
                 relative_f_coupling_to_rest=block.relative_f_coupling_to_rest,
                 max_g_coupling_to_rest=block.max_g_coupling_to_rest,
@@ -357,7 +361,9 @@ def gf_ped_section_lines(section: GFPEDSection) -> list[str]:
                 f"F_COUPLE_REL={_format_float(block.relative_f_coupling_to_rest)} "
                 f"G_COUPLE_MAX={_format_float(block.max_g_coupling_to_rest)} "
                 f"G_COUPLE_REL={_format_float(block.relative_g_coupling_to_rest)} "
-                f"FG_COUPLE_REL={_format_float(block.relative_fg_coupling_to_rest)}"
+                f"FG_COUPLE_REL={_format_float(block.relative_fg_coupling_to_rest)} "
+                f"G_INV_SOURCE={block.g_inverse_source or 'NA'} "
+                f"G_INV_BLOCK={_format_matrix(block.g_inverse_block)}"
             )
     else:
         lines.append("NONE")
@@ -589,6 +595,8 @@ def _parse_large_amplitude_block_line(line: str) -> GFLargeAmplitudeBlockRow:
         family=fields.get("FAMILY", ""),
         gics=tuple(item for item in fields.get("GICS", "").split(",") if item),
         frequencies_cm=_float_tuple(fields.get("FREQUENCIES_CM-1", "")),
+        g_inverse_block=_float_matrix(fields.get("G_INV_BLOCK", "")),
+        g_inverse_source=_optional_text(fields.get("G_INV_SOURCE")),
         max_f_coupling_to_rest=_optional_float(fields.get("F_COUPLE_MAX")) or 0.0,
         relative_f_coupling_to_rest=_optional_float(fields.get("F_COUPLE_REL")) or 0.0,
         max_g_coupling_to_rest=_optional_float(fields.get("G_COUPLE_MAX")) or 0.0,
@@ -628,7 +636,7 @@ def _parse_large_amplitude_dvr_plan_line(line: str) -> GFLargeAmplitudeDVRPlanRo
         fourier_amplitude_cm=_optional_float(fields.get("FOURIER_AMPLITUDE_CM-1")),
         barrier_cm=_optional_float(fields.get("BARRIER_CM-1")),
         g_inverse_diagonal=_optional_float(fields.get("G_INV_DIAG")),
-        g_inverse_source="" if fields.get("G_INV_SOURCE", "NA") == "NA" else fields.get("G_INV_SOURCE", ""),
+        g_inverse_source=_optional_text(fields.get("G_INV_SOURCE")),
         reason=fields.get("REASON", ""),
     )
 
@@ -657,10 +665,27 @@ def _float_tuple(text: str) -> tuple[float, ...]:
     return tuple(float(item) for item in text.split(",") if item)
 
 
+def _float_matrix(text: str) -> tuple[tuple[float, ...], ...]:
+    if not text or text.upper() in {"NA", "NONE"}:
+        return ()
+    return tuple(
+        tuple(float(item.replace("D", "E").replace("d", "e")) for item in row.split(",") if item)
+        for row in text.split(";")
+        if row
+    )
+
+
 def _optional_path(raw: str | None) -> Path | None:
     if raw is None or not raw.strip():
         return None
     return Path(raw)
+
+
+def _optional_text(raw: str | None) -> str:
+    if raw is None:
+        return ""
+    text = str(raw).strip()
+    return "" if not text or text.upper() == "NA" else text
 
 
 def _optional_float(raw: str | None) -> float | None:
@@ -703,8 +728,18 @@ def _section_float(value: float | None) -> float | None:
     return float(_format_float(value))
 
 
+def _section_matrix(rows: tuple[tuple[float, ...], ...]) -> tuple[tuple[float, ...], ...]:
+    return tuple(tuple(float(_format_float(value)) for value in row) for row in rows)
+
+
 def _format_optional_float(value: float | None) -> str:
     return "NA" if value is None else _format_float(value)
+
+
+def _format_matrix(rows: tuple[tuple[float, ...], ...]) -> str:
+    if not rows:
+        return "NA"
+    return ";".join(",".join(_format_float(value) for value in row) for row in rows)
 
 
 def _format_pair(value: tuple[int, int] | None) -> str:

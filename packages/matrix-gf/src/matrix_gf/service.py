@@ -354,7 +354,8 @@ def format_gf_report(
                 f"freqs=[{frequencies}] "
                 f"Fcouple={block.max_f_coupling_to_rest:.6g} "
                 f"Gcouple={block.max_g_coupling_to_rest:.6g} "
-                f"FGrel={block.relative_fg_coupling_to_rest:.6g}"
+                f"FGrel={block.relative_fg_coupling_to_rest:.6g} "
+                f"Ginv_block={len(block.g_inverse_block)}x{len(block.g_inverse_block)}"
             )
         dvr_ready = [
             item
@@ -554,8 +555,7 @@ def gf_csv_tables(report: GFReport) -> dict[str, str]:
     }
     if report.result.large_amplitude is not None:
         g_inverse = np.asarray(report.result.large_amplitude.g_inverse, dtype=float)
-        if g_inverse.shape == report.result.g_matrix.shape:
-            tables["g_inverse.csv"] = _csv_text(_square_gic_table(g_inverse, report.result))
+        tables["g_inverse.csv"] = _csv_text(_square_gic_table(g_inverse, report.result))
         tables.update(_large_amplitude_csv_tables(report.result))
     if report.frequency_comparison is not None:
         tables["frequency_comparison.csv"] = _csv_text(
@@ -1025,6 +1025,8 @@ def _large_amplitude_csv_tables(result: InternalGFResult) -> dict[str, str]:
             "max_g_coupling_to_rest",
             "relative_g_coupling_to_rest",
             "relative_fg_coupling_to_rest",
+            "g_inverse_source",
+            "g_inverse_block",
         ]
     ]
     block_rows.extend(
@@ -1039,9 +1041,29 @@ def _large_amplitude_csv_tables(result: InternalGFResult) -> dict[str, str]:
             f"{block.max_g_coupling_to_rest:.10g}",
             f"{block.relative_g_coupling_to_rest:.10g}",
             f"{block.relative_fg_coupling_to_rest:.10g}",
+            block.g_inverse_source,
+            _compact_matrix_csv(block.g_inverse_block),
         ]
         for block in large.blocks
     )
+    g_inverse_block_rows = [
+        ["block", "family", "row_gic", "col_gic", "g_inverse_value", "g_inverse_source"]
+    ]
+    for block in large.blocks:
+        for row_idx, row in enumerate(block.g_inverse_block):
+            row_gic = block.indices[row_idx]
+            for col_idx, value in enumerate(row):
+                col_gic = block.indices[col_idx]
+                g_inverse_block_rows.append(
+                    [
+                        block.label,
+                        block.family,
+                        f"GIC{row_gic:03d}",
+                        f"GIC{col_gic:03d}",
+                        f"{value:.10g}",
+                        block.g_inverse_source,
+                    ]
+                )
     mode_rows = [["mode", "frequency_cm-1", "large_amplitude_ped_percent"]]
     mode_rows.extend(
         [item.mode, f"{item.frequency_cm:.10g}", f"{item.ped_percent:.10g}"]
@@ -1091,6 +1113,11 @@ def _large_amplitude_csv_tables(result: InternalGFResult) -> dict[str, str]:
     return {
         "large_amplitude_coordinates.csv": _csv_text(coordinate_rows),
         "large_amplitude_blocks.csv": _csv_text(block_rows),
+        "large_amplitude_g_inverse_blocks.csv": _csv_text(g_inverse_block_rows),
         "large_amplitude_mode_ped.csv": _csv_text(mode_rows),
         "large_amplitude_dvr_plan.csv": _csv_text(dvr_rows),
     }
+
+
+def _compact_matrix_csv(rows: tuple[tuple[float, ...], ...]) -> str:
+    return ";".join(",".join(f"{value:.10g}" for value in row) for row in rows)

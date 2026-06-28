@@ -167,9 +167,10 @@ separate rotor geometry algorithm.  Since the GF calculation already owns the
 Wilson \(G\) matrix in the final non-redundant GIC basis, MATRIX inverts that
 global matrix once and keeps \(G^{-1}\).  The DVR plan records
 \((G^{-1})_{ii}\) for each large-amplitude coordinate.  For angular coordinates
-this is the effective reduced moment in the current GIC metric; for coupled
-large-amplitude treatments the downstream DVR code uses the corresponding
-sub-block of the stored global \(G^{-1}\).
+this is the effective reduced moment in the current GIC metric.  For coupled
+large-amplitude treatments MATRIX stores the full selected block
+\(G^{-1}_{SS}\), not only its diagonal, because the multidimensional DVR
+kinetic operator needs the off-diagonal metric couplings as well.
 Every torsional, ring-puckering, butterfly, out-of-plane, linear-bend and
 special coordinate is retained as a candidate.  The local one-coordinate GF
 frequency marks whether the candidate is active; by default the CLI uses
@@ -478,16 +479,25 @@ after optional scaling. \\
 \texttt{\detokenize{*_g_inverse.csv}} & Global inverse Wilson \(G^{-1}\)
 matrix in the same non-redundant GIC order; large-amplitude DVR setup reuses
 this table rather than rebuilding reduced moments. \\
-\texttt{\detokenize{*_large_amplitude_coordinates.csv}} & Large-amplitude GIC
+\texttt{\detokenize{*_large_amplitude_}}\newline
+\texttt{\detokenize{coordinates.csv}} & Large-amplitude GIC
 selection with family labels, local one-coordinate GF frequency and
 active/excluded status. \\
-\texttt{\detokenize{*_large_amplitude_blocks.csv}} & Mono- and
+\texttt{\detokenize{*_large_amplitude_}}\newline
+\texttt{\detokenize{blocks.csv}} & Mono- and
 poly-dimensional direct \(F/G\) subspace frequencies and coupling
 diagnostics, including the combined \(\max(F_{\mathrm{rel}},G_{\mathrm{rel}})\)
-criterion. \\
-\texttt{\detokenize{*_large_amplitude_mode_ped.csv}} & Total large-amplitude
+criterion and the selected \(G^{-1}_{SS}\) block used by multidimensional DVR
+setups. \\
+\texttt{\detokenize{*_large_amplitude_}}\newline
+\texttt{\detokenize{g_inverse_blocks.csv}} & Long-form
+row/column table of the same \(G^{-1}_{SS}\) blocks, convenient for numerical
+audit and downstream readers. \\
+\texttt{\detokenize{*_large_amplitude_}}\newline
+\texttt{\detokenize{mode_ped.csv}} & Total large-amplitude
 PED contribution for each GF mode. \\
-\texttt{\detokenize{*_large_amplitude_dvr_plan.csv}} & DVR-ready
+\texttt{\detokenize{*_large_amplitude_}}\newline
+\texttt{\detokenize{dvr_plan.csv}} & DVR-ready
 large-amplitude plan with status, \(F/G\) coupling diagnostic, torsional
 periodicity, minimum position, \((G^{-1})_{ii}\), and one-term Fourier estimate
 when a 1D treatment is justified. \\

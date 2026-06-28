@@ -72,6 +72,8 @@ class LargeAmplitudeBlock:
     family: str
     indices: tuple[int, ...]
     frequencies_cm: tuple[float, ...]
+    g_inverse_block: tuple[tuple[float, ...], ...]
+    g_inverse_source: str
     max_f_coupling_to_rest: float
     max_g_coupling_to_rest: float
     relative_f_coupling_to_rest: float
@@ -219,6 +221,8 @@ def large_amplitude_analysis_from_gf_matrices(
             indices=tuple(indices),
             force_constants=f_mat,
             g_matrix=g_mat,
+            g_inverse=g_inverse,
+            g_inverse_source=g_inverse_source,
         )
         for family, indices in by_family.items()
         if indices
@@ -232,6 +236,8 @@ def large_amplitude_analysis_from_gf_matrices(
                 indices=all_indices,
                 force_constants=f_mat,
                 g_matrix=g_mat,
+                g_inverse=g_inverse,
+                g_inverse_source=g_inverse_source,
             )
         )
 
@@ -317,10 +323,13 @@ def _large_amplitude_block(
     indices: tuple[int, ...],
     force_constants: np.ndarray,
     g_matrix: np.ndarray,
+    g_inverse: np.ndarray,
+    g_inverse_source: str,
 ) -> LargeAmplitudeBlock:
     index = np.asarray(indices, dtype=int)
     f_sub = force_constants[np.ix_(index, index)]
     g_sub = g_matrix[np.ix_(index, index)]
+    g_inv_sub = g_inverse[np.ix_(index, index)]
     gf = solve_wilson_gf(f_sub, g_sub, scale_to_cm=True)
     f_coupling, f_relative = _coupling_to_rest(force_constants, indices)
     g_coupling, g_relative = _coupling_to_rest(g_matrix, indices)
@@ -329,6 +338,8 @@ def _large_amplitude_block(
         family=family,
         indices=tuple(int(value) + 1 for value in indices),
         frequencies_cm=tuple(float(value) for value in gf.frequencies_cm),
+        g_inverse_block=tuple(tuple(float(value) for value in row) for row in g_inv_sub),
+        g_inverse_source=g_inverse_source,
         max_f_coupling_to_rest=f_coupling,
         max_g_coupling_to_rest=g_coupling,
         relative_f_coupling_to_rest=f_relative,
