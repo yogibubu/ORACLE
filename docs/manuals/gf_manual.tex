@@ -139,6 +139,25 @@ The absolute-value normalization makes the PED table robust for coupled modes
 with positive and negative cross terms, while retaining the relative
 coordinate contribution pattern.
 
+\subsection{Large-amplitude GIC subspaces}
+
+GF/PED does not identify torsions by projecting Cartesian normal modes.  The
+large-amplitude coordinates are already part of the frozen non-redundant GIC
+basis supplied by NEO.  GF/PED therefore treats torsions, ring puckering,
+butterfly, out-of-plane, linear-bend and special fragment/centre coordinates
+as ordinary rows and columns of the same internal-coordinate \(F\) and \(G\)
+matrices.
+
+For diagnostics and later anharmonic workflows, GF/PED extracts the
+corresponding GIC subsets and solves mono- or poly-dimensional Wilson GF
+problems on their direct \(F_{SS}\) and \(G_{SS}\) sub-blocks.  No new
+coordinates are generated and no Cartesian projection is performed.  The
+report also gives the largest \(F\) and \(G\) couplings between each selected
+subspace and the remaining coordinates, plus the total large-amplitude PED
+contribution to every GF mode.  These diagnostics decide whether a
+one-dimensional, coupled multidimensional, DVR or perturbative treatment is
+appropriate downstream.
+
 \section{Input Contracts}
 
 \subsection{Cartesian Hessian}
@@ -422,6 +441,13 @@ as modes. \\
 \texttt{\detokenize{*_force_constants.csv}} & Internal-coordinate force-constant matrix
 after optional scaling. \\
 \texttt{\detokenize{*_g_matrix.csv}} & Wilson G matrix in the same GIC order. \\
+\texttt{\detokenize{*_large_amplitude_coordinates.csv}} & Large-amplitude GIC
+selection with family labels. \\
+\texttt{\detokenize{*_large_amplitude_blocks.csv}} & Mono- and
+poly-dimensional direct \(F/G\) subspace frequencies and coupling
+diagnostics. \\
+\texttt{\detokenize{*_large_amplitude_mode_ped.csv}} & Total large-amplitude
+PED contribution for each GF mode. \\
 \bottomrule
 \end{longtable}
 

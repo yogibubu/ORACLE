@@ -9,6 +9,7 @@ from matrix_chem import preprocess_to_enriched_xyz, write_validation_section
 from matrix_gaussian import hessian_input_from_gaussian_fchk, lower_to_symmetric, read_gaussian_fchk
 from matrix_gf import (
     format_gf_scaling_preview,
+    gf_csv_tables,
     gf_scaling_preview_from_xyzin,
     gf_from_cartesian_hessian_and_gic_b_matrix,
     nonbonded_cartesian_hessian_correction,
@@ -91,6 +92,33 @@ def test_gf_can_solve_separated_symmetry_blocks():
     assert result.frequencies_cm[0] < result.frequencies_cm[1]
     assert np.allclose(result.ped.values, np.diag([100.0, 100.0]))
     assert np.allclose(np.sum(result.ped.values, axis=0), 100.0)
+
+
+def test_gf_large_amplitude_subspaces_use_existing_gic_blocks_without_projection():
+    result = gf_from_cartesian_hessian_and_gic_b_matrix(
+        np.diag([4.0, 9.0, 16.0]),
+        np.eye(3),
+        np.asarray([1.0], dtype=float),
+        gic_labels=("GIC001 R(1,2)", "GIC002 D(1,2,3,4)", "GIC003 U(1,2,3,4)"),
+        gic_names=("A1Str001", "A2Tors001", "B1OuPl001"),
+        gic_irreps=("A1", "A2", "B1"),
+    )
+    large = result.large_amplitude
+
+    assert large is not None
+    assert [(item.index, item.family) for item in large.coordinates] == [
+        (2, "torsion"),
+        (3, "oop"),
+    ]
+    assert [(block.label, block.indices) for block in large.blocks] == [
+        ("torsion", (2,)),
+        ("oop", (3,)),
+        ("all_large_amplitude", (2, 3)),
+    ]
+    assert np.allclose(large.blocks[0].frequencies_cm, [3.0 * 5140.487143715055])
+    assert large.blocks[0].max_f_coupling_to_rest == 0.0
+    assert large.mode_contributions[1].ped_percent == pytest.approx(100.0)
+    assert large.mode_contributions[2].ped_percent == pytest.approx(100.0)
 
 
 def test_gf_rejects_cross_irrep_couplings_when_symmetry_blocks_requested():
@@ -284,12 +312,41 @@ def test_xyzin_gf_report_runs_from_fchk_and_frozen_gics(tmp_path):
     assert report.result.ped.values.shape == (definition.rank, definition.rank)
     assert (tmp_path / "csv" / "gic_gf_frequencies.csv").is_file()
     assert "ped.csv" in written
+    assert "large_amplitude_coordinates.csv" in written
+    assert "large_amplitude_blocks.csv" in written
     assert section.source_kind == "fchk"
     assert reread.source_path == GF_FIXTURES / "h2o.fchk"
     assert reread.report_path == tmp_path / "gf.report"
     assert len(reread.modes) == definition.rank
     assert len(reread.gics) == definition.rank
     assert len(reread.gics[0].ped) == definition.rank
+    assert reread.large_amplitude_blocks == section.large_amplitude_blocks
+
+
+def test_gf_report_and_csv_include_large_amplitude_ring_coordinates(tmp_path):
+    source = MOLECULES / "pyrrole.inp"
+    xyzin = tmp_path / "pyrrole.xyzin"
+
+    preprocess_to_enriched_xyz(source, xyzin)
+    write_validation_section(xyzin)
+    write_gicforge_build_sections(xyzin, symmetrize=True)
+
+    report = run_xyzin_gf_report_from_fchk(MOLECULES / "pyrrole.fchk", xyzin)
+    tables = gf_csv_tables(report)
+    section = write_gf_ped_section_from_report(xyzin, report, source_kind="fchk")
+    reread = read_gf_ped_section(xyzin)
+    large = report.result.large_amplitude
+
+    assert large is not None
+    assert large.coordinate_count > 0
+    assert any(coordinate.family == "ring_puckering" for coordinate in large.coordinates)
+    assert any(coordinate.family == "oop" for coordinate in large.coordinates)
+    assert "Large-amplitude block GF frequencies" in report.text
+    assert "no projection" in report.text
+    assert "large_amplitude_mode_ped.csv" in tables
+    assert section.large_amplitude_blocks
+    assert reread.large_amplitude_coordinates == section.large_amplitude_coordinates
+    assert any(block.family == "ring_puckering" for block in reread.large_amplitude_blocks)
 
 
 def test_xyzin_gf_report_can_use_symmetry_blocks(tmp_path):

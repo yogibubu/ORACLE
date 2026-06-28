@@ -36,6 +36,34 @@ class GFGICRow:
 
 
 @dataclass(frozen=True)
+class GFLargeAmplitudeCoordinateRow:
+    identifier: str
+    name: str
+    irrep: str
+    family: str
+    label: str
+
+
+@dataclass(frozen=True)
+class GFLargeAmplitudeBlockRow:
+    label: str
+    family: str
+    gics: tuple[str, ...]
+    frequencies_cm: tuple[float, ...]
+    max_f_coupling_to_rest: float = 0.0
+    relative_f_coupling_to_rest: float = 0.0
+    max_g_coupling_to_rest: float = 0.0
+    relative_g_coupling_to_rest: float = 0.0
+
+
+@dataclass(frozen=True)
+class GFLargeAmplitudeModeRow:
+    index: int
+    frequency_cm: float
+    ped_percent: float
+
+
+@dataclass(frozen=True)
 class GFPEDSection:
     source_kind: str = "xyzin"
     source_path: Path | None = None
@@ -51,6 +79,9 @@ class GFPEDSection:
     force_threshold: float | None = None
     modes: tuple[GFModeRow, ...] = ()
     gics: tuple[GFGICRow, ...] = ()
+    large_amplitude_coordinates: tuple[GFLargeAmplitudeCoordinateRow, ...] = ()
+    large_amplitude_blocks: tuple[GFLargeAmplitudeBlockRow, ...] = ()
+    large_amplitude_modes: tuple[GFLargeAmplitudeModeRow, ...] = ()
     schema: str = ORACLE_XYZ_GF_PED_SCHEMA
 
     def __post_init__(self) -> None:
@@ -60,6 +91,13 @@ class GFPEDSection:
                 object.__setattr__(self, attr, Path(value))
         object.__setattr__(self, "modes", tuple(self.modes))
         object.__setattr__(self, "gics", tuple(self.gics))
+        object.__setattr__(
+            self,
+            "large_amplitude_coordinates",
+            tuple(self.large_amplitude_coordinates),
+        )
+        object.__setattr__(self, "large_amplitude_blocks", tuple(self.large_amplitude_blocks))
+        object.__setattr__(self, "large_amplitude_modes", tuple(self.large_amplitude_modes))
 
 
 def gf_ped_section_from_report(
@@ -113,6 +151,43 @@ def gf_ped_section_from_report(
             )
         )
 
+    large = getattr(result, "large_amplitude", None)
+    large_coordinates = ()
+    large_blocks = ()
+    large_modes = ()
+    if large is not None:
+        large_coordinates = tuple(
+            GFLargeAmplitudeCoordinateRow(
+                identifier=f"GIC{coordinate.index:03d}",
+                name=coordinate.name,
+                irrep=coordinate.irrep,
+                family=coordinate.family,
+                label=coordinate.label,
+            )
+            for coordinate in large.coordinates
+        )
+        large_blocks = tuple(
+            GFLargeAmplitudeBlockRow(
+                label=block.label,
+                family=block.family,
+                gics=tuple(f"GIC{index:03d}" for index in block.indices),
+                frequencies_cm=block.frequencies_cm,
+                max_f_coupling_to_rest=block.max_f_coupling_to_rest,
+                relative_f_coupling_to_rest=block.relative_f_coupling_to_rest,
+                max_g_coupling_to_rest=block.max_g_coupling_to_rest,
+                relative_g_coupling_to_rest=block.relative_g_coupling_to_rest,
+            )
+            for block in large.blocks
+        )
+        large_modes = tuple(
+            GFLargeAmplitudeModeRow(
+                index=item.mode,
+                frequency_cm=item.frequency_cm,
+                ped_percent=item.ped_percent,
+            )
+            for item in large.mode_contributions
+        )
+
     resolved_source_path = Path(source_path) if source_path is not None else Path(report.fchk_path)
     resolved_source_kind = source_kind or _infer_source_kind(report, resolved_source_path)
     return GFPEDSection(
@@ -130,6 +205,9 @@ def gf_ped_section_from_report(
         force_threshold=getattr(result, "force_threshold", None),
         modes=modes,
         gics=tuple(gics),
+        large_amplitude_coordinates=large_coordinates,
+        large_amplitude_blocks=large_blocks,
+        large_amplitude_modes=large_modes,
     )
 
 
@@ -200,6 +278,40 @@ def gf_ped_section_lines(section: GFPEDSection) -> list[str]:
             )
     else:
         lines.append("NONE")
+    lines.append("[LARGE_AMPLITUDE_COORDINATES]")
+    if section.large_amplitude_coordinates:
+        for coordinate in section.large_amplitude_coordinates:
+            lines.append(
+                f"{coordinate.identifier} NAME={coordinate.name} IRREP={coordinate.irrep} "
+                f"FAMILY={coordinate.family} LABEL={coordinate.label}"
+            )
+    else:
+        lines.append("NONE")
+
+    lines.append("[LARGE_AMPLITUDE_BLOCKS]")
+    if section.large_amplitude_blocks:
+        for block in section.large_amplitude_blocks:
+            lines.append(
+                f"{block.label} FAMILY={block.family} DIM={len(block.gics)} "
+                f"GICS={','.join(block.gics)} "
+                f"FREQUENCIES_CM-1={','.join(_format_float(value) for value in block.frequencies_cm)} "
+                f"F_COUPLE_MAX={_format_float(block.max_f_coupling_to_rest)} "
+                f"F_COUPLE_REL={_format_float(block.relative_f_coupling_to_rest)} "
+                f"G_COUPLE_MAX={_format_float(block.max_g_coupling_to_rest)} "
+                f"G_COUPLE_REL={_format_float(block.relative_g_coupling_to_rest)}"
+            )
+    else:
+        lines.append("NONE")
+
+    lines.append("[LARGE_AMPLITUDE_MODE_PED]")
+    if section.large_amplitude_modes:
+        for mode in section.large_amplitude_modes:
+            lines.append(
+                f"{mode.index} FREQUENCY_CM-1={_format_float(mode.frequency_cm)} "
+                f"PED_PERCENT={_format_float(mode.ped_percent)}"
+            )
+    else:
+        lines.append("NONE")
     return lines
 
 
@@ -223,6 +335,21 @@ def parse_gf_ped_section(lines: Iterable[str]) -> GFPEDSection:
         for line in _subsection(raw_lines, "GICS")
         if _data_line(line)
     )
+    large_coordinates = tuple(
+        _parse_large_amplitude_coordinate_line(line)
+        for line in _subsection(raw_lines, "LARGE_AMPLITUDE_COORDINATES")
+        if _data_line(line)
+    )
+    large_blocks = tuple(
+        _parse_large_amplitude_block_line(line)
+        for line in _subsection(raw_lines, "LARGE_AMPLITUDE_BLOCKS")
+        if _data_line(line)
+    )
+    large_modes = tuple(
+        _parse_large_amplitude_mode_line(line)
+        for line in _subsection(raw_lines, "LARGE_AMPLITUDE_MODE_PED")
+        if _data_line(line)
+    )
     return GFPEDSection(
         source_kind=values.get("SOURCE_KIND", "xyzin"),
         source_path=_optional_path(values.get("SOURCE_PATH")),
@@ -238,6 +365,9 @@ def parse_gf_ped_section(lines: Iterable[str]) -> GFPEDSection:
         force_threshold=_optional_float(values.get("FORCE_THRESHOLD")),
         modes=modes,
         gics=gics,
+        large_amplitude_coordinates=large_coordinates,
+        large_amplitude_blocks=large_blocks,
+        large_amplitude_modes=large_modes,
         schema=schema,
     )
 
@@ -339,6 +469,54 @@ def _parse_gic_line(line: str, *, ped_by_gic: Mapping[str, tuple[float, ...]]) -
         label=label,
         ped=ped_by_gic.get(identifier, ()),
         scaling_factor=_optional_float(fields.get("SCALE")),
+    )
+
+
+def _parse_large_amplitude_coordinate_line(line: str) -> GFLargeAmplitudeCoordinateRow:
+    if " LABEL=" in line:
+        prefix, label = line.split(" LABEL=", 1)
+    else:
+        prefix, label = line, ""
+    parts = prefix.split()
+    if not parts:
+        raise ValueError("empty GF_PED large-amplitude coordinate line")
+    fields = _key_values(parts[1:])
+    identifier = parts[0]
+    return GFLargeAmplitudeCoordinateRow(
+        identifier=identifier,
+        name=fields.get("NAME", identifier),
+        irrep=fields.get("IRREP", "UNK"),
+        family=fields.get("FAMILY", ""),
+        label=label,
+    )
+
+
+def _parse_large_amplitude_block_line(line: str) -> GFLargeAmplitudeBlockRow:
+    parts = line.split()
+    if not parts:
+        raise ValueError("empty GF_PED large-amplitude block line")
+    fields = _key_values(parts[1:])
+    return GFLargeAmplitudeBlockRow(
+        label=parts[0],
+        family=fields.get("FAMILY", ""),
+        gics=tuple(item for item in fields.get("GICS", "").split(",") if item),
+        frequencies_cm=_float_tuple(fields.get("FREQUENCIES_CM-1", "")),
+        max_f_coupling_to_rest=_optional_float(fields.get("F_COUPLE_MAX")) or 0.0,
+        relative_f_coupling_to_rest=_optional_float(fields.get("F_COUPLE_REL")) or 0.0,
+        max_g_coupling_to_rest=_optional_float(fields.get("G_COUPLE_MAX")) or 0.0,
+        relative_g_coupling_to_rest=_optional_float(fields.get("G_COUPLE_REL")) or 0.0,
+    )
+
+
+def _parse_large_amplitude_mode_line(line: str) -> GFLargeAmplitudeModeRow:
+    parts = line.split()
+    if not parts:
+        raise ValueError("empty GF_PED large-amplitude mode line")
+    fields = _key_values(parts[1:])
+    return GFLargeAmplitudeModeRow(
+        index=int(parts[0]),
+        frequency_cm=float(fields["FREQUENCY_CM-1"]),
+        ped_percent=float(fields["PED_PERCENT"]),
     )
 
 

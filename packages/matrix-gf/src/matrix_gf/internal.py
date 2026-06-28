@@ -19,6 +19,7 @@ from matrix_neo import (
 )
 
 from .harmonic import solve_wilson_gf
+from .large_amplitude import GFLargeAmplitudeAnalysis, large_amplitude_analysis_from_gf_matrices
 from .models import HessianInput
 
 
@@ -61,6 +62,7 @@ class InternalGFResult:
     block_labels: tuple[str, ...] = ()
     force_threshold: float | None = None
     hessian_correction: str = "NONE"
+    large_amplitude: GFLargeAmplitudeAnalysis | None = None
 
 
 def primitive_label(primitive: object) -> str:
@@ -219,6 +221,15 @@ def gf_from_cartesian_hessian_and_gic_b_matrix(
     g_inv_half = (g_vec * (1.0 / np.sqrt(np.clip(g_eval, 1.0e-14, None)))) @ g_vec.T
     modes_internal = g_inv_half @ gf.normal_modes
     ped = _ped(force_constants, modes_internal, gf.eigenvalues)
+    large_amplitude = large_amplitude_analysis_from_gf_matrices(
+        force_constants=force_constants,
+        g_matrix=g_matrix,
+        frequencies_cm=gf.frequencies_cm,
+        ped=ped,
+        gic_labels=tuple(gic_labels),
+        gic_names=tuple(gic_names),
+        gic_irreps=tuple(gic_irreps),
+    )
     return InternalGFResult(
         frequencies_cm=gf.frequencies_cm,
         force_constants=force_constants,
@@ -245,6 +256,7 @@ def gf_from_cartesian_hessian_and_gic_b_matrix(
         block_labels=block_labels,
         force_threshold=force_threshold,
         hessian_correction=cartesian_hessian_correction_label,
+        large_amplitude=large_amplitude,
     )
 
 
@@ -383,6 +395,7 @@ def gf_from_cartesian_hessian_and_matrix_gics(
         symmetrized_gics=result.symmetrized_gics,
         scaling_factors=result.scaling_factors,
         coordinate_source="generated-matrix-gics",
+        large_amplitude=result.large_amplitude,
     )
 
 

@@ -23,6 +23,15 @@ from .internal import (
     pulay_scale_internal_hessian,
     topology_bonds_from_xyzin,
 )
+from .large_amplitude import (
+    DEFAULT_LARGE_AMPLITUDE_FAMILIES,
+    GFLargeAmplitudeAnalysis,
+    LargeAmplitudeBlock,
+    LargeAmplitudeCoordinate,
+    LargeAmplitudeModeContribution,
+    gic_coordinate_family,
+    large_amplitude_analysis_from_gf_matrices,
+)
 from .models import HessianInput
 from .nonbonded import (
     nonbonded_cartesian_hessian_correction,
@@ -30,6 +39,9 @@ from .nonbonded import (
 )
 from .sections import (
     GFGICRow,
+    GFLargeAmplitudeBlockRow,
+    GFLargeAmplitudeCoordinateRow,
+    GFLargeAmplitudeModeRow,
     GFModeRow,
     GFPEDSection,
     ORACLE_XYZ_GF_PED_SCHEMA,
@@ -71,9 +83,14 @@ def __getattr__(name: str):
 
 __all__ = [
     "BOHR_TO_ANGSTROM",
+    "DEFAULT_LARGE_AMPLITUDE_FAMILIES",
     "GFGICRow",
     "GFFrequencyComparison",
     "GFGeometryComparison",
+    "GFLargeAmplitudeAnalysis",
+    "GFLargeAmplitudeBlockRow",
+    "GFLargeAmplitudeCoordinateRow",
+    "GFLargeAmplitudeModeRow",
     "GFLocalOptions",
     "GFModeRow",
     "GFPEDSection",
@@ -85,6 +102,9 @@ __all__ = [
     "GFScalingRulePreview",
     "HessianInput",
     "InternalGFResult",
+    "LargeAmplitudeBlock",
+    "LargeAmplitudeCoordinate",
+    "LargeAmplitudeModeContribution",
     "ORACLE_XYZ_GF_PED_SCHEMA",
     "PEDTable",
     "format_gf_report",
@@ -103,6 +123,8 @@ __all__ = [
     "gf_from_hessian_input_with_matrix_gics",
     "gf_from_hessian_input_with_oracle_gics",
     "gic_labels_from_u",
+    "gic_coordinate_family",
+    "large_amplitude_analysis_from_gf_matrices",
     "local_force_constant_mask",
     "mass_weighted_cartesian_hessian",
     "nonbonded_cartesian_hessian_correction",

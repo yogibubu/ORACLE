@@ -4,7 +4,6 @@ from dataclasses import dataclass
 import csv
 from io import StringIO
 from pathlib import Path
-import re
 
 import numpy as np
 
@@ -20,6 +19,7 @@ from .internal import (
     gf_from_hessian_input_with_matrix_gics,
     topology_bonds_from_xyzin,
 )
+from .large_amplitude import gic_coordinate_family
 from .nonbonded import nonbonded_cartesian_hessian_correction, synthon_charges_from_xyzin
 
 
@@ -328,6 +328,34 @@ def format_gf_report(
             for label in dict.fromkeys(result.block_labels)
         )
         lines.insert(3 if xyzin_path is not None else 2, f"GF blocks: {counts}")
+    if result.large_amplitude is not None and result.large_amplitude.coordinate_count:
+        large = result.large_amplitude
+        family_counts = ", ".join(
+            f"{family}:{sum(1 for item in large.coordinates if item.family == family)}"
+            for family in dict.fromkeys(item.family for item in large.coordinates)
+        )
+        lines.append(
+            "Large-amplitude GIC subspace: "
+            f"coordinates={large.coordinate_count} families={family_counts}"
+        )
+        lines.append("Large-amplitude block GF frequencies (cm-1; no projection):")
+        for block in large.blocks:
+            frequencies = ", ".join(f"{value:.3f}" for value in block.frequencies_cm)
+            indices = ",".join(f"GIC{index:03d}" for index in block.indices)
+            lines.append(
+                f"  {block.label}: dim={len(block.indices)} [{indices}] "
+                f"freqs=[{frequencies}] "
+                f"Fcouple={block.max_f_coupling_to_rest:.6g} "
+                f"Gcouple={block.max_g_coupling_to_rest:.6g}"
+            )
+        dominant = [item for item in large.mode_contributions if item.ped_percent >= 50.0]
+        if dominant:
+            lines.append("Large-amplitude dominated GF modes (PED >= 50%):")
+            for item in dominant:
+                lines.append(
+                    f"  mode {item.mode:3d}: {item.frequency_cm:12.3f} cm-1 "
+                    f"large-amplitude PED={item.ped_percent:7.2f}%"
+                )
     if geometry_comparison is not None:
         lines.append(
             "Geometry check: "
@@ -494,6 +522,8 @@ def gf_csv_tables(report: GFReport) -> dict[str, str]:
         ),
         "g_matrix.csv": _csv_text(_square_gic_table(report.result.g_matrix, report.result)),
     }
+    if report.result.large_amplitude is not None:
+        tables.update(_large_amplitude_csv_tables(report.result))
     if report.frequency_comparison is not None:
         tables["frequency_comparison.csv"] = _csv_text(
             [
@@ -871,27 +901,7 @@ def _resolve_scaling_class_pattern(
 
 
 def _gic_coordinate_family(name: str, label: str) -> str:
-    text = f"{name} {label}".lower()
-    if any(token in text for token in ("rpck", "qpck", "phip", "pck", "butterfly")):
-        return "ring"
-    if any(token in text for token in ("fragment", "frag", "centroid", "center", "centre")):
-        return "special"
-    if re.search(r"\br\s*\(", text) or "str" in text or "stretch" in text or "bond(" in text:
-        return "stretch"
-    if re.search(r"\ba\s*\(", text) or "bend" in text or "angle(" in text:
-        return "bend"
-    if re.search(r"\bd\s*\(", text) or "tors" in text or "dih" in text or "dihedral(" in text:
-        return "torsion"
-    if (
-        re.search(r"\bu\s*\(", text)
-        or "oop" in text
-        or "improper" in text
-        or "out_of_plane(" in text
-    ):
-        return "oop"
-    if re.search(r"\bl\s*\(", text) or "linear_bend" in text or "lin" in text:
-        return "linear"
-    return ""
+    return gic_coordinate_family(name, label)
 
 
 def _common_family(
@@ -948,3 +958,57 @@ def _square_gic_table(matrix: np.ndarray, result: InternalGFResult) -> list[list
         irrep = result.gic_irreps[idx - 1] if idx <= len(result.gic_irreps) else "UNK"
         rows.append([f"GIC{idx:03d}", name, irrep, *[f"{value:.10g}" for value in row]])
     return rows
+
+
+def _large_amplitude_csv_tables(result: InternalGFResult) -> dict[str, str]:
+    large = result.large_amplitude
+    if large is None:
+        return {}
+    coordinate_rows = [["gic", "name", "irrep", "family", "label"]]
+    coordinate_rows.extend(
+        [
+            f"GIC{coordinate.index:03d}",
+            coordinate.name,
+            coordinate.irrep,
+            coordinate.family,
+            coordinate.label,
+        ]
+        for coordinate in large.coordinates
+    )
+    block_rows = [
+        [
+            "label",
+            "family",
+            "dimension",
+            "gics",
+            "frequencies_cm-1",
+            "max_f_coupling_to_rest",
+            "relative_f_coupling_to_rest",
+            "max_g_coupling_to_rest",
+            "relative_g_coupling_to_rest",
+        ]
+    ]
+    block_rows.extend(
+        [
+            block.label,
+            block.family,
+            len(block.indices),
+            ",".join(f"GIC{index:03d}" for index in block.indices),
+            ",".join(f"{value:.10g}" for value in block.frequencies_cm),
+            f"{block.max_f_coupling_to_rest:.10g}",
+            f"{block.relative_f_coupling_to_rest:.10g}",
+            f"{block.max_g_coupling_to_rest:.10g}",
+            f"{block.relative_g_coupling_to_rest:.10g}",
+        ]
+        for block in large.blocks
+    )
+    mode_rows = [["mode", "frequency_cm-1", "large_amplitude_ped_percent"]]
+    mode_rows.extend(
+        [item.mode, f"{item.frequency_cm:.10g}", f"{item.ped_percent:.10g}"]
+        for item in large.mode_contributions
+    )
+    return {
+        "large_amplitude_coordinates.csv": _csv_text(coordinate_rows),
+        "large_amplitude_blocks.csv": _csv_text(block_rows),
+        "large_amplitude_mode_ped.csv": _csv_text(mode_rows),
+    }
