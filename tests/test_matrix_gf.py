@@ -206,9 +206,9 @@ def test_large_amplitude_dvr_plan_marks_active_torsion_periodicity_and_barrier()
     assert plan.fourier_amplitude_cm == pytest.approx(0.009 * 219474.6313705 / 9.0)
     assert plan.barrier_cm == pytest.approx(2.0 * plan.fourier_amplitude_cm)
     assert plan.g_inverse_diagonal == pytest.approx(1.0)
-    assert plan.g_inverse_source == "G_INVERSE"
+    assert plan.g_inverse_source == "EQUILIBRIUM_G_INVERSE"
     assert analysis.g_inverse == ((1.0,),)
-    assert analysis.g_inverse_source == "G_INVERSE"
+    assert analysis.g_inverse_source == "EQUILIBRIUM_G_INVERSE"
 
 
 def test_large_amplitude_dvr_plan_uses_global_g_inverse_diagonal():

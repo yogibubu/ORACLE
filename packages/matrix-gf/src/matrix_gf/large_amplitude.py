@@ -454,12 +454,12 @@ def _invert_g_matrix(g_matrix: np.ndarray) -> tuple[np.ndarray, str]:
     symmetric = 0.5 * (values + values.T)
     try:
         inverse = np.linalg.inv(symmetric)
-        source = "G_INVERSE"
+        source = "EQUILIBRIUM_G_INVERSE"
         if not np.all(np.isfinite(inverse)):
             raise np.linalg.LinAlgError("non-finite inverse")
     except np.linalg.LinAlgError:
         inverse = np.linalg.pinv(symmetric, rcond=DEFAULT_G_INVERSE_RCOND)
-        source = "G_PSEUDOINVERSE"
+        source = "EQUILIBRIUM_G_PSEUDOINVERSE"
     return 0.5 * (inverse + inverse.T), source
 
 

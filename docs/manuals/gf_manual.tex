@@ -165,12 +165,20 @@ exports \(\max(F_{\mathrm{rel}},G_{\mathrm{rel}})\) as the combined
 The kinetic coefficient needed by the DVR branch is not recomputed from a
 separate rotor geometry algorithm.  Since the GF calculation already owns the
 Wilson \(G\) matrix in the final non-redundant GIC basis, MATRIX inverts that
-global matrix once and keeps \(G^{-1}\).  The DVR plan records
+global equilibrium matrix once and keeps \(G^{-1}\) as a reference metric.  The
+DVR plan records
 \((G^{-1})_{ii}\) for each large-amplitude coordinate.  For angular coordinates
 this is the effective reduced moment in the current GIC metric.  For coupled
 large-amplitude treatments MATRIX stores the full selected block
 \(G^{-1}_{SS}\), not only its diagonal, because the multidimensional DVR
 kinetic operator needs the off-diagonal metric couplings as well.
+This exported block is not the final kinetic operator for a large-amplitude
+DVR.  Along a scan or grid the B matrix, \(G(Q)\), and \(G(Q)^{-1}\) generally
+depend on the large-amplitude coordinates \(Q\).  A production DVR must
+therefore either recompute the selected metric block at each grid geometry or
+use an explicit derivative expansion of \(G(Q)\).  The GF export is the
+equilibrium reference used for planning, diagnostics, one-dimensional bootstrap
+estimates and consistency checks.
 Every torsional, ring-puckering, butterfly, out-of-plane, linear-bend and
 special coordinate is retained as a candidate.  The local one-coordinate GF
 frequency marks whether the candidate is active; by default the CLI uses
@@ -476,9 +484,10 @@ as modes. \\
 \texttt{\detokenize{*_force_constants.csv}} & Internal-coordinate force-constant matrix
 after optional scaling. \\
 \texttt{\detokenize{*_g_matrix.csv}} & Wilson G matrix in the same GIC order. \\
-\texttt{\detokenize{*_g_inverse.csv}} & Global inverse Wilson \(G^{-1}\)
-matrix in the same non-redundant GIC order; large-amplitude DVR setup reuses
-this table rather than rebuilding reduced moments. \\
+\texttt{\detokenize{*_g_inverse.csv}} & Equilibrium reference inverse Wilson
+\(G^{-1}\) matrix in the same non-redundant GIC order; large-amplitude DVR setup
+uses this table for planning, but production grids must recompute \(G(Q)\) or
+include metric derivatives. \\
 \texttt{\detokenize{*_large_amplitude_}}\newline
 \texttt{\detokenize{coordinates.csv}} & Large-amplitude GIC
 selection with family labels, local one-coordinate GF frequency and
@@ -488,11 +497,11 @@ active/excluded status. \\
 poly-dimensional direct \(F/G\) subspace frequencies and coupling
 diagnostics, including the combined \(\max(F_{\mathrm{rel}},G_{\mathrm{rel}})\)
 criterion and the selected \(G^{-1}_{SS}\) block used by multidimensional DVR
-setups. \\
+planning at the reference geometry. \\
 \texttt{\detokenize{*_large_amplitude_}}\newline
 \texttt{\detokenize{g_inverse_blocks.csv}} & Long-form
 row/column table of the same \(G^{-1}_{SS}\) blocks, convenient for numerical
-audit and downstream readers. \\
+audit and downstream readers; values are equilibrium references. \\
 \texttt{\detokenize{*_large_amplitude_}}\newline
 \texttt{\detokenize{mode_ped.csv}} & Total large-amplitude
 PED contribution for each GF mode. \\
