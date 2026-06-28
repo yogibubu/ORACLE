@@ -185,6 +185,22 @@ isotope, source program, method, basis/level and conversion label so downstream
 rotational or hyperfine tools can use the value without reparsing Molpro output
 or guessing the conversion.
 
+The first implemented property utility is nuclear quadrupole coupling:
+
+- Molpro `expec,fg` output is parsed for `FGXX`, `FGYY`, `FGZZ` and optional
+  off-diagonal EFG components. MATRIX stores the raw EFG tensor in atomic units
+  and converts it to `NUCLEAR_QUADRUPOLE_COUPLING` in MHz with
+  `234.9647 * Q(barn) * V(a.u.)`.
+- Gaussian quadrupole coupling constants are promoted directly because
+  Gaussian reports the constants in MHz.
+- ORCA quadrupole coupling constants are promoted directly when present; if
+  ORCA output contains only an EFG tensor, MATRIX uses the same conversion path
+  as Molpro.
+
+The isotope moment used in a conversion is recorded in the `CONVERSION` field.
+For Molpro outputs that do not identify the EFG nucleus unambiguously, the
+adapter requires an explicit atom index or isotope override.
+
 `matrix gf --xyzin molecule.xyzin` updates `#GF_PED` by default. The section
 uses schema `oracle.xyz.gf_ped.v1` and stores the Hessian source, coordinate
 source, point group, matrix model, nonbonded correction label, frequencies,

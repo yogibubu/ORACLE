@@ -65,6 +65,11 @@ from .rovib import (
     parse_gaussian_rovib_log,
     promote_gaussian_rovib_to_xyzin,
 )
+from .properties import (
+    GaussianQuadrupolePromotion,
+    parse_gaussian_quadrupole_properties,
+    promote_gaussian_quadrupole_properties_to_xyzin,
+)
 
 __all__ = [
     "FORMCHK_EXECUTABLE",
@@ -80,6 +85,7 @@ __all__ = [
     "GaussianLogNormalModes",
     "GaussianLogSummary",
     "GaussianReadAllGICLogCheck",
+    "GaussianQuadrupolePromotion",
     "GaussianRovibData",
     "GaussianRovibPromotion",
     "GaussianRunResult",
@@ -101,8 +107,10 @@ __all__ = [
     "promote_gaussian_log_hessian_to_xyzin",
     "parse_gaussian_topology",
     "parse_gaussian_electronic_log",
+    "parse_gaussian_quadrupole_properties",
     "parse_gaussian_rovib_log",
     "promote_gaussian_electronic_log_to_xyzin",
+    "promote_gaussian_quadrupole_properties_to_xyzin",
     "promote_gaussian_rovib_to_xyzin",
     "read_gaussian_fchk",
     "read_gaussian_fchk_qff",

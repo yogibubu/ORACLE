@@ -182,6 +182,20 @@ gradients and converted nuclear quadrupole coupling constants.  Downstream
 spectroscopic tools must read this normalized section instead of reparsing QM
 outputs.
 
+The first concrete \sectionname{PROPERTIES} utility is nuclear quadrupole
+coupling.  Molpro \texttt{expec,fg} output is converted from electric-field
+gradient components in atomic units with
+\texttt{234.9647 * Q(barn) * V(a.u.)}; Gaussian constants are promoted directly
+because they are already printed in MHz; ORCA constants are promoted directly
+when present or converted from EFG tensors otherwise.
+
+\begin{lstlisting}[style=matrix]
+matrix molpro promote-quadrupole molpro.out molecule.xyzin --atom 1 --isotope 14N
+matrix gaussian promote-quadrupole gaussian.log molecule.xyzin
+matrix orca promote-quadrupole orca.out molecule.xyzin
+matrix properties summary molecule.xyzin --name NUCLEAR_QUADRUPOLE_COUPLING
+\end{lstlisting}
+
 \subsection{Remote QM Execution}
 
 Heavy QM jobs can be launched on the private Linux host \texttt{oracle} and

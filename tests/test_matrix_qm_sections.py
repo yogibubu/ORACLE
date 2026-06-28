@@ -22,6 +22,8 @@ from matrix_qm import (
     PropertiesSection,
     PropertyRecord,
     TransitionsSection,
+    efg_asymmetry_parameter,
+    efg_to_nqcc_mhz,
     electronic_section_lines,
     merge_properties_section,
     hessian_input_from_xyzin,
@@ -35,6 +37,7 @@ from matrix_qm import (
     property_records_for_atom,
     qff_section_from_quartic_force_field,
     quartic_force_field_from_qff_section,
+    quadrupole_moment_from_label,
     read_cartesian_hessian_section,
     read_electronic_section,
     read_normal_modes_section,
@@ -213,6 +216,14 @@ def test_properties_merge_and_cli_summary(tmp_path, capsys):
     assert rc == 0
     assert "properties: 1" in out
     assert "EFG_TENSOR" in out
+
+
+def test_quadrupole_conversion_uses_isotope_moment_in_barn():
+    moment = quadrupole_moment_from_label("14N")
+    assert moment is not None
+    assert np.isclose(moment.quadrupole_barn, 0.02044)
+    assert np.isclose(efg_to_nqcc_mhz((-9.091670249869,), moment)[0], -43.6643689472)
+    assert np.isclose(efg_asymmetry_parameter((-9.0, 4.5, 4.5)), 0.0)
 
 
 def test_gaussian_electronic_log_promotion_writes_sections(tmp_path):

@@ -214,6 +214,12 @@ def build_parser(
         default=[],
         help="Exclude a normal-mode index from alpha-derived DeltaBvib",
     )
+    gaussian_promote_quadrupole = gaussian_sub.add_parser(
+        "promote-quadrupole",
+        help="Promote Gaussian nuclear quadrupole coupling constants into #PROPERTIES",
+    )
+    gaussian_promote_quadrupole.add_argument("log", type=Path)
+    gaussian_promote_quadrupole.add_argument("xyzin", type=Path)
 
     molpro = sub.add_parser("molpro", help="Molpro output adapter utilities")
     molpro_sub = molpro.add_subparsers(dest="molpro_command")
@@ -240,6 +246,17 @@ def build_parser(
     molpro_promote.add_argument("--symmetry-distance", type=float, default=1.0e-3)
     molpro_promote.add_argument("--symmetry-inertia", type=float, default=1.0e-3)
     molpro_promote.add_argument("--max-rotation-order", type=int, default=6)
+    molpro_promote_quadrupole = molpro_sub.add_parser(
+        "promote-quadrupole",
+        help="Convert Molpro EFG tensors into quadrupole #PROPERTIES records",
+    )
+    molpro_promote_quadrupole.add_argument("output", type=Path)
+    molpro_promote_quadrupole.add_argument("xyzin", type=Path)
+    molpro_promote_quadrupole.add_argument("--atom", type=int, help="One-based EFG nucleus")
+    molpro_promote_quadrupole.add_argument(
+        "--isotope",
+        help="Isotope label such as 14N; default uses MATRIX isotope table for the atom",
+    )
 
     orca = sub.add_parser("orca", help="ORCA job utilities")
     orca_sub = orca.add_subparsers(dest="orca_command")
@@ -266,6 +283,12 @@ def build_parser(
     orca_promote.add_argument("--symmetry-distance", type=float, default=1.0e-3)
     orca_promote.add_argument("--symmetry-inertia", type=float, default=1.0e-3)
     orca_promote.add_argument("--max-rotation-order", type=int, default=6)
+    orca_promote_quadrupole = orca_sub.add_parser(
+        "promote-quadrupole",
+        help="Promote ORCA quadrupole/EFG data into #PROPERTIES",
+    )
+    orca_promote_quadrupole.add_argument("output", type=Path)
+    orca_promote_quadrupole.add_argument("xyzin", type=Path)
 
     mrcc = sub.add_parser("mrcc", help="MRCC output adapter utilities")
     mrcc_sub = mrcc.add_subparsers(dest="mrcc_command")
@@ -1194,6 +1217,14 @@ def main(
         print(f"wrote_rotational: {int(result.wrote_rotational)}")
         print(f"wrote_deltabvib: {int(result.wrote_deltabvib)}")
         return 0
+    if args.command == "gaussian" and args.gaussian_command == "promote-quadrupole":
+        from matrix_gaussian import promote_gaussian_quadrupole_properties_to_xyzin
+
+        result = promote_gaussian_quadrupole_properties_to_xyzin(args.log, args.xyzin)
+        print(f"Promoted Gaussian quadrupole properties: {result.log_path} -> {result.xyzin}")
+        print(f"wrote_properties: {int(result.wrote_properties)}")
+        print(f"property_count: {result.property_count}")
+        return 0
     if args.command == "molpro" and args.molpro_command == "status":
         from matrix_molpro import molpro_job_status
 
@@ -1244,6 +1275,19 @@ def main(
             f"PG={result.point_group}, bonds={result.topology_bond_count}, "
             f"rings={result.ring_count})"
         )
+        return 0
+    if args.command == "molpro" and args.molpro_command == "promote-quadrupole":
+        from matrix_molpro import promote_molpro_quadrupole_properties_to_xyzin
+
+        result = promote_molpro_quadrupole_properties_to_xyzin(
+            args.output,
+            args.xyzin,
+            atom=args.atom,
+            isotope=args.isotope or "",
+        )
+        print(f"Promoted Molpro quadrupole properties: {result.output_path} -> {result.xyzin}")
+        print(f"wrote_properties: {int(result.wrote_properties)}")
+        print(f"property_count: {result.property_count}")
         return 0
     if args.command == "orca" and args.orca_command == "status":
         from matrix_orca import orca_job_status
@@ -1297,6 +1341,14 @@ def main(
         print(f"Promoted ORCA output: {result.output_path} -> {result.xyzin}")
         print(f"wrote_geometry: {int(result.wrote_geometry)}")
         print(f"wrote_cartesian_hessian: {int(result.wrote_cartesian_hessian)}")
+        return 0
+    if args.command == "orca" and args.orca_command == "promote-quadrupole":
+        from matrix_orca import promote_orca_quadrupole_properties_to_xyzin
+
+        result = promote_orca_quadrupole_properties_to_xyzin(args.output, args.xyzin)
+        print(f"Promoted ORCA quadrupole properties: {result.output_path} -> {result.xyzin}")
+        print(f"wrote_properties: {int(result.wrote_properties)}")
+        print(f"property_count: {result.property_count}")
         return 0
     if args.command == "mrcc" and args.mrcc_command == "summary":
         from matrix_mrcc import summarize_mrcc_output

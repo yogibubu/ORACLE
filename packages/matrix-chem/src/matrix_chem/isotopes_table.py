@@ -21,7 +21,7 @@ class Isotope:
     mass: float          # atomic mass (amu)
     spin2: int           # 2 * nuclear spin
     g_factor: float      # nuclear magnetic moment
-    quadrupole: float    # nuclear quadrupole moment (barn)
+    quadrupole: float    # nuclear quadrupole moment (fm^2); convert to barn by /100
 
 
 # ----------------------------------------------------------------------

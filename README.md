@@ -73,6 +73,7 @@ the same metadata used by the GUI:
 python -m matrix help
 python -m matrix help gf --xyzin molecule.xyzin
 python -m matrix manuals NEO --format markdown
+python -m matrix properties summary molecule.xyzin
 ```
 
 The demanding `test_molecules` corpus is versioned under

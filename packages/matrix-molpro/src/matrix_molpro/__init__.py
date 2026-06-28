@@ -8,7 +8,10 @@ from .jobs import (
 )
 from .parsers import (
     MOLPRO_OUTPUT_FORMAT,
+    MolproQuadrupolePromotion,
     MolproOutputSummary,
+    parse_molpro_quadrupole_properties,
+    promote_molpro_quadrupole_properties_to_xyzin,
     promote_molpro_output_to_xyzin,
     read_molpro_output_geometry,
     summarize_molpro_output,
@@ -18,8 +21,11 @@ __all__ = [
     "MOLPRO_OUTPUT_FORMAT",
     "MOLPRO_EXECUTABLE",
     "MOLPRO_SPEC",
+    "MolproQuadrupolePromotion",
     "MolproOutputSummary",
     "molpro_job_status",
+    "parse_molpro_quadrupole_properties",
+    "promote_molpro_quadrupole_properties_to_xyzin",
     "promote_molpro_output_to_xyzin",
     "read_molpro_output_geometry",
     "run_molpro_job",

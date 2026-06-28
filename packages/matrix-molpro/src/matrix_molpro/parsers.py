@@ -22,6 +22,14 @@ class MolproOutputSummary:
     atomic_coordinate_blocks: int
 
 
+@dataclass(frozen=True)
+class MolproQuadrupolePromotion:
+    xyzin: Path
+    output_path: Path
+    wrote_properties: bool
+    property_count: int
+
+
 def summarize_molpro_output(path: Path | str) -> MolproOutputSummary:
     target = Path(path)
     lines = target.read_text(encoding="utf-8", errors="replace").splitlines()
@@ -69,6 +77,93 @@ def promote_molpro_output_to_xyzin(
             inertia_relative=symmetry_inertia,
             max_rotation_order=max_rotation_order,
         ),
+    )
+
+
+def parse_molpro_quadrupole_properties(
+    path: Path | str,
+    *,
+    atom: int | None = None,
+    isotope: str = "",
+) -> tuple:
+    from matrix_qm import infer_unique_quadrupolar_atom, quadrupole_property_records_from_efg
+
+    target = Path(path)
+    lines = target.read_text(encoding="utf-8", errors="replace").splitlines()
+    method, relaxation, components = _parse_last_efg_components(lines)
+    if not components:
+        return ()
+    input_atoms = _parse_input_geometry_atoms(lines)
+    try:
+        atoms, _ = _parse_atomic_coordinates(lines)
+    except GeometryParseError:
+        atoms = input_atoms
+    selected_atom = atom
+    selected_number = None
+    if selected_atom is not None:
+        atom_source = input_atoms if input_atoms and selected_atom <= len(input_atoms) else atoms
+        if selected_atom < 1 or selected_atom > len(atom_source):
+            raise ValueError(f"Molpro quadrupole atom index out of range: {selected_atom}")
+        from matrix_chem.topology.elements import atomic_number
+
+        selected_number = atomic_number(atom_source[selected_atom - 1])
+    else:
+        inferred = infer_unique_quadrupolar_atom(tuple(atoms))
+        if inferred is None and input_atoms:
+            inferred = infer_unique_quadrupolar_atom(tuple(input_atoms))
+        if inferred is not None:
+            selected_atom, selected_number = inferred
+    if selected_number is None:
+        if not isotope:
+            raise ValueError(
+                "Molpro EFG output does not identify the nucleus; provide --atom or --isotope"
+            )
+        from matrix_qm import parse_isotope_label
+
+        selected_number, _, _ = parse_isotope_label(isotope)
+    level = _parse_basis(lines)
+    efg = (
+        components.get("XX", 0.0),
+        components.get("YY", 0.0),
+        components.get("ZZ", 0.0),
+        components.get("XY", 0.0),
+        components.get("XZ", 0.0),
+        components.get("YZ", 0.0),
+    )
+    return quadrupole_property_records_from_efg(
+        atom=selected_atom,
+        atomic_number_value=int(selected_number),
+        efg_au=efg,
+        program="Molpro",
+        source=target,
+        isotope=isotope,
+        method=method,
+        level=level,
+        axes="MOLPRO_EFG:xx,yy,zz,xy,xz,yz",
+        status="raw",
+        comment=f"relaxation={relaxation}",
+    )
+
+
+def promote_molpro_quadrupole_properties_to_xyzin(
+    output: Path | str,
+    xyzin: Path | str,
+    *,
+    atom: int | None = None,
+    isotope: str = "",
+) -> MolproQuadrupolePromotion:
+    from matrix_qm import merge_properties_section
+
+    source = Path(output)
+    target = Path(xyzin)
+    records = parse_molpro_quadrupole_properties(source, atom=atom, isotope=isotope)
+    if records:
+        merge_properties_section(target, records)
+    return MolproQuadrupolePromotion(
+        xyzin=target,
+        output_path=source,
+        wrote_properties=bool(records),
+        property_count=len(records),
     )
 
 
@@ -142,8 +237,98 @@ def _parse_coordinate_line(line: str) -> tuple[str, list[float]] | None:
     return atom, [float(value) for value in numeric_values[-3:]]
 
 
+def _parse_input_geometry_atoms(lines: list[str]) -> list[str]:
+    starts = [idx for idx, line in enumerate(lines) if line.strip().lower().startswith("geometry={")]
+    for start in reversed(starts):
+        atoms: list[str] = []
+        for raw in lines[start + 1 :]:
+            text = raw.strip()
+            if not text:
+                continue
+            if text.startswith("}"):
+                break
+            parts = text.split()
+            if len(parts) == 1 and parts[0].isdigit():
+                continue
+            try:
+                atoms.append(normalize_atom_symbol(parts[0]))
+            except (GeometryParseError, IndexError):
+                continue
+        if atoms:
+            return atoms
+    return []
+
+
 def _float_or_none(token: str) -> float | None:
     try:
         return float(token.replace("D", "E").replace("d", "e"))
     except ValueError:
         return None
+
+
+def _parse_last_efg_components(lines: list[str]) -> tuple[str, str, dict[str, float]]:
+    groups: dict[str, tuple[str, dict[str, float]]] = {}
+    for raw in lines:
+        upper = raw.upper()
+        if "FG" not in upper:
+            continue
+        component = _efg_component_from_line(upper)
+        if component is None:
+            continue
+        value = _last_float(raw)
+        if value is None:
+            continue
+        method = _method_from_efg_line(raw)
+        relaxation = _relaxation_from_efg_line(upper)
+        key = relaxation or "unknown"
+        current_method, current_components = groups.get(key, (method, {}))
+        if method:
+            current_method = method
+        current_components[component] = value
+        groups[key] = (current_method, current_components)
+    for key in ("relax", "norela", "unknown"):
+        if key in groups:
+            method, components = groups[key]
+            if {"XX", "YY", "ZZ"}.issubset(components):
+                return method, key, components
+    return "", "", {}
+
+
+def _efg_component_from_line(line: str) -> str | None:
+    match = re.search(r"\bFG([XYZ][XYZ])\b", line)
+    if match is None:
+        return None
+    component = match.group(1)
+    if component in {"YX", "ZX", "ZY"}:
+        component = component[::-1]
+    return component
+
+
+def _method_from_efg_line(line: str) -> str:
+    match = re.search(r"!\s*([A-Za-z0-9()+\-]+)\s+\(", line)
+    return "" if match is None else match.group(1)
+
+
+def _relaxation_from_efg_line(line: str) -> str:
+    if "ED,RELAX" in line:
+        return "relax"
+    if "ED,NORELA" in line:
+        return "norela"
+    return ""
+
+
+def _last_float(line: str) -> float | None:
+    for token in reversed(line.replace("=", " ").split()):
+        value = _float_or_none(token)
+        if value is not None:
+            return value
+    return None
+
+
+def _parse_basis(lines: list[str]) -> str:
+    basis_pattern = re.compile(r"\bBASIS\s*=\s*([A-Za-z0-9()+.,_\-/]+)", re.I)
+    for raw in lines:
+        match = basis_pattern.search(raw)
+        if match is not None:
+            return match.group(1)
+    return ""

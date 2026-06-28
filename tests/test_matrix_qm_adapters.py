@@ -11,17 +11,28 @@ from matrix_chem import (
     write_validation_section,
 )
 from matrix_core import read_basic_section, read_sectioned_lines, section_content
-from matrix_molpro import read_molpro_output_geometry, summarize_molpro_output
+from matrix_gaussian import (
+    parse_gaussian_quadrupole_properties,
+    promote_gaussian_quadrupole_properties_to_xyzin,
+)
+from matrix_molpro import (
+    parse_molpro_quadrupole_properties,
+    promote_molpro_quadrupole_properties_to_xyzin,
+    read_molpro_output_geometry,
+    summarize_molpro_output,
+)
 from matrix_mrcc import read_mrcc_output_geometry, summarize_mrcc_output
 from matrix_orca import (
     hessian_input_from_orca_output,
+    parse_orca_quadrupole_properties,
     promote_orca_output_to_xyzin,
+    promote_orca_quadrupole_properties_to_xyzin,
     read_orca_output_geometry,
     summarize_orca_output,
 )
 from matrix_gf import read_gf_ped_section, run_xyzin_gf_report_from_xyzin, write_gf_ped_section_from_report
 from matrix_neo import write_gicforge_build_sections
-from matrix_qm import read_cartesian_hessian_section
+from matrix_qm import EFG_AU_TO_NQCC_MHZ_PER_BARN, read_cartesian_hessian_section, read_properties_section
 from tools import matrix_run
 
 
@@ -39,6 +50,58 @@ def _molpro_output() -> str:
             "",
         ]
     )
+
+
+def _molpro_quadrupole_output() -> str:
+    return "\n".join(
+        [
+            " PROGRAM SYSTEM MOLPRO",
+            " SETTING BASIS          =    CC-PVTZ",
+            " ATOMIC COORDINATES",
+            " NR  ATOM    CHARGE       X              Y              Z",
+            "  1  N       7.000000   -1.37109100     0.00000000     0.00000000",
+            "  2  H       1.000000   -1.74414300    -0.47145500     0.81658400",
+            "  3  H       1.000000   -1.74414300    -0.47145500    -0.81658400",
+            "  4  H       1.000000   -1.74414300     0.94291100     0.00000000",
+            "  5  F       9.000000    1.27143200     0.00000000     0.00000000",
+            "",
+            " !CCSD(T) (ED,norela <1.1|FGXX|1.1>    -9.091670249869",
+            " !CCSD(T) (ED,norela <1.1|FGYY|1.1>     4.545835124971",
+            " !CCSD(T) (ED,norela <1.1|FGZZ|1.1>     4.545835124898",
+            "",
+        ]
+    )
+
+
+def _gaussian_quadrupole_output() -> str:
+    return "\n".join(
+        [
+            "#p b3lyp/6-31g nmr",
+            "",
+            " Nuclear quadrupole coupling constants (MHz)",
+            " Atom Isotope ChiXX ChiYY ChiZZ ChiXY ChiXZ ChiYZ",
+            " 1 14N -4.100000 2.050000 2.050000 0.010000 0.020000 0.030000",
+            "",
+            " Normal termination of Gaussian",
+        ]
+    )
+
+
+def _orca_quadrupole_output(*, direct: bool) -> str:
+    rows = (
+        [
+            " NUCLEAR QUADRUPOLE COUPLING CONSTANTS (MHz)",
+            " Atom Isotope ChiXX ChiYY ChiZZ ChiXY ChiXZ ChiYZ",
+            " 1 14N -4.100000 2.050000 2.050000 0.010000 0.020000 0.030000",
+        ]
+        if direct
+        else [
+            " ELECTRIC FIELD GRADIENTS (a.u.)",
+            " Atom Isotope VXX VYY VZZ VXY VXZ VYZ",
+            " 1 14N -9.091670249869 4.545835124971 4.545835124898 0.0 0.0 0.0",
+        ]
+    )
+    return "\n".join(["Program ORCA", *rows, "****ORCA TERMINATED NORMALLY****"])
 
 
 def _mrcc_output() -> str:
@@ -111,6 +174,96 @@ def test_molpro_output_adapter_returns_shared_geometry(tmp_path):
     assert geometry.charge == -1
     assert geometry.multiplicity == 2
     assert np.allclose(geometry.coordinates_angstrom[1], [0.0, 0.0, 0.96])
+
+
+def test_molpro_quadrupole_adapter_converts_efg_to_properties(tmp_path):
+    output = tmp_path / "molpro.out"
+    xyzin = tmp_path / "mol.xyzin"
+    output.write_text(_molpro_quadrupole_output(), encoding="utf-8")
+    xyzin.write_text("1\nn\nN 0 0 0\n", encoding="utf-8")
+
+    records = parse_molpro_quadrupole_properties(output)
+    result = promote_molpro_quadrupole_properties_to_xyzin(output, xyzin)
+    section = read_properties_section(xyzin)
+
+    nqcc = [record for record in records if record.name == "NUCLEAR_QUADRUPOLE_COUPLING"][0]
+    expected = EFG_AU_TO_NQCC_MHZ_PER_BARN * 0.02044 * -9.091670249869
+    assert result.wrote_properties is True
+    assert result.property_count == 3
+    assert len(section.records) == len(records)
+    assert [record.name for record in section.records] == [record.name for record in records]
+    assert nqcc.atom == 1
+    assert nqcc.isotope == "14N"
+    assert nqcc.status == "converted"
+    assert np.isclose(nqcc.value[0], expected)
+    stored_nqcc = [
+        record for record in section.records if record.name == "NUCLEAR_QUADRUPOLE_COUPLING"
+    ][0]
+    assert np.allclose(stored_nqcc.value, nqcc.value)
+
+
+def test_molpro_quadrupole_adapter_uses_input_geometry_fallback(tmp_path):
+    output = tmp_path / "molpro.out"
+    output.write_text(
+        "\n".join(
+            [
+                " geometry={",
+                " 6",
+                " N    -1.371091    0.000000   -0.000000",
+                " H    -1.744143   -0.471455    0.816584",
+                " F     1.271432    0.000000    0.000000",
+                " }",
+                " ATOMIC COORDINATES:q",
+                "   2     0.00092229     0.46181898     8.14e-05      2  2    0.42",
+                "   3     0.00092684     0.46294355     4.81e-06      3  3    0.66",
+                " !CCSD(T) (ED,norela <1.1|FGXX|1.1>    -9.091670249869",
+                " !CCSD(T) (ED,norela <1.1|FGYY|1.1>     4.545835124971",
+                " !CCSD(T) (ED,norela <1.1|FGZZ|1.1>     4.545835124898",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    records = parse_molpro_quadrupole_properties(output)
+
+    assert records[0].atom == 1
+    assert records[0].isotope == "14N"
+
+
+def test_gaussian_quadrupole_adapter_promotes_direct_constants(tmp_path):
+    output = tmp_path / "gaussian.log"
+    xyzin = tmp_path / "mol.xyzin"
+    output.write_text(_gaussian_quadrupole_output(), encoding="utf-8")
+    xyzin.write_text("1\nn\nN 0 0 0\n", encoding="utf-8")
+
+    records = parse_gaussian_quadrupole_properties(output)
+    result = promote_gaussian_quadrupole_properties_to_xyzin(output, xyzin)
+    section = read_properties_section(xyzin)
+
+    assert result.wrote_properties is True
+    assert result.property_count == 1
+    assert section.records == records
+    assert records[0].program == "Gaussian"
+    assert records[0].method == "b3lyp/6-31g"
+    assert records[0].value == (-4.1, 2.05, 2.05, 0.01, 0.02, 0.03)
+
+
+def test_orca_quadrupole_adapter_promotes_direct_or_converted_constants(tmp_path):
+    direct = tmp_path / "orca_direct.out"
+    efg = tmp_path / "orca_efg.out"
+    direct.write_text(_orca_quadrupole_output(direct=True), encoding="utf-8")
+    efg.write_text(_orca_quadrupole_output(direct=False), encoding="utf-8")
+
+    direct_records = parse_orca_quadrupole_properties(direct)
+    efg_records = parse_orca_quadrupole_properties(efg)
+
+    assert len(direct_records) == 1
+    assert direct_records[0].status == "raw"
+    assert direct_records[0].value[:3] == (-4.1, 2.05, 2.05)
+    converted = [record for record in efg_records if record.name == "NUCLEAR_QUADRUPOLE_COUPLING"]
+    assert len(converted) == 1
+    assert converted[0].status == "converted"
+    assert np.isclose(converted[0].value[0], EFG_AU_TO_NQCC_MHZ_PER_BARN * 0.02044 * -9.091670249869)
 
 
 def test_mrcc_output_adapter_returns_shared_geometry(tmp_path):
@@ -288,6 +441,32 @@ def test_orca_summary_and_promote_cli_use_adapter(tmp_path, capsys):
     assert "Promoted ORCA output" in promote_out
     assert "wrote_cartesian_hessian: 1" in promote_out
     assert read_cartesian_hessian_section(xyzin).cartesian_hessian.shape == (9, 9)
+
+
+def test_quadrupole_promote_cli_updates_properties(tmp_path, capsys):
+    gaussian = tmp_path / "gaussian.log"
+    molpro = tmp_path / "molpro.out"
+    orca = tmp_path / "orca.out"
+    gaussian_xyzin = tmp_path / "gaussian.xyzin"
+    molpro_xyzin = tmp_path / "molpro.xyzin"
+    orca_xyzin = tmp_path / "orca.xyzin"
+    gaussian.write_text(_gaussian_quadrupole_output(), encoding="utf-8")
+    molpro.write_text(_molpro_quadrupole_output(), encoding="utf-8")
+    orca.write_text(_orca_quadrupole_output(direct=False), encoding="utf-8")
+    for xyzin in (gaussian_xyzin, molpro_xyzin, orca_xyzin):
+        xyzin.write_text("1\nn\nN 0 0 0\n", encoding="utf-8")
+
+    assert matrix_run.main(["gaussian", "promote-quadrupole", str(gaussian), str(gaussian_xyzin)]) == 0
+    assert matrix_run.main(["molpro", "promote-quadrupole", str(molpro), str(molpro_xyzin)]) == 0
+    assert matrix_run.main(["orca", "promote-quadrupole", str(orca), str(orca_xyzin)]) == 0
+    out = capsys.readouterr().out
+
+    assert "Promoted Gaussian quadrupole properties" in out
+    assert "Promoted Molpro quadrupole properties" in out
+    assert "Promoted ORCA quadrupole properties" in out
+    assert len(read_properties_section(gaussian_xyzin).records) == 1
+    assert len(read_properties_section(molpro_xyzin).records) == 3
+    assert len(read_properties_section(orca_xyzin).records) == 3
 
 
 def test_orca_promoted_hessian_feeds_gf_without_orca_parsing_in_gf(tmp_path):
