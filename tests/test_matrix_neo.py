@@ -359,6 +359,7 @@ def test_coordinate_generator_registry_is_deterministic_and_stage_separated():
         "STRETCH",
         "LOCAL_XH_STRETCH",
         "BEND",
+        "LOCAL_ANGLE_SALC",
         "TORSION",
         "RING_PUCKER_COMPONENT",
         "BUTTERFLY",
@@ -367,6 +368,7 @@ def test_coordinate_generator_registry_is_deterministic_and_stage_separated():
     assert by_family["LOCAL_XH_STRETCH"].implemented_by == (
         "matrix_neo.generators.generate_stretch_coordinates"
     )
+    assert "through 9" in by_family["LOCAL_ANGLE_SALC"].notes
 
 
 def _stretch_generator_signature(records):

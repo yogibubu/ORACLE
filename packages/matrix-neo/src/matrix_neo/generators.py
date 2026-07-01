@@ -80,6 +80,19 @@ DEFAULT_COORDINATE_GENERATOR_REGISTRY: tuple[CoordinateGeneratorSpec, ...] = (
         status=STATUS_LEGACY_PORTED,
     ),
     CoordinateGeneratorSpec(
+        name="LocalSymmetryAngleSALCGenerator",
+        stage=STAGE_COORDINATE_GENERATION,
+        coordinate_family="LOCAL_ANGLE_SALC",
+        produces=("XAng", "SymD", "Rock", "HCAn"),
+        consumes=("TOPOLOGY.BONDS", "GEOMETRY.CARTESIAN", "TOPOLOGY.LOCAL_EQUIVALENCE"),
+        implemented_by="matrix_neo.runtime.gicforge_python local-angle paths",
+        status=STATUS_REFACTOR_BOUNDARY,
+        notes=(
+            "Extraction boundary for Merlino local angle/SALC logic; must support "
+            "coordination numbers through 9 before replacing the legacy path."
+        ),
+    ),
+    CoordinateGeneratorSpec(
         name="LinearBendGenerator",
         stage=STAGE_COORDINATE_GENERATION,
         coordinate_family="LINEAR_BEND",

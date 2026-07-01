@@ -107,6 +107,7 @@ Current extraction status:
 | --- | --- | --- |
 | `StretchGenerator` | Extracted in `matrix_neo.generators.generate_stretch_coordinates` | Must remain identical to the stretch part of `definition._primitive_candidates`. |
 | `LocalXHStretchGenerator` | Extracted in `matrix_neo.generators.generate_stretch_coordinates` | Uses the same opt-in X-H policy as NEO; GF treats only these rows as local X-H. |
+| `LocalSymmetryAngleSALCGenerator` | Refactor boundary around the Merlino local-angle path | Must build SALCs for local angle environments through coordination 9 before it can replace the legacy implementation. |
 | Other generators | Still embedded in the Merlino-compatible NEO path | Must be extracted one family at a time with golden tests before behaviour changes. |
 
 ## Reduction and Symmetry Boundary
