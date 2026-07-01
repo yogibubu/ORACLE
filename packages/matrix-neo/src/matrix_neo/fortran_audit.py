@@ -330,6 +330,7 @@ def _audit_one(
         residual = _row_space_residual(oracle_b, fortran_b)
         oracle_rank = int(definition.rank)
         fortran_rank = int(legacy.final_counts[-1])
+        salc_norm_error = float(projector["salc_coefficient_max_norm_error"])
         passed = (
             oracle_rank == fortran_rank
             and oracle_row_rank == fortran_row_rank == oracle_rank
@@ -337,6 +338,7 @@ def _audit_one(
             and residual <= tolerance
             and (not projector_required or projector["projector_status"] == "POINT_GROUP_PROJECTOR")
             and projector["mixed_symmetry_group_count"] == 0
+            and salc_norm_error <= tolerance
         )
         return GICForgeFortranAuditResult(
             molecule=molecule,
@@ -360,7 +362,7 @@ def _audit_one(
             mixed_symmetry_group_count=int(projector["mixed_symmetry_group_count"]),
             total_symmetric_gic_count=int(projector["total_symmetric_gic_count"]),
             salc_coefficient_gic_count=int(projector["salc_coefficient_gic_count"]),
-            salc_coefficient_max_norm_error=float(projector["salc_coefficient_max_norm_error"]),
+            salc_coefficient_max_norm_error=salc_norm_error,
             message=""
             if passed
             else _failure_message(
@@ -448,6 +450,9 @@ def _failure_message(
         reasons.append("symmetry projector was not applied")
     if int(projector["mixed_symmetry_group_count"]):
         reasons.append("symmetry projector mixed coordinate families")
+    salc_norm_error = float(projector["salc_coefficient_max_norm_error"])
+    if salc_norm_error > tolerance:
+        reasons.append("SALC coefficient normalization exceeds tolerance")
     if not reasons:
         reasons.append("rank, shape or row-space residual mismatch")
     return "; ".join(reasons)

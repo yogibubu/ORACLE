@@ -5,6 +5,7 @@ from pathlib import Path
 
 from matrix_link import rdkit_available
 from matrix_neo import (
+    DEFAULT_FORTRAN_AUDIT_MOLECULES,
     audit_gic_corpus_geometry,
     discover_gic_corpus,
     summarize_gic_corpus,
@@ -73,6 +74,28 @@ def test_official_neo_gic_golden_corpus_registry_is_stable():
     } <= roles
     for entry in entries:
         assert (root / entry["path"]).is_file(), entry["path"]
+
+
+def test_fortran_audit_default_covers_golden_gic_closure_roles():
+    registry = json.loads(GOLDEN_CORPUS.read_text(encoding="utf-8"))
+    closure_roles = {
+        "fused_ring",
+        "bridged_ring",
+        "spiro_ring",
+        "python_fortran_parity",
+        "metal_center",
+        "ring_center",
+        "d5h_symmetry",
+        "d5d_symmetry",
+    }
+    required = {
+        Path(entry["path"]).name
+        for entry in registry["entries"]
+        if closure_roles.intersection(entry["roles"])
+        and Path(entry["path"]).parent.name == "molecules"
+    }
+
+    assert required <= set(DEFAULT_FORTRAN_AUDIT_MOLECULES)
 
 
 def test_gic_regression_corpus_keeps_qm_adapter_outputs():

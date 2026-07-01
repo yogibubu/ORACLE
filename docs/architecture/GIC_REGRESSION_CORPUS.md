@@ -73,15 +73,16 @@ Current required gate:
 - The default audit set is pyrrole, benzene, pyridine, pyrimidine, naphthalene,
   phenanthrene, anthracene, pyrene, fluorene, azulene, norbornane, norbornene,
   norbornadiene, norcamphor, spiro, acetylene, linear C4S, thujone, ribose,
-  cubane and cyclottane.
+  cubane, SF6, ferrocene D5h, ferrocene D5d, the no-H-bond proline/glycine
+  probe and cyclottane.
 - The default audit is tied to the golden registry roles. Every entry tagged
   `fused_ring`, `bridged_ring`, `spiro_ring` or `python_fortran_parity` must
   remain in `DEFAULT_FORTRAN_AUDIT_MOLECULES` unless the registry is explicitly
   reviewed.
-- This gate must pass with matching final rank, matching row-space rank and
-  Wilson-B row-space residual below the audit tolerance. The finite
-  point-group projector must be active for every non-`C1`, non-linear molecule
-  in the gate.
+- This gate must pass with matching final rank, matching row-space rank,
+  Wilson-B row-space residual below the audit tolerance and normalized SALC
+  coefficient vectors. The finite point-group projector must be active for
+  every non-`C1`, non-linear molecule in the gate.
 - The audit summary reports projector status, symmetry block counts, mixed
   symmetry-family counts, total-symmetric GIC counts, nontrivial SALC
   coefficient counts and the largest SALC coefficient normalization residual.
@@ -120,8 +121,9 @@ Current required gate:
   Wilson-B row space.
 - Ribose is an explicit regression for a flexible oxygenated sugar ring:
   `ribose.inp` must keep the Merlino-equivalent final rank 51, preserve the
-  ring `RDef`/`RPck`/`QPck`/`PhiP` coordinate families, and match the Wilson-B
-  row space.
+  ring `RDef`/`RPck` source spaces, keep polar `QPck`/`PhiP` quantities as
+  post-processing descriptors rather than Gaussian-active coordinates, and
+  match the Wilson-B row space.
 - Cubane is an explicit high-symmetry regression: `cubane.inp` must detect
   point group `Oh`, keep the Merlino-equivalent final rank 42, use the full
   point-group projector, keep `BUTTERFLY` and `CYCLIC_BEND` as separate
@@ -131,10 +133,11 @@ Current required gate:
   Python/Fortran parity audit: they must detect `D5h` and `D5d`, respectively,
   keep the full point-group projector active, preserve Wilson-B rank 57 and
   match the Fortran Wilson-B row space.
-- Cyclottane is an explicit large noncondensed ring regression: `cyclottane.inp`
-  must detect point group `D2`, keep the Merlino-equivalent final rank 66, use
-  the full point-group projector, preserve five `RDef`/`RPck` components, and
-  export the expected polar `QPck`/`PhiP` ring-puckering functionals.
+- Cyclottane is an explicit large noncondensed ring regression:
+  `cyclottane.inp` must detect point group `D2`, keep the Merlino-equivalent
+  final rank 66, use the full point-group projector, preserve five
+  `RDef`/`RPck` components, and keep `QPck`/`PhiP` as post-processing
+  descriptors rather than Gaussian-active coordinates.
 
 Full-corpus status from the 127 imported `.inp` files is not yet a release
 gate. The current broad audit separates:

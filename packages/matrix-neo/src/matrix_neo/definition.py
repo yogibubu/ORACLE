@@ -426,6 +426,7 @@ def _construct_merlino_python_definition(
             for coefficient, primitive in coordinate.terms
             if abs(float(coefficient)) > 1.0e-14
         )
+        coefficients = _normalized_coefficients(coefficients)
         if not coefficients:
             raise GICForgeContractError(f"empty Merlino Python coordinate {coordinate.name!r}")
         gics.append(
@@ -511,6 +512,15 @@ def _merlino_runtime_primitive(
     if kind == "out_of_plane":
         return GICPrimitive(identifier, identifier, family, "U", atoms, refs=refs)
     raise GICForgeContractError(f"unsupported Merlino Python primitive kind: {kind}")
+
+
+def _normalized_coefficients(
+    coefficients: tuple[tuple[str, float], ...],
+) -> tuple[tuple[str, float], ...]:
+    norm = float(np.sqrt(sum(float(coefficient) ** 2 for _identifier, coefficient in coefficients)))
+    if not np.isfinite(norm) or norm <= 1.0e-14:
+        return coefficients
+    return tuple((identifier, float(coefficient) / norm) for identifier, coefficient in coefficients)
 
 
 def _merlino_coordinate_primitive_refs(

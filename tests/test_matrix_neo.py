@@ -37,6 +37,8 @@ from matrix_neo import (
     gic_report_from_xyzin,
     gic_b_matrix_lines,
     gic_definition_section_lines,
+    primitive_reduction_class,
+    primitive_symmetry_block,
     special_symmetry_source_blocks,
     symmetrize_gic_definition,
     irrep_characters_for_operations,
@@ -45,6 +47,11 @@ from matrix_neo import (
     write_gicforge_build_sections,
     write_gicforge_gaussian_input,
     write_gicforge_plan_sections,
+)
+from matrix_neo.policy import (
+    ORDINARY_REDUCTION_CLASS,
+    SPECIAL_PRIMITIVE_FAMILIES,
+    SPECIAL_REDUCTION_CLASS,
 )
 from matrix_neo.definition import (
     _analytic_b_row,
@@ -393,6 +400,36 @@ def test_coordinate_generator_registry_is_deterministic_and_stage_separated():
     )
     assert "5-9" in by_family["LOCAL_ANGLE_SALC"].notes
     assert "ligand-equivalence" in by_family["LOCAL_ANGLE_SALC"].notes
+
+
+def test_gic_closure_families_have_explicit_reduction_and_symmetry_policy():
+    ordinary_protected_by_family = {
+        "LOCAL_XH_STRETCH": "LOCAL_XH_STRETCH",
+        "CYCLIC_BEND": "CYCLIC_BEND",
+        "SPIRO_BEND": "SPIRO_BEND",
+        "LINEAR_BEND": "LINEAR_BEND",
+        "RING_PUCKER_COMPONENT": "RING_PUCKER_COMPONENT",
+        "BUTTERFLY": "BUTTERFLY",
+        "OUT_OF_PLANE": "OUT_OF_PLANE",
+        "IMPROPER_DIHEDRAL": "OUT_OF_PLANE",
+    }
+    special_by_family = {
+        "FRAG_DISTANCE": "SPECIAL_FRAGMENT_DISTANCE",
+        "FRAG_CENTER_ATOM_DISTANCE": "SPECIAL_FRAGMENT_CENTER_ATOM",
+        "FRAG_TRANSLATION": "SPECIAL_FRAGMENT_TRANSLATION",
+        "FRAG_ORIENTATION": "SPECIAL_FRAGMENT_ORIENTATION",
+        "CENTER_ATOM_DISTANCE": "SPECIAL_CENTER_ATOM",
+    }
+
+    for family, block in ordinary_protected_by_family.items():
+        assert primitive_reduction_class(family) == ORDINARY_REDUCTION_CLASS
+        assert primitive_symmetry_block(family) == block
+
+    for family, block in special_by_family.items():
+        assert primitive_reduction_class(family) == SPECIAL_REDUCTION_CLASS
+        assert primitive_symmetry_block(family) == block
+
+    assert special_by_family.keys() <= SPECIAL_PRIMITIVE_FAMILIES
 
 
 def test_local_ligand_equivalence_uses_atom_type_and_radial_shell():
