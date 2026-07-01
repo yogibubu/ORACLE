@@ -228,6 +228,14 @@ def _first_selected_difference(
                 f"selected SALC count changed for {key}: "
                 f"expected={len(left_records)} current={len(right_records)}"
             )
+        if key[0] not in PRIORITY_FAMILIES:
+            # Generic symmetry blocks can be larger than the stored compact
+            # selection.  Later vectors in a truncated degenerate block are not
+            # unique across BLAS/SVD backends, so only the leading representative
+            # is a stable golden artifact.  Special-coordinate families are kept
+            # as full selected subspaces because they are the regression target.
+            left_records = left_records[:1]
+            right_records = right_records[:1]
         left_ids, left_projector = _selected_subspace_projector(left_records)
         right_ids, right_projector = _selected_subspace_projector(right_records)
         if left_ids != right_ids or not np.allclose(
