@@ -38,6 +38,17 @@ class CoordinateGeneratorSpec:
     notes: str = ""
 
 
+@dataclass(frozen=True)
+class GeneratedCoordinate:
+    """Generator-neutral coordinate definition produced before NEO reduction."""
+
+    family: str
+    function: str
+    atoms: tuple[int, ...]
+    mode: int = 0
+    refs: tuple[str, ...] = ()
+
+
 DEFAULT_COORDINATE_GENERATOR_REGISTRY: tuple[CoordinateGeneratorSpec, ...] = (
     CoordinateGeneratorSpec(
         name="StretchGenerator",
@@ -45,7 +56,7 @@ DEFAULT_COORDINATE_GENERATOR_REGISTRY: tuple[CoordinateGeneratorSpec, ...] = (
         coordinate_family="STRETCH",
         produces=("R(i,j)",),
         consumes=("TOPOLOGY.BONDS",),
-        implemented_by="matrix_neo.definition._primitive_candidates",
+        implemented_by="matrix_neo.generators.generate_stretch_coordinates",
         status=STATUS_LEGACY_PORTED,
         notes="Includes the default Merlino-compatible bonded stretch path.",
     ),
@@ -55,7 +66,7 @@ DEFAULT_COORDINATE_GENERATOR_REGISTRY: tuple[CoordinateGeneratorSpec, ...] = (
         coordinate_family="LOCAL_XH_STRETCH",
         produces=("R(X,H)",),
         consumes=("TOPOLOGY.BONDS", "GIC.XH_STRETCH_POLICY"),
-        implemented_by="matrix_neo.definition._primitive_candidates",
+        implemented_by="matrix_neo.generators.generate_stretch_coordinates",
         status=STATUS_LEGACY_PORTED,
         notes="Opt-in unsymmetrized X-H stretches for local-mode workflows.",
     ),
@@ -140,6 +151,39 @@ DEFAULT_COORDINATE_GENERATOR_REGISTRY: tuple[CoordinateGeneratorSpec, ...] = (
 )
 
 
+def generate_stretch_coordinates(
+    bonds: tuple[tuple[int, int], ...],
+    *,
+    atom_symbols: tuple[str, ...] = (),
+    xh_stretch_policy: str = "SYMMETRIZE",
+    local_xh_bonds: tuple[tuple[int, int], ...] = (),
+    local_xh_classes: tuple[str, ...] = (),
+) -> tuple[GeneratedCoordinate, ...]:
+    """Generate bonded stretch definitions, including opt-in local X-H rows."""
+
+    xh_class_by_bond = _xh_class_by_bond(bonds, atom_symbols)
+    return tuple(
+        GeneratedCoordinate(
+            family=(
+                "LOCAL_XH_STRETCH"
+                if _use_local_xh_stretch(
+                    left,
+                    right,
+                    atom_symbols,
+                    xh_stretch_policy,
+                    local_xh_bonds,
+                    local_xh_classes,
+                    xh_class_by_bond,
+                )
+                else "STRETCH"
+            ),
+            function="R",
+            atoms=(int(left), int(right)),
+        )
+        for left, right in bonds
+    )
+
+
 def default_coordinate_generator_registry() -> tuple[CoordinateGeneratorSpec, ...]:
     """Return the immutable default registry in deterministic order."""
 
@@ -173,3 +217,87 @@ def validate_coordinate_generator_registry(
             diagnostics.append(f"unexpected generator stage for {entry.name}: {entry.stage}")
     return tuple(diagnostics)
 
+
+def _use_local_xh_stretch(
+    left: int,
+    right: int,
+    atom_symbols: tuple[str, ...],
+    xh_stretch_policy: str,
+    local_xh_bonds: tuple[tuple[int, int], ...],
+    local_xh_classes: tuple[str, ...],
+    xh_class_by_bond: dict[tuple[int, int], str],
+) -> bool:
+    if not _is_xh_bond(left, right, atom_symbols):
+        return False
+    policy = _normalize_xh_stretch_policy(xh_stretch_policy)
+    if policy == "SYMMETRIZE":
+        return False
+    if policy == "LOCAL_ALL":
+        return True
+    pair = _pair_key(left, right)
+    if pair in set(local_xh_bonds):
+        return True
+    return xh_class_by_bond.get(pair, "") in set(local_xh_classes)
+
+
+def _is_xh_bond(left: int, right: int, atom_symbols: tuple[str, ...]) -> bool:
+    heavy, hydrogen = _xh_heavy_and_hydrogen(left, right, atom_symbols)
+    return heavy is not None and hydrogen is not None
+
+
+def _xh_class_by_bond(
+    bonds: tuple[tuple[int, int], ...],
+    atom_symbols: tuple[str, ...],
+) -> dict[tuple[int, int], str]:
+    hydrogens_by_heavy: dict[int, set[int]] = {}
+    for left, right in bonds:
+        heavy, hydrogen = _xh_heavy_and_hydrogen(left, right, atom_symbols)
+        if heavy is None or hydrogen is None:
+            continue
+        hydrogens_by_heavy.setdefault(heavy, set()).add(hydrogen)
+    result: dict[tuple[int, int], str] = {}
+    for heavy, hydrogens in hydrogens_by_heavy.items():
+        count = len(hydrogens)
+        if count <= 1:
+            xh_class = "XH"
+        elif count == 2:
+            xh_class = "XH2"
+        else:
+            xh_class = "XH3"
+        for hydrogen in hydrogens:
+            result[_pair_key(heavy, hydrogen)] = xh_class
+    return result
+
+
+def _xh_heavy_and_hydrogen(
+    left: int,
+    right: int,
+    atom_symbols: tuple[str, ...],
+) -> tuple[int | None, int | None]:
+    if left < 1 or right < 1 or left > len(atom_symbols) or right > len(atom_symbols):
+        return None, None
+    left_symbol = str(atom_symbols[left - 1]).strip().upper()
+    right_symbol = str(atom_symbols[right - 1]).strip().upper()
+    if left_symbol == "H" and right_symbol != "H":
+        return right, left
+    if right_symbol == "H" and left_symbol != "H":
+        return left, right
+    return None, None
+
+
+def _pair_key(left: int, right: int) -> tuple[int, int]:
+    return (int(left), int(right)) if int(left) <= int(right) else (int(right), int(left))
+
+
+def _normalize_xh_stretch_policy(value: str | None) -> str:
+    text = str(value or "SYMMETRIZE").strip().replace("-", "_").upper()
+    aliases = {
+        "YES": "SYMMETRIZE",
+        "TRUE": "SYMMETRIZE",
+        "ALL": "LOCAL_ALL",
+        "LOCAL": "LOCAL_ALL",
+        "SELECTED": "LOCAL_SELECTED",
+        "NO": "LOCAL_ALL",
+        "FALSE": "LOCAL_ALL",
+    }
+    return aliases.get(text, text)

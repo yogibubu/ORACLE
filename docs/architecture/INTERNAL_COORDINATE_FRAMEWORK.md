@@ -101,6 +101,14 @@ A generator must not:
 - diagonalize matrices or solve eigenproblems;
 - manipulate Hessians.
 
+Current extraction status:
+
+| Generator | Status | Behavioural contract |
+| --- | --- | --- |
+| `StretchGenerator` | Extracted in `matrix_neo.generators.generate_stretch_coordinates` | Must remain identical to the stretch part of `definition._primitive_candidates`. |
+| `LocalXHStretchGenerator` | Extracted in `matrix_neo.generators.generate_stretch_coordinates` | Uses the same opt-in X-H policy as NEO; GF treats only these rows as local X-H. |
+| Other generators | Still embedded in the Merlino-compatible NEO path | Must be extracted one family at a time with golden tests before behaviour changes. |
+
 ## Reduction and Symmetry Boundary
 
 Reduction receives generated coordinates and analytic B rows.  It may use
@@ -130,4 +138,3 @@ downstream GF use require tests on representative systems:
 Golden tests should compare at least coordinate counts, labels/families,
 selected primitive/GIC rows, symmetry diagnostics and B-row numerical values
 where available.
-

@@ -111,8 +111,10 @@ from .generators import (
     STAGE_SYMMETRIZATION,
     STAGE_TOPOLOGY,
     CoordinateGeneratorSpec,
+    GeneratedCoordinate,
     coordinate_generator_by_family,
     default_coordinate_generator_registry,
+    generate_stretch_coordinates,
     validate_coordinate_generator_registry,
 )
 
@@ -164,6 +166,7 @@ __all__ = [
     "SYMMETRIZATION_POLICY",
     "B_MATRIX_BACKEND",
     "CoordinateGeneratorSpec",
+    "GeneratedCoordinate",
     "audit_gic_corpus_geometry",
     "audit_gicforge_fortran_corpus",
     "build_gic_b_matrix",
@@ -184,6 +187,7 @@ __all__ = [
     "gic_corpus_geometry_audit_records",
     "gic_corpus_records",
     "gicforge_fortran_audit_records",
+    "generate_stretch_coordinates",
     "gaussian_gic_lines_from_xyzin",
     "gic_b_matrix_lines",
     "gic_definition_section_lines",

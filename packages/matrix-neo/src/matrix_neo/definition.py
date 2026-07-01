@@ -18,6 +18,7 @@ from .contracts import (
     GICForgeContractError,
     validate_gicforge_prerequisites,
 )
+from .generators import generate_stretch_coordinates
 from .policy import (
     B_MATRIX_BACKEND,
     DIAGNOSTIC_FINITE_DIFFERENCE_STEP,
@@ -1396,23 +1397,17 @@ def _primitive_candidates(
     adjacency = _adjacency(bonds, natoms=natoms)
     counters: dict[str, int] = {family: 0 for family in PRIMITIVE_FAMILY_ORDER}
     candidates: list[GICPrimitive] = []
-    xh_class_by_bond = _xh_class_by_bond(bonds, atom_symbols)
 
-    for i, j in bonds:
-        family = (
-            "LOCAL_XH_STRETCH"
-            if _use_local_xh_stretch(
-                i,
-                j,
-                atom_symbols,
-                xh_stretch_policy,
-                local_xh_bonds,
-                local_xh_classes,
-                xh_class_by_bond,
-            )
-            else "STRETCH"
+    for stretch in generate_stretch_coordinates(
+        bonds,
+        atom_symbols=atom_symbols,
+        xh_stretch_policy=xh_stretch_policy,
+        local_xh_bonds=local_xh_bonds,
+        local_xh_classes=local_xh_classes,
+    ):
+        candidates.append(
+            _make_primitive(stretch.family, stretch.function, stretch.atoms, counters)
         )
-        candidates.append(_make_primitive(family, "R", (i, j), counters))
 
     candidates.extend(
         _fragment_primitive_candidates(fragment_records, coords=coords, counters=counters)

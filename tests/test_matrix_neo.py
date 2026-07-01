@@ -12,6 +12,7 @@ from matrix_chem import (
     MolecularGeometry,
     analyze_molecular_symmetry,
     preprocess_to_enriched_xyz,
+    read_enriched_xyz,
     write_validation_section,
 )
 from matrix_fragments import write_fragment_build_section, write_interaction_center_section
@@ -31,6 +32,7 @@ from matrix_neo import (
     build_gic_definition_from_xyzin,
     coordinate_generator_by_family,
     default_coordinate_generator_registry,
+    generate_stretch_coordinates,
     gaussian_gic_lines_from_xyzin,
     gic_report_from_xyzin,
     gic_b_matrix_lines,
@@ -52,6 +54,7 @@ from matrix_neo.definition import (
     _primitive_value,
     _ring_pucker_component_terms,
     _select_ranked_primitives,
+    _topology_bonds,
 )
 
 
@@ -362,8 +365,94 @@ def test_coordinate_generator_registry_is_deterministic_and_stage_separated():
         "SPECIAL_COORDINATE",
     } <= set(by_family)
     assert by_family["LOCAL_XH_STRETCH"].implemented_by == (
-        "matrix_neo.definition._primitive_candidates"
+        "matrix_neo.generators.generate_stretch_coordinates"
     )
+
+
+def _stretch_generator_signature(records):
+    return tuple((item.family, item.function, item.atoms) for item in records)
+
+
+def _stretch_candidate_signature(candidates):
+    return tuple(
+        (item.family, item.function, item.atoms)
+        for item in candidates
+        if item.function == "R" and item.family in {"STRETCH", "LOCAL_XH_STRETCH"}
+    )
+
+
+def _assert_stretch_generator_matches_primitive_candidates(
+    bonds,
+    coords,
+    atom_symbols,
+    *,
+    xh_stretch_policy="SYMMETRIZE",
+    local_xh_classes=(),
+):
+    generated = generate_stretch_coordinates(
+        tuple(bonds),
+        atom_symbols=tuple(atom_symbols),
+        xh_stretch_policy=xh_stretch_policy,
+        local_xh_classes=tuple(local_xh_classes),
+    )
+    candidates = _primitive_candidates(
+        tuple(bonds),
+        coords=np.asarray(coords, dtype=float),
+        natoms=len(atom_symbols),
+        atom_symbols=tuple(atom_symbols),
+        xh_stretch_policy=xh_stretch_policy,
+        local_xh_classes=tuple(local_xh_classes),
+    )
+
+    assert _stretch_generator_signature(generated) == _stretch_candidate_signature(candidates)
+
+
+def test_stretch_generator_matches_primitive_candidates_for_small_xh_cases():
+    _assert_stretch_generator_matches_primitive_candidates(
+        ((1, 2), (1, 3)),
+        np.asarray([(0.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0)]),
+        ("O", "H", "H"),
+        xh_stretch_policy="LOCAL_SELECTED",
+        local_xh_classes=("XH2",),
+    )
+    _assert_stretch_generator_matches_primitive_candidates(
+        ((1, 2), (1, 3), (1, 4)),
+        np.asarray(
+            [
+                (0.0, 0.0, 0.0),
+                (0.94, 0.0, 0.0),
+                (-0.313, 0.885, 0.0),
+                (-0.313, -0.442, 0.766),
+            ]
+        ),
+        ("N", "H", "H", "H"),
+        xh_stretch_policy="LOCAL_SELECTED",
+        local_xh_classes=("XH3",),
+    )
+    _assert_stretch_generator_matches_primitive_candidates(
+        ((1, 2), (1, 3), (1, 4), (1, 5)),
+        _tetrahedral_methane_coordinates(),
+        ("C", "H", "H", "H", "H"),
+        xh_stretch_policy="SYMMETRIZE",
+    )
+
+
+def test_stretch_generator_matches_primitive_candidates_for_ring_fixtures(tmp_path):
+    for filename in ("benzene.inp", "pyrrole.inp"):
+        source = _test_molecule_path(filename)
+        xyzin = tmp_path / f"{filename}.xyzin"
+        preprocess_to_enriched_xyz(source, xyzin)
+        write_validation_section(xyzin)
+        lines = xyzin.read_text(encoding="utf-8").splitlines()
+        geometry = read_enriched_xyz(xyzin)
+        bonds = _topology_bonds(lines, natoms=geometry.natoms)
+
+        _assert_stretch_generator_matches_primitive_candidates(
+            bonds,
+            geometry.coordinates_angstrom,
+            geometry.atoms,
+            xh_stretch_policy="SYMMETRIZE",
+        )
 
 
 def test_gicforge_plan_requires_validation_pass(tmp_path):
