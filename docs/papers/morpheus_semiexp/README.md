@@ -29,3 +29,6 @@ python -m matrix semiexp-benchmark --outdir docs/papers/morpheus_semiexp/generat
 
 Some paper-specific generated tables in `generated/` come from dedicated
 workflows and should be refreshed together with their corresponding input data.
+
+See `reproducibility_audit.md` for the current command-by-command status of the
+paper results.

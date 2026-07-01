@@ -1,6 +1,6 @@
 {
   "schema": "oracle.semiexp.paper_regression.v1",
-  "created_from": "Merlino SEfit benchmark outputs used in the newmsr manuscript",
+  "created_from": "MORPHEUS paper generated CSV assets committed in docs/papers/morpheus_semiexp/generated",
   "cases": {
     "glycolaldehyde": {
       "point_group": "Cs",
@@ -26,56 +26,6 @@
       "minimum_hessian_eigenvalue": 4.37570047669,
       "stationary_point": "minimum",
       "run_dir": "working/semiexp/glycolaldehyde/run_pcs4"
-    },
-    "glycine_I": {
-      "point_group": "Cs",
-      "coordinate_model": "gic",
-      "rotational_pair": "ABC",
-      "components": [
-        "Ia",
-        "Ib",
-        "Ic"
-      ],
-      "isotopologues": 5,
-      "reported_constants": 15,
-      "final_gics": 24,
-      "totally_symmetric_gics": 15,
-      "effective_parameters": 11,
-      "rank": 11,
-      "primitive_constraints": 4,
-      "accepted_steps": 6,
-      "rejected_steps": 5,
-      "condition_number": 10202.781071477888,
-      "rotational_rms_MHz": 0.02709546189715932,
-      "rotational_max_MHz": 0.0565325500284,
-      "minimum_hessian_eigenvalue": 546406.36319,
-      "stationary_point": "minimum",
-      "run_dir": "working/semiexp/glycine_I_cs_table5_gic_fortran"
-    },
-    "glycine_II": {
-      "point_group": "C1",
-      "coordinate_model": "gic",
-      "rotational_pair": "ABC",
-      "components": [
-        "Ia",
-        "Ib",
-        "Ic"
-      ],
-      "isotopologues": 10,
-      "reported_constants": 30,
-      "final_gics": 24,
-      "totally_symmetric_gics": 24,
-      "effective_parameters": 19,
-      "rank": 19,
-      "primitive_constraints": 5,
-      "accepted_steps": 16,
-      "rejected_steps": 30,
-      "condition_number": 10543.733841102394,
-      "rotational_rms_MHz": 0.24911628585532697,
-      "rotational_max_MHz": 0.670672236074,
-      "minimum_hessian_eigenvalue": 61995.9401444,
-      "stationary_point": "minimum",
-      "run_dir": "working/semiexp/glycine_II_dpcs3_table5_repo_gic_fortran"
     },
     "cyclopentadiene": {
       "point_group": "C2v",
@@ -126,6 +76,30 @@
       "stationary_point": "flat_or_rank_deficient",
       "run_dir": "working/semiexp/nitrobenzene/run_pair_auto"
     },
+    "p-EBN": {
+      "point_group": "C2v",
+      "coordinate_model": "gic",
+      "rotational_pair": "AB",
+      "components": [
+        "Ia",
+        "Ib"
+      ],
+      "isotopologues": 11,
+      "reported_constants": 33,
+      "final_gics": 39,
+      "totally_symmetric_gics": 14,
+      "effective_parameters": 6,
+      "rank": 6,
+      "primitive_constraints": 22,
+      "accepted_steps": 4,
+      "rejected_steps": 20,
+      "condition_number": 2440.2453803166427,
+      "rotational_rms_MHz": 0.11897469514086748,
+      "rotational_max_MHz": 0.567403095696,
+      "minimum_hessian_eigenvalue": 25.9063599697,
+      "stationary_point": "minimum",
+      "run_dir": "working/semiexp/p-EBN/run_legacy_import"
+    },
     "azulene": {
       "point_group": "C2v",
       "coordinate_model": "gic",
@@ -174,6 +148,56 @@
       "minimum_hessian_eigenvalue": 0.175456863111,
       "stationary_point": "minimum",
       "run_dir": "working/semiexp/norcamphor/run_msr_rd_explicit"
+    },
+    "glycine_I": {
+      "point_group": "Cs",
+      "coordinate_model": "gic",
+      "rotational_pair": "ABC",
+      "components": [
+        "Ia",
+        "Ib",
+        "Ic"
+      ],
+      "isotopologues": 5,
+      "reported_constants": 15,
+      "final_gics": 24,
+      "totally_symmetric_gics": 15,
+      "effective_parameters": 11,
+      "rank": 11,
+      "primitive_constraints": 4,
+      "accepted_steps": 3,
+      "rejected_steps": 17,
+      "condition_number": 10203.867287514242,
+      "rotational_rms_MHz": 0.02685950948210901,
+      "rotational_max_MHz": 0.0570480817205,
+      "minimum_hessian_eigenvalue": 547708.346436,
+      "stationary_point": "minimum",
+      "run_dir": "working/semiexp/glycine_I_pcs4_auto_gic_fortran"
+    },
+    "glycine_II": {
+      "point_group": "C1",
+      "coordinate_model": "gic",
+      "rotational_pair": "ABC",
+      "components": [
+        "Ia",
+        "Ib",
+        "Ic"
+      ],
+      "isotopologues": 10,
+      "reported_constants": 30,
+      "final_gics": 24,
+      "totally_symmetric_gics": 24,
+      "effective_parameters": 19,
+      "rank": 19,
+      "primitive_constraints": 5,
+      "accepted_steps": 26,
+      "rejected_steps": 8,
+      "condition_number": 10543.733315477484,
+      "rotational_rms_MHz": 0.24911633684024337,
+      "rotational_max_MHz": 0.670672228787,
+      "minimum_hessian_eigenvalue": 61995.9464426,
+      "stationary_point": "minimum",
+      "run_dir": "working/semiexp/glycine_II_dpcs3_auto_gic_fortran"
     }
   },
   "planar_pair_diagnostics": {

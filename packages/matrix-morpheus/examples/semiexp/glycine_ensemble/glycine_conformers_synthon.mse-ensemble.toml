@@ -15,11 +15,11 @@ high_correlation_reject_threshold = 0.9999
 
 [[molecules]]
 name = "glycine_I"
-job = "../../../benchmarks/semiexp_msr/inputs/glycine/glycine_I_cs_table5_constraints.msr"
+job = "../../../../../benchmarks/semiexp_msr/inputs/glycine/glycine_I_cs_table5_constraints.msr"
 
 [[molecules]]
 name = "glycine_II"
-job = "../../../benchmarks/semiexp_msr/inputs/glycine/glycine_II_dpcs3_table5_constraints.msr"
+job = "../../../../../benchmarks/semiexp_msr/inputs/glycine/glycine_II_dpcs3_table5_constraints.msr"
 
 [[classes]]
 name = "Ccarb_Cmethylene"

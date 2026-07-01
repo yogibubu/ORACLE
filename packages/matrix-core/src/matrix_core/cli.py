@@ -726,6 +726,32 @@ def build_parser(
         default=[],
         help="Class constraint as name:shared|fixed:pattern[|pattern...]; can be repeated",
     )
+    semiexp.add_argument(
+        "--primitive-class",
+        action="append",
+        default=[],
+        help=(
+            "Primitive-defined class as name:primitive[|primitive...]. MORPHEUS maps "
+            "the primitives onto disjoint GIC classes using coefficient thresholds."
+        ),
+    )
+    semiexp.add_argument(
+        "--primitive-class-min",
+        type=float,
+        default=0.70,
+        help="Minimum GIC coefficient fraction required to assign a primitive class",
+    )
+    semiexp.add_argument(
+        "--primitive-class-cross-max",
+        type=float,
+        default=0.20,
+        help="Maximum competing class fraction allowed for an unambiguous assignment",
+    )
+    semiexp.add_argument(
+        "--primitive-class-budget",
+        default="auto",
+        help="Maximum number of primitive-derived classes: auto, all, or an integer",
+    )
 
     semiexp_ensemble = sub.add_parser(
         "semiexp-ensemble",
@@ -2130,9 +2156,12 @@ def main(
             ParameterClassConstraint,
             QMParameterPredicate,
             SemiexperimentalFitRequest,
+            derive_primitive_class_plan,
             fit_semiexperimental_geometry,
             is_msr_legacy_file,
+            parse_primitive_class_spec,
             prepare_semiexperimental_xyzin,
+            preview_semiexperimental_gics,
             read_observations,
             read_semiexperimental_job,
             semiexperimental_latex_tables,
@@ -2201,6 +2230,9 @@ def main(
             job.parameter_classes if job else (),
             _parse_parameter_classes(args.parameter_class, ParameterClassConstraint),
         )
+        primitive_classes = tuple(
+            parse_primitive_class_spec(item) for item in getattr(args, "primitive_class", ())
+        )
         backend = _job_default(args.backend, "python", job.backend if job else None)
         max_iter = args.max_iter if args.max_iter is not None else (job.max_iter if job else None)
         step = _job_default(args.step, 1.0e-4, job.step if job else None)
@@ -2222,6 +2254,35 @@ def main(
             args.checkpoint if args.checkpoint is not None else (job.checkpoint if job else None)
         )
         restart = args.restart if args.restart is not None else (job.restart if job else None)
+        if primitive_classes:
+            if coordinate_model != "gic":
+                raise ValueError("--primitive-class is only supported with --coordinate-model gic")
+            class_budget = _primitive_class_budget(
+                args.primitive_class_budget,
+                observations=observations,
+                rotational_components=rotational_components,
+            )
+            preview = preview_semiexperimental_gics(Path(geometry_path), observations)
+            class_plan = derive_primitive_class_plan(
+                preview.gic_labels,
+                primitive_classes,
+                min_fraction=args.primitive_class_min,
+                cross_fraction_max=args.primitive_class_cross_max,
+                max_classes=class_budget,
+            )
+            fixed = _merge_unique(fixed, class_plan.fixed_patterns)
+            parameter_classes = _merge_unique(parameter_classes, class_plan.parameter_classes)
+            print(
+                "primitive_class_plan: "
+                f"classes={len(class_plan.parameter_classes)} "
+                f"fixed={len(class_plan.fixed_patterns)} "
+                f"rejected={len(class_plan.rejected_labels)}"
+            )
+            for item in class_plan.parameter_classes:
+                print(
+                    f"primitive_class: {item.name} "
+                    f"gics={len(item.patterns)} patterns={'|'.join(item.patterns)}"
+                )
         request = SemiexperimentalFitRequest(
             initial_geometry=geometry_path,
             observations=observations,
@@ -2871,6 +2932,31 @@ def _parse_parameter_classes(items: list[str], class_type: type) -> tuple:
         patterns = tuple(part.strip() for part in parts[2].split("|") if part.strip())
         constraints.append(class_type(parts[0].strip(), patterns, parts[1].strip()))
     return tuple(constraints)
+
+
+def _primitive_class_budget(
+    raw: str,
+    *,
+    observations: tuple,
+    rotational_components: str,
+) -> int | None:
+    text = str(raw or "auto").strip().lower()
+    if text == "all":
+        return None
+    if text == "auto":
+        component_count = len(_semiexp_components_for_budget(rotational_components))
+        return max(1, len(observations) * component_count)
+    value = int(text)
+    if value < 0:
+        raise ValueError("--primitive-class-budget must be auto, all, or a non-negative integer")
+    return value
+
+
+def _semiexp_components_for_budget(rotational_components: str) -> tuple[str, ...]:
+    text = str(rotational_components or "auto").upper()
+    if text in {"AB", "AC", "BC"}:
+        return tuple(text)
+    return ("A", "B", "C")
 
 
 def _merge_unique(left: tuple[_T, ...], right: tuple[_T, ...]) -> tuple[_T, ...]:

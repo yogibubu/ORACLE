@@ -1312,13 +1312,22 @@ Operationally, non-skeletal stretch combinations and the angular, torsional,
 and out-of-plane families are held fixed for this parent-only diagnostic, while
 the retained C--C stretch block is replaced by one shared variable after rank
 reduction. The resulting refinement improves the residuals to $-0.027$,
-$0.633$, and $0.291$ MHz, reducing the RMS rotational residual from 2.73 to
-0.40 MHz. This test is deliberately not presented as an isotope-rich structural
-validation: it demonstrates that a large-molecule QC geometry, vibrational
-corrections, non-redundant coordinate generation, and class-constrained
-refinement can be chained for a 49-atom fused-ring molecule, where sufficiently
-rich isotopic substitution data are not presently available for a full
-validation of the fit engine.
+$0.633$, and $0.292$ MHz, reducing the RMS rotational residual from 2.73 to
+0.40 MHz. Two additional end-to-end variants test more informative model
+formulations without changing the input data. Separating C--C and C--O stretch
+classes gives residuals of $0.002$, $0.046$, and $-0.058$ MHz. In this run the
+model is specified only through primitive C--C and C--O bond classes; MORPHEUS
+maps the generated GICs onto disjoint shared classes with default coefficient
+thresholds and an automatic data-compatible class budget, freezing unsupported
+directions.
+A predicate model that keeps a compact C--C/C--O subset independent and
+constrains the corresponding QC bond lengths with 0.05~\AA{} uncertainties gives
+$0.382$, $0.499$, and $0.174$ MHz. This test is deliberately not presented as an isotope-rich
+structural validation: it demonstrates that a large-molecule QC geometry,
+vibrational corrections, non-redundant coordinate generation, class constraints,
+and weighted predicates can be chained for a 49-atom fused-ring molecule, where
+sufficiently rich isotopic substitution data are not presently available for a
+full validation of the fit engine.
 
 \begin{center}
 \includegraphics[width=0.90\linewidth]{figures/testosterone_qc_cropped.jpg}
@@ -1337,7 +1346,9 @@ derived from the published $B_0$ and $\Delta B_\mathrm{vib}$ values.
 Model & Variables & $\Delta A$ & $\Delta B$ & $\Delta C$ \\
 \midrule
 QC+$\Delta B_\mathrm{vib}$ & 0 & 4.638 & 0.674 & 0.563 \\
-Class-constrained fit & 1 & -0.027 & 0.633 & 0.291 \\
+C--C class & 1 & -0.027 & 0.633 & 0.292 \\
+C--C/C--O classes & 2 & 0.002 & 0.046 & -0.058 \\
+QC predicates & 7 & 0.382 & 0.499 & 0.174 \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -1393,8 +1404,9 @@ equilibrium geometry toward the semiexperimental solution. Model generation
 and structural refinement are integrated into a single workflow rather than
 being treated as separate steps.
 The essential shift is from expert-dependent model formulation to reproducible
-algorithmic model generation. The algorithm replaces expert-dependent model
-formulation rather than expert chemical judgement.
+algorithmic model generation. The algorithm records and enforces chemical
+judgement in a reproducible form rather than replacing it with hidden manual
+choices.
 Although motivated by semiexperimental equilibrium structures, the underlying
 graph-driven model-construction strategy is applicable to any constrained
 refinement problem requiring simultaneous treatment of topology, symmetry, rank

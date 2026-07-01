@@ -89,7 +89,13 @@ def read_msr_legacy_input(path: Path) -> MSRLegacyInput:
     else:
         zmat = _parse_zmatrix(geometry_lines, variables)
         atoms, coords, physical_map = _zmatrix_to_cartesian(zmat)
-        fixed_parameters = _zmatrix_frozen_constraints(zmat, physical_map)
+        expression_definitions = _zmatrix_gic_definitions(zmat, physical_map)
+        explicit_constraints, remainder = _extract_cartesian_constraints(remainder)
+        fixed_parameters = (
+            *expression_definitions,
+            *_zmatrix_frozen_constraints(zmat, physical_map),
+            *explicit_constraints,
+        )
         source_format = "msr_legacy_zmatrix"
     isotope_blocks, sections = _parse_isotopes_and_sections(remainder, natoms=len(atoms))
     observations = _build_observations(isotope_blocks, sections)
@@ -164,7 +170,11 @@ def _split_msr_legacy_lines(
         if not line:
             idx += 1
             continue
-        if _is_section_header(line) or _first_token_is_float(line):
+        if (
+            _is_section_header(line)
+            or _first_token_is_float(line)
+            or _is_cartesian_constraint_header(line)
+        ):
             break
         parsed = _parse_variable_assignment(line)
         if parsed is None:
@@ -329,6 +339,59 @@ def _zmatrix_frozen_constraints(
     return tuple(constraints)
 
 
+def _zmatrix_gic_definitions(
+    zmat: tuple[_ZMatrixLine, ...], physical_map: tuple[int, ...]
+) -> tuple[str, ...]:
+    z_to_physical = {
+        z_index: phys_index for phys_index, z_index in enumerate(physical_map, start=1)
+    }
+    definitions: list[str] = []
+    seen: set[str] = set()
+    for z_zero, row in enumerate(zmat):
+        z_index = z_zero + 1
+        if z_zero >= 1:
+            atoms = _physical_atoms(z_to_physical, z_index, row.refs[0] + 1)
+            if atoms is not None:
+                i, j = sorted(atoms[:2])
+                _append_zmatrix_definition(
+                    definitions, seen, row.distance_token, f"R({i},{j})"
+                )
+        if z_zero >= 2:
+            atoms = _physical_atoms(z_to_physical, z_index, row.refs[0] + 1, row.refs[1] + 1)
+            if atoms is not None:
+                _append_zmatrix_definition(
+                    definitions, seen, row.angle_token, f"A({atoms[0]},{atoms[1]},{atoms[2]})"
+                )
+        if z_zero >= 3:
+            atoms = _physical_atoms(
+                z_to_physical, z_index, row.refs[0] + 1, row.refs[1] + 1, row.refs[2] + 1
+            )
+            if atoms is not None:
+                _append_zmatrix_definition(
+                    definitions,
+                    seen,
+                    row.dihedral_token,
+                    f"D({atoms[0]},{atoms[1]},{atoms[2]},{atoms[3]})",
+                )
+    return tuple(definitions)
+
+
+def _append_zmatrix_definition(
+    definitions: list[str], seen: set[str], token: str, expression: str
+) -> None:
+    name = _clean_variable_name(token)
+    if not name or name in seen or name.startswith("#"):
+        return
+    try:
+        _parse_float(name)
+    except ValueError:
+        pass
+    else:
+        return
+    definitions.append(f"{name}={expression}")
+    seen.add(name)
+
+
 def _physical_atoms(z_to_physical: dict[int, int], *z_indices: int) -> tuple[int, ...] | None:
     atoms: list[int] = []
     for z_index in z_indices:
@@ -371,6 +434,10 @@ def _extract_cartesian_constraints(lines: list[str]) -> tuple[tuple[str, ...], l
             constraints.append(line)
             idx += 1
             continue
+        if in_explicit_block and _looks_like_legacy_expression_constraint(line):
+            constraints.append(f"{line} Frozen")
+            idx += 1
+            continue
         if in_explicit_block:
             raise ValueError(f"Invalid MSR Cartesian constraint line: {line}")
         break
@@ -379,12 +446,27 @@ def _extract_cartesian_constraints(lines: list[str]) -> tuple[tuple[str, ...], l
 
 def _is_cartesian_constraint_header(line: str) -> bool:
     parts = _split_fields(line)
-    return len(parts) == 1 and parts[0].lower() in MSR_CARTESIAN_CONSTRAINT_HEADERS
+    return (
+        len(parts) == 1
+        and parts[0].lower().rstrip(":") in MSR_CARTESIAN_CONSTRAINT_HEADERS
+    )
 
 
 def _is_cartesian_constraint_end(line: str) -> bool:
     parts = _split_fields(line)
-    return len(parts) == 1 and parts[0].lower() in MSR_CARTESIAN_CONSTRAINT_END
+    return len(parts) == 1 and parts[0].lower().rstrip(":") in MSR_CARTESIAN_CONSTRAINT_END
+
+
+def _looks_like_legacy_expression_constraint(line: str) -> bool:
+    text = _strip_inline_comment(line).strip()
+    if not text:
+        return False
+    return bool(
+        re.fullmatch(
+            r"[A-Za-z_][A-Za-z0-9_#'\"]*(?:\s*[+-]\s*[A-Za-z_][A-Za-z0-9_#'\"]*)+",
+            text,
+        )
+    )
 
 
 def _is_modredundant_constraint_line(line: str) -> bool:
@@ -431,12 +513,18 @@ def _parse_isotopes_and_sections(
 
     sections: dict[str, tuple[_SectionRow, ...]] = {}
     while idx < len(rows):
+        if _is_legacy_trailing_directive(rows[idx]):
+            break
         if not _is_section_header(rows[idx]):
             raise ValueError(f"Expected MSR section header, found: {rows[idx]}")
         section = rows[idx].split()[0].lower()
         idx += 1
         section_rows: list[_SectionRow] = []
-        while idx < len(rows) and not _is_section_header(rows[idx]):
+        while (
+            idx < len(rows)
+            and not _is_section_header(rows[idx])
+            and not _is_legacy_trailing_directive(rows[idx])
+        ):
             section_rows.append(_parse_section_row(rows[idx]))
             idx += 1
         sections[section] = tuple(section_rows)
@@ -445,6 +533,14 @@ def _parse_isotopes_and_sections(
     if "bexp" not in sections:
         raise ValueError("MSR input needs a bexp section")
     return tuple(isotope_blocks), sections
+
+
+def _is_legacy_trailing_directive(line: str) -> bool:
+    parts = _split_fields(line)
+    if not parts:
+        return False
+    head = parts[0].lower()
+    return head in {"propagation", "redundant", "coordinates", "coordinate"}
 
 
 def _build_observations(

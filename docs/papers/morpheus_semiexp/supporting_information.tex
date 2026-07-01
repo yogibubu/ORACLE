@@ -844,54 +844,73 @@ a Z-matrix, hand-selected internal coordinates, or a stored refinement model.
 Topology perception identifies the C$_{19}$H$_{28}$O$_2$ molecular graph,
 MORPHEUS builds the 141-coordinate non-redundant GIC space, and the
 MORPHEUS class layer applies the reduced-dimensionality model after symmetry
-and rank reduction. For this parent-only diagnostic, all angular, torsional,
-and out-of-plane GIC families are fixed. Stretch combinations involving C--H,
-O--H, and C--O primitives are also fixed. The retained C--C skeletal stretch
-block is then assigned to one shared parameter class, so the fit contains one
-effective variable. This is a hard class constraint: it does not add an
-observation or a statistical prior, but replaces the selected active
+and rank reduction. For the baseline parent-only diagnostic, all angular,
+torsional, and out-of-plane GIC families are fixed. Stretch combinations
+involving C--H, O--H, and C--O primitives are also fixed. The retained C--C
+skeletal stretch block is then assigned to one shared parameter class, so the
+fit contains one effective variable. This is a hard class constraint: it does
+not add an observation or a statistical prior, but replaces the selected active
 coordinates by a single shared displacement direction before the least-squares
 normal equations are formed.
 
-\begin{table}
-\caption{Testosterone T1-H2$^{-}$-gp rotational constants used for the
-large-molecule scale check. Constants and residuals are in MHz. The QC
-column is the unrefined rotational constant calculated from the input
-geometry; the class-refined column is the parent-only MORPHEUS result with a
-single C--C skeletal stretch class.}
-\label{tab:si-testosterone-rotconstants}
-\begin{tabular}{lrrrrrr}
-\toprule
-Constant & $B_0$ & $\Delta B_\mathrm{vib}$ & $B_e^\mathrm{SE}$ & QC & Class-refined & Final diff. \\
-\midrule
-$A$ & 801.5 & 8.1 & 793.4 & 788.762 & 793.427 & -0.027 \\
-$B$ & 171.9 & 1.6 & 170.3 & 169.626 & 169.667 & +0.633 \\
-$C$ & 156.6 & 1.4 & 155.2 & 154.637 & 154.909 & +0.291 \\
-\bottomrule
-\end{tabular}
-\end{table}
+Two further models were generated with the same automated basis. In the
+two-class model, the refinement model is specified through the C--C skeletal
+class and the C--O stretch class as primitive bond sets. MORPHEUS then maps the
+generated GICs onto disjoint shared classes with default coefficient
+thresholds. Later, more specific classes in the declaration have priority over
+earlier, broader classes; GICs that do not satisfy the thresholds, or that
+cannot be supported within the data-compatible class budget, are frozen. In the
+predicate model, a
+compact C--C/C--O GIC subset is kept independent and QC bond lengths for the
+corresponding graph are added as weighted observations with a default
+uncertainty of 0.05~\AA{}. The predicate uncertainty is intentionally exposed as
+\texttt{MATRIX\_TESTOSTERONE\_PREDICATE\_SIGMA}, because it controls the
+tradeoff between the parent rotational data and the QC reference geometry.
 
-\begin{table}
-\caption{Testosterone model-construction diagnostics. The class-refined
-calculation used rotational constants as observables and all three parent
-components.}
-\label{tab:si-testosterone-diagnostics}
-\begin{tabular}{lr}
+\begin{center}
+\refstepcounter{table}\label{tab:si-testosterone-rotconstants}
+\parbox{0.94\linewidth}{\small Table~\thetable: Testosterone T1-H2$^{-}$-gp
+rotational constants used for the large-molecule scale check. Constants are in
+MHz. The QC column is the unrefined rotational constant calculated from the
+input geometry. The three MORPHEUS columns are, respectively, the one-class
+C--C baseline, the two-class C--C/C--O model, and the weighted predicate model.}
+
+\smallskip
+\begin{tabular}{lrrrrrrr}
 \toprule
-Quantity & Value \\
+Constant & $B_0$ & $\Delta B_\mathrm{vib}$ & $B_e^\mathrm{SE}$ & QC & C--C & C--C/C--O & Pred. \\
 \midrule
-Atoms & 49 \\
-Non-redundant GICs & 141 \\
-Retained active C--C stretch combinations & 5 \\
-Effective fitted variables & 1 \\
-Rank & 1 \\
-Condition number & 1.0 \\
-Unrefined QC RMS residual / MHz & 2.725 \\
-Class-refined RMS residual / MHz & 0.402 \\
-Iterations & 5 \\
+$A$ & 801.5 & 8.1 & 793.4 & 788.762 & 793.427 & 793.398 & 793.018 \\
+$B$ & 171.9 & 1.6 & 170.3 & 169.626 & 169.667 & 170.254 & 169.801 \\
+$C$ & 156.6 & 1.4 & 155.2 & 154.637 & 154.908 & 155.258 & 155.026 \\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{center}
+
+\begin{center}
+\refstepcounter{table}\label{tab:si-testosterone-diagnostics}
+\parbox{0.94\linewidth}{\small Table~\thetable: Testosterone
+model-construction diagnostics. All calculations used rotational constants as
+observables and all three parent components. The rotational RMS residual is in
+MHz.}
+
+\smallskip
+\begin{tabular}{lrrr}
+\toprule
+Quantity & C--C & C--C/C--O & Predicates \\
+\midrule
+Atoms & 49 & 49 & 49 \\
+Non-redundant GICs & 141 & 141 & 141 \\
+Retained C--C GICs & 5 & 21 & 5 \\
+Retained C--O GICs & 0 & 2 & 2 \\
+Effective fitted variables & 1 & 2 & 7 \\
+Rank & 1 & 2 & 7 \\
+Condition number & 1.0 & 28.36 & 4.17 \\
+Rotational RMS residual / MHz & 0.403 & 0.043 & 0.376 \\
+Iterations & 5 & 3 & 11 \\
+\bottomrule
+\end{tabular}
+\end{center}
 
 \begin{lstlisting}
 parameter_class = CC_skeleton; mode=shared;
@@ -905,26 +924,54 @@ parameter_class = Torsions_fixed; mode=fixed; patterns=ATor
 parameter_class = OOP_fixed; mode=fixed; patterns=AOop
 \end{lstlisting}
 
-The important point is that the class is applied in the final working basis,
-not as a molecule-specific Z-matrix instruction. The user supplies Cartesian
-coordinates and the literature rotational data; the topology labels determine
-which retained GICs belong to the C--C skeletal class.
-
-The exact repository command used for this diagnostic is archived in the
-testosterone example directory as \path{run_testosterone_cc_class.sh}. It can be
-run from the repository root and reads the QC Cartesian geometry, the
-published parent rotational constants, and the published vibrational
-corrections:
+For the two-class model, the script now gives primitive classes, not a
+molecule-specific list of GIC labels:
 \begin{lstlisting}
-sh examples/semiexp/testosterone/run_testosterone_cc_class.sh
+primitive_class = CC_skeleton;
+patterns = R(1,2)|R(1,6)|R(2,3)|R(2,45)|...
+
+primitive_class = CO_stretches;
+patterns = R(7,13)|R(16,17)
+
+primitive_class_min = 0.70
+primitive_class_cross_max = 0.20
+primitive_class_budget = auto
+\end{lstlisting}
+With the generated testosterone GIC basis, this gives 21 C--C-dominated GICs
+and two C--O-dominated GICs (\texttt{GIC020} and \texttt{GIC040}). The
+\texttt{auto} budget limits the number of independent class corrections to the
+number compatible with the available experimental observables; among competing
+declared classes, the most populated and highest-weighted classes are retained.
+
+The predicate model freezes the complement of its compact C--C/C--O subset but
+keeps those directions independent. The C--C and C--O bond predicates are
+evaluated from the QC input geometry at run time and are therefore not
+hard-coded numerical constants in the script.
+
+The important point is that the class is applied in the final working basis,
+not as a molecule-specific Z-matrix instruction. The input consists of Cartesian
+coordinates and the literature rotational data; the topology labels determine
+which retained GICs belong to the chemically declared classes.
+
+The exact repository commands used for these diagnostics are archived in the
+testosterone example directory. They can be run from the repository root and
+read the QC Cartesian geometry, the published parent rotational constants, and
+the published vibrational corrections:
+\begin{lstlisting}
+sh packages/matrix-morpheus/examples/semiexp/testosterone/run_testosterone_cc_class.sh
+sh packages/matrix-morpheus/examples/semiexp/testosterone/run_testosterone_cc_co_classes.sh
+sh packages/matrix-morpheus/examples/semiexp/testosterone/run_testosterone_predicates.sh
 \end{lstlisting}
 
 \section{Characteristics of the Test Cases}
 
-\begin{table}
-\caption{Constraints and coordinate choices (symmetry-adapted internal or Cartesian coordinates, SAI and SAC, respectively) used for the benchmark calculations.}
-\label{tab:si-reproducibility}
+\begin{center}
+\refstepcounter{table}\label{tab:si-reproducibility}
+\parbox{0.94\linewidth}{\small Table~\thetable: Constraints and coordinate
+choices (symmetry-adapted internal or Cartesian coordinates, SAI and SAC,
+respectively) used for the benchmark calculations.}
 
+\smallskip
 \begin{tabular}{lll}
 \toprule
 Case & Constraints & Coordinates \\
@@ -940,10 +987,9 @@ Glycine II      & Five generated QC constraints      & SAI, ABC \\
 Maleic anhydride & No fixed primitive constraints        & SAI and SAC, AB \\
 Phthalic anhydride & Weighted $r_e^\mathrm{BO}$ predicates & SAI, AC \\
 Succinic anhydride & Fixed local H-frame parameters       & SAI, AC \\
-Testosterone & One shared C--C skeletal stretch class   & SAI, ABC \\
+Testosterone & C--C class; C--C/C--O classes; QC predicates   & SAI, ABC \\
 \bottomrule
 \end{tabular}
-
-\end{table}
+\end{center}
 
 \end{document}

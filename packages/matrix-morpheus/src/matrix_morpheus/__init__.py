@@ -124,6 +124,12 @@ from .constraints import (
     gic_expression_constraint_values,
     parse_gaussian_style_constraints,
 )
+from .class_advisor import (
+    DerivedPrimitiveClassPlan,
+    PrimitiveClassSpec,
+    derive_primitive_class_plan,
+    parse_primitive_class_spec,
+)
 from .diagnostics import iteration_trace_csv_rows, svd_diagnostics_csv, uncertainty_diagnostics_csv
 from .performance import mass_vector_for_isotopes, mass_vector_for_observation
 from .report import (
@@ -173,6 +179,7 @@ __all__ = [
     "DEFAULT_SE_GEOMETRY_LIBRARY",
     "DEFAULT_SEMIEXP_BENCHMARK_OUTPUT_DIR",
     "DEFAULT_SEMIEXP_BENCHMARK_SNAPSHOT",
+    "DerivedPrimitiveClassPlan",
     "FragmentTarget",
     "HYDROGEN_PARAMETER_CONSTRAINT",
     "ElectronicCorrection",
@@ -189,6 +196,7 @@ __all__ = [
     "KraitchmanSeedResult",
     "ParameterClassConstraint",
     "PAPER_BENCHMARK_SCHEMA",
+    "PrimitiveClassSpec",
     "ORACLE_XYZ_MORPHEUS_SCHEMA",
     "CartesianCoordinateModel",
     "MorpheusSection",
@@ -232,6 +240,7 @@ __all__ = [
     "generate_paper_benchmark_artifacts",
     "observations_from_mapping",
     "combined_constraint_b_matrix",
+    "derive_primitive_class_plan",
     "finite_difference_constraint_b_matrix",
     "gic_expression_constraint_targets",
     "gic_expression_constraint_values",
@@ -250,6 +259,7 @@ __all__ = [
     "parse_substitutions",
     "parse_gaussian_style_constraints",
     "prepare_semiexperimental_xyzin",
+    "parse_primitive_class_spec",
     "preview_semiexperimental_gics",
     "preview_semiexperimental_conditioning",
     "read_observations",
