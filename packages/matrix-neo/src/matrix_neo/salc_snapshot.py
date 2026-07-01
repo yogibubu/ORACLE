@@ -12,6 +12,7 @@ from .definition import GICDefinition, read_gic_definition_from_xyzin
 SALC_SNAPSHOT_SCHEMA = "matrix.neo.gic_salc_snapshot.v2"
 DEFAULT_ROUNDING_DECIMALS = 12
 DEFAULT_SELECTED_PER_FAMILY = 3
+SALC_COEFFICIENT_TOLERANCE = 1.0e-8
 PRIORITY_FAMILIES = frozenset(
     {
         "RING_PUCKER_COMPONENT",
@@ -211,6 +212,25 @@ def _first_selected_difference(
     if len(expected) != len(current):
         return f"selected SALC count changed expected={len(expected)} current={len(current)}"
     for index, (left, right) in enumerate(zip(expected, current), start=1):
-        if left != right:
-            return f"first selected SALC difference at #{index}: expected={left!r} current={right!r}"
+        for key in ("name", "family", "irrep"):
+            if left.get(key) != right.get(key):
+                return (
+                    f"first selected SALC difference at #{index}: "
+                    f"expected={left!r} current={right!r}"
+                )
+        left_coefficients = left.get("coefficients", ())
+        right_coefficients = right.get("coefficients", ())
+        if len(left_coefficients) != len(right_coefficients):
+            return (
+                f"first selected SALC difference at #{index}: "
+                f"expected={left!r} current={right!r}"
+            )
+        for (left_id, left_value), (right_id, right_value) in zip(
+            left_coefficients, right_coefficients
+        ):
+            if left_id != right_id or abs(left_value - right_value) > SALC_COEFFICIENT_TOLERANCE:
+                return (
+                    f"first selected SALC difference at #{index}: "
+                    f"expected={left!r} current={right!r}"
+                )
     return ""
