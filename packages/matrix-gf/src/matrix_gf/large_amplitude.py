@@ -751,15 +751,19 @@ def _ring_torsional_assignment(
     family: str,
     text: str,
     context: LargeAmplitudeTopologyContext | None,
+    contrast_tolerance: float = 0.50,
 ) -> AnharmonicModelAssignment:
     torsions = _torsion_terms(text)
     if context is None or not torsions:
         return _local_assignment(family, "RING_MODE")
     central_bonds = tuple(dict.fromkeys(_pair_key(term[1], term[2]) for term in torsions))
     bond_orders = [context.bond_order(*bond) for bond in central_bonds]
-    if any(
-        order is not None and order >= DEFAULT_TORSION_DOUBLE_BOND_ORDER_THRESHOLD
-        for order in bond_orders
+    finite = [float(order) for order in bond_orders if order is not None and order > 1.0e-12]
+    if (
+        len(finite) == len(bond_orders)
+        and len(finite) > 1
+        and min(finite) > 0.0
+        and max(finite) / min(finite) > 1.0 + float(contrast_tolerance)
     ):
         return _local_assignment(family, "RING_MODE_HIGH_BOND_ORDER_STIFFENED")
     return _local_assignment(family, "RING_MODE")

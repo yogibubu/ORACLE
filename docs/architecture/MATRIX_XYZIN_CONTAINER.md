@@ -72,8 +72,10 @@ If Mayer bond orders are present, topology and synthons use them and record
 uses the ORACLE continuous Pauling bond-order model and records
 `BOND_ORDER_SOURCE Topology Pauling continuous model`. Gaussian total bond
 orders are not a fallback source.  NEO uses these normalized bond orders to
-weight endocyclic ring-puckering dihedrals: high-bond-order central bonds get a
-smaller flexibility factor before each RPck vector is normalized.
+weight endocyclic ring-puckering dihedrals relative to the other bonds in the
+same ring.  If the ring bond orders are equivalent within tolerance the RPck
+vector is unchanged; if they differ, the more rigid central bonds get smaller
+flexibility factors before each RPck vector is normalized.
 
 ## Gaussian Rovibrational Promotion
 

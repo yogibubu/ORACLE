@@ -162,6 +162,7 @@ class GICDefinition:
     xh_stretch_policy: str = XH_STRETCH_POLICY_SYMMETRIZE
     local_xh_bonds: tuple[tuple[int, int], ...] = ()
     local_xh_classes: tuple[str, ...] = ()
+    ring_puckering_diagnostics: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -250,6 +251,9 @@ def construct_gic_definition_from_xyzin(
     )
     fragment_records = _fragment_records(target)
     interaction_centers = _interaction_center_definition(target)
+    bonds = _topology_bonds(lines, natoms=geometry.natoms)
+    rings = _topology_rings(lines, natoms=geometry.natoms)
+    bond_orders = topology_bond_orders_from_lines(lines, natoms=geometry.natoms)
 
     if not fragment_records and _empty_interaction_centers(interaction_centers):
         definition = _construct_merlino_python_definition(
@@ -260,12 +264,13 @@ def construct_gic_definition_from_xyzin(
             xh_stretch_policy=resolved_xh_policy,
             local_xh_bonds=resolved_local_xh_bonds,
             local_xh_classes=resolved_local_xh_classes,
+            ring_puckering_diagnostics=_ring_puckering_diagnostics(
+                rings,
+                bond_orders=bond_orders,
+            ),
         )
         return definition, tuple(geometry.atoms), symmetry_operations
 
-    bonds = _topology_bonds(lines, natoms=geometry.natoms)
-    rings = _topology_rings(lines, natoms=geometry.natoms)
-    bond_orders = topology_bond_orders_from_lines(lines, natoms=geometry.natoms)
     pseudo_bonds: tuple[tuple[int, int], ...] = ()
     pseudo_bond_kinds: tuple[str, ...] = ()
     candidate_fragment_records = fragment_records
@@ -342,6 +347,7 @@ def construct_gic_definition_from_xyzin(
         xh_stretch_policy=resolved_xh_policy,
         local_xh_bonds=resolved_local_xh_bonds,
         local_xh_classes=resolved_local_xh_classes,
+        ring_puckering_diagnostics=_ring_puckering_diagnostics(rings, bond_orders=bond_orders),
     )
     return definition, tuple(geometry.atoms), symmetry_operations
 
@@ -364,6 +370,7 @@ def _construct_merlino_python_definition(
     xh_stretch_policy: str,
     local_xh_bonds: tuple[tuple[int, int], ...],
     local_xh_classes: tuple[str, ...],
+    ring_puckering_diagnostics: tuple[str, ...] = (),
 ) -> GICDefinition:
     from matrix_neo.runtime.gicforge_python import build_gicforge_python_model
 
@@ -479,6 +486,7 @@ def _construct_merlino_python_definition(
         xh_stretch_policy=xh_stretch_policy,
         local_xh_bonds=local_xh_bonds,
         local_xh_classes=local_xh_classes,
+        ring_puckering_diagnostics=ring_puckering_diagnostics,
     )
 
 
@@ -849,6 +857,10 @@ def symmetrize_gic_definition(
         fragment_mode=definition.fragment_mode,
         pseudo_bonds=definition.pseudo_bonds,
         pseudo_bond_kinds=definition.pseudo_bond_kinds,
+        xh_stretch_policy=definition.xh_stretch_policy,
+        local_xh_bonds=definition.local_xh_bonds,
+        local_xh_classes=definition.local_xh_classes,
+        ring_puckering_diagnostics=definition.ring_puckering_diagnostics,
     )
 
 
@@ -918,6 +930,8 @@ def gic_definition_section_lines(definition: GICDefinition) -> list[str]:
     lines.extend(_reduction_diagnostics_lines(definition))
     lines.append("[SYMMETRY_DIAGNOSTICS]")
     lines.extend(_symmetry_diagnostics_lines(definition))
+    lines.append("[RING_PUCKERING_DIAGNOSTICS]")
+    lines.extend(definition.ring_puckering_diagnostics or ("NONE",))
     lines.append("[PSEUDO_BONDS]")
     if definition.pseudo_bonds:
         kinds = definition.pseudo_bond_kinds or (
@@ -1167,6 +1181,11 @@ def read_gic_definition_from_xyzin(path: Path) -> GICDefinition:
         xh_stretch_policy=_xh_stretch_policy(_section_value(section, "XH_STRETCH_POLICY")),
         local_xh_bonds=_normalize_pairs(_section_value(section, "LOCAL_XH_BONDS")),
         local_xh_classes=_normalize_xh_classes(_section_value(section, "LOCAL_XH_CLASSES")),
+        ring_puckering_diagnostics=tuple(
+            line
+            for line in _subsection(section, "RING_PUCKERING_DIAGNOSTICS")
+            if line.strip() and line.strip().upper() != "NONE"
+        ),
     )
 
 
@@ -1600,11 +1619,10 @@ def _ring_pucker_component_terms(
             terms.append(
                 (
                     coefficient
-                    * _ring_dihedral_flexibility_one_based(
-                        ring_atoms[iang2],
-                        ring_atoms[iang3],
+                    * _ring_dihedral_flexibilities_one_based(
+                        ring_atoms,
                         bond_orders=bond_orders or {},
-                    ),
+                    )[iterm - 1],
                     (
                         ring_atoms[iang1],
                         ring_atoms[iang2],
@@ -1617,16 +1635,58 @@ def _ring_pucker_component_terms(
     return tuple(components)
 
 
-def _ring_dihedral_flexibility_one_based(
-    left: int,
-    right: int,
+def _ring_dihedral_flexibilities_one_based(
+    ring_atoms: tuple[int, ...],
     *,
     bond_orders: dict[tuple[int, int], float],
-) -> float:
-    bond_order = bond_orders.get(tuple(sorted((left, right))))
-    if bond_order is None or bond_order < 1.75:
-        return 1.0
-    return 1.0 / float(np.sqrt(float(bond_order)))
+    contrast_tolerance: float = 0.50,
+) -> tuple[float, ...]:
+    orders = _ring_dihedral_bond_orders_one_based(ring_atoms, bond_orders=bond_orders)
+    finite = [order for order in orders if order is not None and order > 1.0e-12]
+    if len(finite) != len(orders):
+        return tuple(1.0 for _order in orders)
+    reference = min(float(order) for order in finite)
+    maximum = max(float(order) for order in finite)
+    if reference <= 0.0 or maximum / reference <= 1.0 + float(contrast_tolerance):
+        return tuple(1.0 for _order in orders)
+    return tuple(float(np.sqrt(reference / float(order))) for order in finite)
+
+
+def _ring_dihedral_bond_orders_one_based(
+    ring_atoms: tuple[int, ...],
+    *,
+    bond_orders: dict[tuple[int, int], float],
+) -> tuple[float | None, ...]:
+    ncyc = len(ring_atoms)
+    orders: list[float | None] = []
+    for iterm in range(1, ncyc + 1):
+        iang2 = _cyclic_index(iterm + ncyc, ncyc)
+        iang3 = _cyclic_index(iterm + ncyc + 1, ncyc)
+        orders.append(bond_orders.get(tuple(sorted((ring_atoms[iang2], ring_atoms[iang3])))))
+    return tuple(orders)
+
+
+def _ring_puckering_diagnostics(
+    rings: tuple[tuple[int, tuple[int, ...]], ...],
+    *,
+    bond_orders: dict[tuple[int, int], float],
+) -> tuple[str, ...]:
+    lines: list[str] = []
+    for ring_index, ring_atoms in rings:
+        orders = _ring_dihedral_bond_orders_one_based(ring_atoms, bond_orders=bond_orders)
+        flex = _ring_dihedral_flexibilities_one_based(ring_atoms, bond_orders=bond_orders)
+        bonds = []
+        for iterm in range(1, len(ring_atoms) + 1):
+            iang2 = _cyclic_index(iterm + len(ring_atoms), len(ring_atoms))
+            iang3 = _cyclic_index(iterm + len(ring_atoms) + 1, len(ring_atoms))
+            bonds.append(f"{ring_atoms[iang2]}-{ring_atoms[iang3]}")
+        order_text = ",".join("NA" if order is None else f"{float(order):.8g}" for order in orders)
+        flex_text = ",".join(f"{value:.8g}" for value in flex)
+        lines.append(
+            f"RING {ring_index} ATOMS={','.join(str(atom) for atom in ring_atoms)} "
+            f"CENTRAL_BONDS={','.join(bonds)} BOND_ORDERS={order_text} FLEX={flex_text}"
+        )
+    return tuple(lines)
 
 
 def _normalize_ring_pucker_terms(

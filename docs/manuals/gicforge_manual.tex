@@ -201,12 +201,15 @@ butterfly coordinates can be introduced.  Spiro systems, rings sharing one
 bond, and larger fused systems therefore differ only in the graph relation
 between the elementary rings: each ring contributes its own protected
 endocyclic bending and puckering source space, while shared bonds add protected
-butterfly coordinates.  Ring-puckering components are not blind Fourier sums:
-when an endocyclic dihedral has a double or partially double central bond, its
-coefficient is multiplied by a smaller flexibility factor before the component
-is normalized.  The frozen coordinate therefore already carries the increased
-rigidity of that ring bond, and GF/DVR planning receives the same bond-order
-information for downstream classification.
+butterfly coordinates.  Ring-puckering components are not blind Fourier sums.
+For each ring, NEO compares the bond orders of all endocyclic central bonds
+that define the puckering dihedrals.  If they are equivalent within the default
+50 percent relative contrast tolerance, even when all are aromatic or partially multiple, the Merlino/Fourier
+coefficients are kept.  If some bonds are more rigid than the others, the
+dihedrals centered on those bonds receive smaller flexibility factors
+\(\sqrt{BO_\mathrm{min}/BO_i}\) before the component is normalized.  The frozen
+coordinate therefore carries relative ring rigidity, not a hard simple/double
+bond classification.
 
 \subsection{Primitive coordinate generation}
 

@@ -181,10 +181,12 @@ torsions around single bonds.  Torsional assignment uses the frozen topology
 and bond-order threshold: high bond-order central bonds are kept in the
 normal-mode/VPT2 class, while unknown bond orders are marked pending rather
 than silently converted to hindered rotors.  Ring-puckering coordinates already
-contain the NEO bond-order weighting of their endocyclic dihedrals; GF also
-marks ring-puckering and butterfly blocks whose source dihedrals contain
-high-bond-order central bonds as stiffened ring modes.  The force constants and
-subsequent DVR/VSCF planning therefore see the extra rigidity consistently.
+contain the NEO relative bond-order weighting of their endocyclic dihedrals;
+GF also marks ring-puckering and butterfly blocks as stiffened only when the
+source dihedral central bonds show an internal bond-order contrast.  Uniform
+aromatic or uniformly high-order rings therefore remain unweighted ring modes.
+The force constants and subsequent DVR/VSCF planning see the same relative
+rigidity consistently.
 X--H stretches are not forced into the local class by GF itself; the choice belongs to NEO through
 \texttt{XH\_STRETCH\_POLICY}, \texttt{LOCAL\_XH\_BONDS} and
 \texttt{LOCAL\_XH\_CLASSES}.  This lets the user keep all X--H stretches

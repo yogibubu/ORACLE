@@ -1156,6 +1156,11 @@ def _cyclic_coordinates(
     vnorm = np.sqrt(2.0 / float(ncyc))
     vnorm1 = np.sqrt(1.0 / float(ncyc))
     coordinates: list[GICForgePythonCoordinate] = []
+    flexibilities = (
+        _ring_dihedral_flexibilities(ring, coords=coords, atomic_numbers=atomic_numbers)
+        if not valence_angle
+        else tuple(1.0 for _atom in ring)
+    )
     for ivar in range(1, ncyc - 2):
         even = ivar == 2 * (ivar // 2)
         terms = []
@@ -1182,12 +1187,7 @@ def _cyclic_coordinates(
             else:
                 coefficient = vnorm1 * np.cos(float(iterm - 1) * np.pi)
             if not valence_angle:
-                coefficient *= _ring_dihedral_flexibility(
-                    ring[iang2],
-                    ring[iang3],
-                    coords=coords,
-                    atomic_numbers=atomic_numbers,
-                )
+                coefficient *= flexibilities[iterm - 1]
             if abs(coefficient) < 1.0e-14:
                 coefficient = 0.0
             if valence_angle:
@@ -1230,16 +1230,16 @@ def _cyclic_svd_coordinates(
         return []
     coefficients = _align_svd_modes_to_reference(u_matrix[:, :rank], reference[:, :rank])
     coordinates: list[GICForgePythonCoordinate] = []
+    flexibilities = (
+        _ring_dihedral_flexibilities(ring, coords=coords, atomic_numbers=atomic_numbers)
+        if not valence_angle
+        else tuple(1.0 for _primitive in primitives)
+    )
     for mode in range(rank):
         coeffs = coefficients[:, mode].astype(float)
         if not valence_angle:
-            for idx, primitive in enumerate(primitives):
-                coeffs[idx] *= _ring_dihedral_flexibility(
-                    primitive.atoms[1],
-                    primitive.atoms[2],
-                    coords=coords,
-                    atomic_numbers=atomic_numbers,
-                )
+            for idx, flexibility in enumerate(flexibilities):
+                coeffs[idx] *= flexibility
             coeffs = _normalize_coefficients(coeffs)
         coeffs[np.abs(coeffs) < 1.0e-14] = 0.0
         terms = tuple(
@@ -1260,27 +1260,51 @@ def _cyclic_svd_coordinates(
     return coordinates
 
 
-def _ring_dihedral_flexibility(
-    left: int,
-    right: int,
+def _ring_dihedral_flexibilities(
+    ring: tuple[int, ...],
     *,
     coords: np.ndarray | None,
     atomic_numbers: tuple[int, ...],
-) -> float:
+    contrast_tolerance: float = 0.50,
+) -> tuple[float, ...]:
     if coords is None or not atomic_numbers:
-        return 1.0
+        return tuple(1.0 for _atom in ring)
+    orders: list[float | None] = []
+    ncyc = len(ring)
+    for iterm in range(1, ncyc + 1):
+        iang2 = _cyclic_index(iterm + ncyc, ncyc)
+        iang3 = _cyclic_index(iterm + ncyc + 1, ncyc)
+        orders.append(
+            _geometric_bond_order(ring[iang2], ring[iang3], coords=coords, atomic_numbers=atomic_numbers)
+        )
+    finite = [order for order in orders if order is not None and order > 1.0e-12]
+    if len(finite) != len(orders):
+        return tuple(1.0 for _order in orders)
+    reference = min(float(order) for order in finite)
+    maximum = max(float(order) for order in finite)
+    if reference <= 0.0 or maximum / reference <= 1.0 + float(contrast_tolerance):
+        return tuple(1.0 for _order in orders)
+    return tuple(float(np.sqrt(reference / float(order))) for order in finite)
+
+
+def _geometric_bond_order(
+    left: int,
+    right: int,
+    *,
+    coords: np.ndarray,
+    atomic_numbers: tuple[int, ...],
+) -> float | None:
     if left < 0 or right < 0 or left >= len(atomic_numbers) or right >= len(atomic_numbers):
-        return 1.0
+        return None
     radius_left = covalent_radius(atomic_numbers[left]) or 0.0
     radius_right = covalent_radius(atomic_numbers[right]) or 0.0
     reference = float(radius_left) + float(radius_right)
-    distance = float(np.linalg.norm(np.asarray(coords[right], dtype=float) - np.asarray(coords[left], dtype=float)))
+    distance = float(
+        np.linalg.norm(np.asarray(coords[right], dtype=float) - np.asarray(coords[left], dtype=float))
+    )
     if reference <= 0.0 or distance <= 1.0e-12:
-        return 1.0
-    bond_order = float(np.exp((reference - distance) / 0.30))
-    if bond_order < 1.75:
-        return 1.0
-    return 1.0 / float(np.sqrt(bond_order))
+        return None
+    return float(np.exp((reference - distance) / 0.30))
 
 
 def _normalize_coordinate_terms(

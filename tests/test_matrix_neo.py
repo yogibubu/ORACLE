@@ -1391,7 +1391,16 @@ def test_gicforge_ring_puckering_coefficients_match_merlino_six_ring():
 def test_gicforge_ring_puckering_weights_high_bond_order_dihedral():
     ring = (1, 2, 3, 4, 5)
     unweighted = _ring_pucker_component_terms(ring)[0]
-    weighted = _ring_pucker_component_terms(ring, bond_orders={(2, 3): 1.8})[0]
+    weighted = _ring_pucker_component_terms(
+        ring,
+        bond_orders={
+            (1, 2): 1.1,
+            (2, 3): 1.8,
+            (3, 4): 1.1,
+            (4, 5): 1.1,
+            (1, 5): 1.1,
+        },
+    )[0]
     by_atoms = {atoms: coefficient for coefficient, atoms in weighted}
     unweighted_by_atoms = {atoms: coefficient for coefficient, atoms in unweighted}
 
@@ -1401,6 +1410,53 @@ def test_gicforge_ring_puckering_weights_high_bond_order_dihedral():
         1.0,
         atol=1.0e-14,
     )
+
+
+def test_gicforge_ring_puckering_keeps_equivalent_high_order_ring_unweighted():
+    ring = (1, 2, 3, 4, 5)
+    unweighted = _ring_pucker_component_terms(ring)
+    weighted = _ring_pucker_component_terms(
+        ring,
+        bond_orders={
+            (1, 2): 1.45,
+            (2, 3): 1.45,
+            (3, 4): 1.45,
+            (4, 5): 1.45,
+            (1, 5): 1.45,
+        },
+    )
+
+    np.testing.assert_allclose(
+        [[coefficient for coefficient, _atoms in component] for component in weighted],
+        [[coefficient for coefficient, _atoms in component] for component in unweighted],
+        atol=1.0e-14,
+    )
+
+
+def test_gicforge_writes_ring_puckering_bond_order_diagnostics(tmp_path):
+    source = _test_molecule_path("pyrrole.inp")
+    xyzin = tmp_path / "pyrrole.xyzin"
+
+    preprocess_to_enriched_xyz(source, xyzin)
+    write_validation_section(xyzin)
+    write_gicforge_build_sections(xyzin)
+    diagnostics = section_content(
+        xyzin.read_text(encoding="utf-8").splitlines(),
+        "GIC",
+    )
+    ring_block = []
+    capture = False
+    for line in diagnostics:
+        if line.strip().upper() == "[RING_PUCKERING_DIAGNOSTICS]":
+            capture = True
+            continue
+        if capture and line.startswith("["):
+            break
+        if capture:
+            ring_block.append(line)
+
+    assert ring_block
+    assert any("BOND_ORDERS=" in line and "FLEX=" in line for line in ring_block)
 
 
 @pytest.mark.parametrize(

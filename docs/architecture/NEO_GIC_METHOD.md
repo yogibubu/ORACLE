@@ -73,6 +73,14 @@ small-rotation limit used by the Gaussian symbolic export.
 Gaussian export marks the selected `RPck` components inactive and derives active
 `QPck`/`PhiP` functionals from consecutive pairs using the Merlino `PrtPckQP`
 rule.
+Before normalization, each endocyclic dihedral coefficient may be multiplied by
+a ring-local flexibility factor.  The factor is relative, not absolute: if all
+endocyclic bond orders in the ring are equivalent within the default 50 percent
+contrast tolerance, the
+Merlino/Fourier vector is unchanged; if some bonds are more rigid than others,
+the dihedrals centered on the more rigid bonds are reduced by
+\(\sqrt{BO_\mathrm{min}/BO_i}\).  Python and Fortran apply the same rule before
+symmetry adaptation and B-matrix evaluation.
 The point-group projector treats `RPck` as a homogeneous ring-puckering source
 block: operations map the underlying dihedral-term vector, so equivalent
 selected `RPck` components can form symmetry-adapted SALCs without mixing with

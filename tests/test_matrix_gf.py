@@ -363,7 +363,7 @@ def test_large_amplitude_ring_puckering_records_high_bond_order_stiffening():
     context = LargeAmplitudeTopologyContext(
         atomic_numbers=(6, 6, 6, 6),
         bonds=((1, 2), (2, 3), (3, 4), (1, 4)),
-        bond_orders={(2, 3): 1.7},
+        bond_orders={(1, 2): 1.1, (2, 3): 1.7, (3, 4): 1.1, (1, 4): 1.1},
         synthon_signatures={1: (6,), 2: (6,), 3: (6,), 4: (6,)},
     )
     analysis = large_amplitude_analysis_from_gf_matrices(
@@ -371,7 +371,7 @@ def test_large_amplitude_ring_puckering_records_high_bond_order_stiffening():
         g_matrix=np.eye(1),
         frequencies_cm=np.asarray([120.0], dtype=float),
         ped=np.asarray([[100.0]], dtype=float),
-        gic_labels=("RPck001=[0.5*D(1,2,3,4)]",),
+        gic_labels=("RPck001=[0.5*D(1,2,3,4)-0.5*D(2,3,4,1)]",),
         gic_names=("A1RPck001",),
         gic_irreps=("A1",),
         frequency_cutoff_cm=1000.0,
