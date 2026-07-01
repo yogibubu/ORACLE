@@ -1,0 +1,3926 @@
+{
+  "description": "Golden topology snapshots for MATRIX LINK output. The hash covers bonds, bond orders, rings, ring relations, aromaticity and connected fragments.",
+  "entries": [
+    {
+      "aromatic_atoms": [
+        2,
+        3,
+        5,
+        7,
+        9,
+        11
+      ],
+      "aromatic_bonds": [],
+      "bond_count": 12,
+      "bond_orders": [
+        {
+          "atoms": [
+            1,
+            2
+          ],
+          "value": 0.83392451
+        },
+        {
+          "atoms": [
+            2,
+            3
+          ],
+          "value": 0.96750803
+        },
+        {
+          "atoms": [
+            2,
+            11
+          ],
+          "value": 0.96750803
+        },
+        {
+          "atoms": [
+            3,
+            4
+          ],
+          "value": 0.83392414
+        },
+        {
+          "atoms": [
+            3,
+            5
+          ],
+          "value": 0.96750801
+        },
+        {
+          "atoms": [
+            5,
+            6
+          ],
+          "value": 0.83392414
+        },
+        {
+          "atoms": [
+            5,
+            7
+          ],
+          "value": 0.96750803
+        },
+        {
+          "atoms": [
+            7,
+            8
+          ],
+          "value": 0.83392451
+        },
+        {
+          "atoms": [
+            7,
+            9
+          ],
+          "value": 0.96750803
+        },
+        {
+          "atoms": [
+            9,
+            10
+          ],
+          "value": 0.83392414
+        },
+        {
+          "atoms": [
+            9,
+            11
+          ],
+          "value": 0.96750801
+        },
+        {
+          "atoms": [
+            11,
+            12
+          ],
+          "value": 0.83392414
+        }
+      ],
+      "bonds": [
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          11
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          3,
+          5
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          5,
+          7
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          7,
+          9
+        ],
+        [
+          9,
+          10
+        ],
+        [
+          9,
+          11
+        ],
+        [
+          11,
+          12
+        ]
+      ],
+      "fragment_count": 1,
+      "fragments": [
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12
+        ]
+      ],
+      "id": "benzene",
+      "ring_basis": {
+        "allowed_atom_count": 12,
+        "allowed_edge_count": 12,
+        "candidate_count": 1,
+        "count": 1,
+        "excluded_atoms": [],
+        "policy": "CHORDLESS_NONMETAL_MINIMUM_CYCLE_BASIS",
+        "rank": 1
+      },
+      "ring_count": 1,
+      "ring_relation_count": 0,
+      "rings": [
+        {
+          "atoms": [
+            2,
+            3,
+            5,
+            7,
+            9,
+            11
+          ],
+          "index": 1,
+          "size": 6
+        }
+      ],
+      "selected_ring_relations": [],
+      "source": "tests/fixtures/test_molecules/molecules/benzene.inp",
+      "topology_schema": "matrix.xyz.topology.v1",
+      "topology_sha256": "3b618eceb0fbf855b76b0a1bb18768cde85917bf8c79758bf12a5f1f06daec90"
+    },
+    {
+      "aromatic_atoms": [
+        1,
+        2,
+        3,
+        5,
+        7
+      ],
+      "aromatic_bonds": [],
+      "bond_count": 10,
+      "bond_orders": [
+        {
+          "atoms": [
+            1,
+            2
+          ],
+          "value": 0.86393176
+        },
+        {
+          "atoms": [
+            1,
+            3
+          ],
+          "value": 1.00399621
+        },
+        {
+          "atoms": [
+            1,
+            4
+          ],
+          "value": 0.82902717
+        },
+        {
+          "atoms": [
+            2,
+            5
+          ],
+          "value": 1.00399621
+        },
+        {
+          "atoms": [
+            2,
+            6
+          ],
+          "value": 0.82902717
+        },
+        {
+          "atoms": [
+            3,
+            7
+          ],
+          "value": 0.8697609
+        },
+        {
+          "atoms": [
+            3,
+            8
+          ],
+          "value": 0.83725924
+        },
+        {
+          "atoms": [
+            5,
+            7
+          ],
+          "value": 0.8697609
+        },
+        {
+          "atoms": [
+            5,
+            10
+          ],
+          "value": 0.83725924
+        },
+        {
+          "atoms": [
+            7,
+            9
+          ],
+          "value": 0.87068331
+        }
+      ],
+      "bonds": [
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          8
+        ],
+        [
+          5,
+          7
+        ],
+        [
+          5,
+          10
+        ],
+        [
+          7,
+          9
+        ]
+      ],
+      "fragment_count": 1,
+      "fragments": [
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ]
+      ],
+      "id": "pyrrole",
+      "ring_basis": {
+        "allowed_atom_count": 10,
+        "allowed_edge_count": 10,
+        "candidate_count": 1,
+        "count": 1,
+        "excluded_atoms": [],
+        "policy": "CHORDLESS_NONMETAL_MINIMUM_CYCLE_BASIS",
+        "rank": 1
+      },
+      "ring_count": 1,
+      "ring_relation_count": 0,
+      "rings": [
+        {
+          "atoms": [
+            1,
+            2,
+            5,
+            7,
+            3
+          ],
+          "index": 1,
+          "size": 5
+        }
+      ],
+      "selected_ring_relations": [],
+      "source": "tests/fixtures/test_molecules/molecules/pyrrole.inp",
+      "topology_schema": "matrix.xyz.topology.v1",
+      "topology_sha256": "3b97270de2c307d4b0547f3350167053993152bc2c60b64a426174a962dfee40"
+    },
+    {
+      "aromatic_atoms": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "aromatic_bonds": [],
+      "bond_count": 19,
+      "bond_orders": [
+        {
+          "atoms": [
+            1,
+            2
+          ],
+          "value": 0.92929402
+        },
+        {
+          "atoms": [
+            1,
+            10
+          ],
+          "value": 0.95570901
+        },
+        {
+          "atoms": [
+            1,
+            11
+          ],
+          "value": 0.82148892
+        },
+        {
+          "atoms": [
+            2,
+            3
+          ],
+          "value": 0.92929262
+        },
+        {
+          "atoms": [
+            2,
+            12
+          ],
+          "value": 0.81909624
+        },
+        {
+          "atoms": [
+            3,
+            4
+          ],
+          "value": 0.95570981
+        },
+        {
+          "atoms": [
+            3,
+            13
+          ],
+          "value": 0.82148895
+        },
+        {
+          "atoms": [
+            4,
+            5
+          ],
+          "value": 1.08540449
+        },
+        {
+          "atoms": [
+            4,
+            14
+          ],
+          "value": 0.82420638
+        },
+        {
+          "atoms": [
+            5,
+            6
+          ],
+          "value": 1.11532641
+        },
+        {
+          "atoms": [
+            5,
+            9
+          ],
+          "value": 0.9276449
+        },
+        {
+          "atoms": [
+            6,
+            7
+          ],
+          "value": 1.02820528
+        },
+        {
+          "atoms": [
+            6,
+            15
+          ],
+          "value": 0.83302964
+        },
+        {
+          "atoms": [
+            7,
+            8
+          ],
+          "value": 1.02820511
+        },
+        {
+          "atoms": [
+            7,
+            16
+          ],
+          "value": 0.83614637
+        },
+        {
+          "atoms": [
+            8,
+            9
+          ],
+          "value": 1.11532764
+        },
+        {
+          "atoms": [
+            8,
+            17
+          ],
+          "value": 0.83303043
+        },
+        {
+          "atoms": [
+            9,
+            10
+          ],
+          "value": 1.08540538
+        },
+        {
+          "atoms": [
+            10,
+            18
+          ],
+          "value": 0.82420608
+        }
+      ],
+      "bonds": [
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          10
+        ],
+        [
+          1,
+          11
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          12
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          3,
+          13
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          14
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          5,
+          9
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          6,
+          15
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          7,
+          16
+        ],
+        [
+          8,
+          9
+        ],
+        [
+          8,
+          17
+        ],
+        [
+          9,
+          10
+        ],
+        [
+          10,
+          18
+        ]
+      ],
+      "fragment_count": 1,
+      "fragments": [
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18
+        ]
+      ],
+      "id": "azulene",
+      "ring_basis": {
+        "allowed_atom_count": 18,
+        "allowed_edge_count": 19,
+        "candidate_count": 2,
+        "count": 2,
+        "excluded_atoms": [],
+        "policy": "CHORDLESS_NONMETAL_MINIMUM_CYCLE_BASIS",
+        "rank": 2
+      },
+      "ring_count": 2,
+      "ring_relation_count": 1,
+      "rings": [
+        {
+          "atoms": [
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "index": 1,
+          "size": 5
+        },
+        {
+          "atoms": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            9,
+            10
+          ],
+          "index": 2,
+          "size": 7
+        }
+      ],
+      "selected_ring_relations": [
+        {
+          "kind": "FUSED",
+          "left": 1,
+          "right": 2,
+          "shared_atoms": [
+            5,
+            9
+          ],
+          "shared_bonds": [
+            [
+              5,
+              9
+            ]
+          ]
+        }
+      ],
+      "source": "tests/fixtures/test_molecules/molecules/azulene.inp",
+      "topology_schema": "matrix.xyz.topology.v1",
+      "topology_sha256": "dccf885a9a257578cb1e9a3fb852337a40a8f7c0456a34217db99b5a30cf047f"
+    },
+    {
+      "aromatic_atoms": [],
+      "aromatic_bonds": [],
+      "bond_count": 29,
+      "bond_orders": [
+        {
+          "atoms": [
+            1,
+            2
+          ],
+          "value": 0.95243855
+        },
+        {
+          "atoms": [
+            1,
+            6
+          ],
+          "value": 0.99094001
+        },
+        {
+          "atoms": [
+            1,
+            26
+          ],
+          "value": 0.81772855
+        },
+        {
+          "atoms": [
+            2,
+            3
+          ],
+          "value": 0.95243855
+        },
+        {
+          "atoms": [
+            2,
+            24
+          ],
+          "value": 0.82386381
+        },
+        {
+          "atoms": [
+            3,
+            4
+          ],
+          "value": 0.99094001
+        },
+        {
+          "atoms": [
+            3,
+            25
+          ],
+          "value": 0.81772855
+        },
+        {
+          "atoms": [
+            4,
+            5
+          ],
+          "value": 0.98709511
+        },
+        {
+          "atoms": [
+            4,
+            10
+          ],
+          "value": 0.87908747
+        },
+        {
+          "atoms": [
+            5,
+            6
+          ],
+          "value": 0.98709511
+        },
+        {
+          "atoms": [
+            5,
+            7
+          ],
+          "value": 0.97140842
+        },
+        {
+          "atoms": [
+            6,
+            15
+          ],
+          "value": 0.87908747
+        },
+        {
+          "atoms": [
+            7,
+            8
+          ],
+          "value": 0.98709511
+        },
+        {
+          "atoms": [
+            7,
+            11
+          ],
+          "value": 0.98709511
+        },
+        {
+          "atoms": [
+            8,
+            9
+          ],
+          "value": 0.87908747
+        },
+        {
+          "atoms": [
+            8,
+            14
+          ],
+          "value": 0.99094001
+        },
+        {
+          "atoms": [
+            9,
+            10
+          ],
+          "value": 1.02791885
+        },
+        {
+          "atoms": [
+            9,
+            22
+          ],
+          "value": 0.80911862
+        },
+        {
+          "atoms": [
+            10,
+            23
+          ],
+          "value": 0.80911862
+        },
+        {
+          "atoms": [
+            11,
+            12
+          ],
+          "value": 0.99094001
+        },
+        {
+          "atoms": [
+            11,
+            16
+          ],
+          "value": 0.87908747
+        },
+        {
+          "atoms": [
+            12,
+            13
+          ],
+          "value": 0.95243855
+        },
+        {
+          "atoms": [
+            12,
+            19
+          ],
+          "value": 0.81772855
+        },
+        {
+          "atoms": [
+            13,
+            14
+          ],
+          "value": 0.95243855
+        },
+        {
+          "atoms": [
+            13,
+            20
+          ],
+          "value": 0.82386381
+        },
+        {
+          "atoms": [
+            14,
+            21
+          ],
+          "value": 0.81772855
+        },
+        {
+          "atoms": [
+            15,
+            16
+          ],
+          "value": 1.02791885
+        },
+        {
+          "atoms": [
+            15,
+            17
+          ],
+          "value": 0.80911862
+        },
+        {
+          "atoms": [
+            16,
+            18
+          ],
+          "value": 0.80911862
+        }
+      ],
+      "bonds": [
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          6
+        ],
+        [
+          1,
+          26
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          24
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          3,
+          25
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          10
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          5,
+          7
+        ],
+        [
+          6,
+          15
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          7,
+          11
+        ],
+        [
+          8,
+          9
+        ],
+        [
+          8,
+          14
+        ],
+        [
+          9,
+          10
+        ],
+        [
+          9,
+          22
+        ],
+        [
+          10,
+          23
+        ],
+        [
+          11,
+          12
+        ],
+        [
+          11,
+          16
+        ],
+        [
+          12,
+          13
+        ],
+        [
+          12,
+          19
+        ],
+        [
+          13,
+          14
+        ],
+        [
+          13,
+          20
+        ],
+        [
+          14,
+          21
+        ],
+        [
+          15,
+          16
+        ],
+        [
+          15,
+          17
+        ],
+        [
+          16,
+          18
+        ]
+      ],
+      "fragment_count": 1,
+      "fragments": [
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26
+        ]
+      ],
+      "id": "pyrene",
+      "ring_basis": {
+        "allowed_atom_count": 26,
+        "allowed_edge_count": 29,
+        "candidate_count": 7,
+        "count": 4,
+        "excluded_atoms": [],
+        "policy": "CHORDLESS_NONMETAL_MINIMUM_CYCLE_BASIS",
+        "rank": 4
+      },
+      "ring_count": 4,
+      "ring_relation_count": 5,
+      "rings": [
+        {
+          "atoms": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "index": 1,
+          "size": 6
+        },
+        {
+          "atoms": [
+            4,
+            5,
+            7,
+            8,
+            9,
+            10
+          ],
+          "index": 2,
+          "size": 6
+        },
+        {
+          "atoms": [
+            5,
+            6,
+            15,
+            16,
+            11,
+            7
+          ],
+          "index": 3,
+          "size": 6
+        },
+        {
+          "atoms": [
+            7,
+            8,
+            14,
+            13,
+            12,
+            11
+          ],
+          "index": 4,
+          "size": 6
+        }
+      ],
+      "selected_ring_relations": [
+        {
+          "kind": "FUSED",
+          "left": 1,
+          "right": 2,
+          "shared_atoms": [
+            4,
+            5
+          ],
+          "shared_bonds": [
+            [
+              4,
+              5
+            ]
+          ]
+        },
+        {
+          "kind": "FUSED",
+          "left": 1,
+          "right": 3,
+          "shared_atoms": [
+            5,
+            6
+          ],
+          "shared_bonds": [
+            [
+              5,
+              6
+            ]
+          ]
+        },
+        {
+          "kind": "FUSED",
+          "left": 2,
+          "right": 3,
+          "shared_atoms": [
+            5,
+            7
+          ],
+          "shared_bonds": [
+            [
+              5,
+              7
+            ]
+          ]
+        },
+        {
+          "kind": "FUSED",
+          "left": 2,
+          "right": 4,
+          "shared_atoms": [
+            7,
+            8
+          ],
+          "shared_bonds": [
+            [
+              7,
+              8
+            ]
+          ]
+        },
+        {
+          "kind": "FUSED",
+          "left": 3,
+          "right": 4,
+          "shared_atoms": [
+            7,
+            11
+          ],
+          "shared_bonds": [
+            [
+              7,
+              11
+            ]
+          ]
+        }
+      ],
+      "source": "tests/fixtures/test_molecules/molecules/pyrene.inp",
+      "topology_schema": "matrix.xyz.topology.v1",
+      "topology_sha256": "358c941763e5e44bafb1817b72ed456bc3df9d3af0f97e01c554aba39b4a3b05"
+    },
+    {
+      "aromatic_atoms": [],
+      "aromatic_bonds": [],
+      "bond_count": 32,
+      "bond_orders": [
+        {
+          "atoms": [
+            1,
+            2
+          ],
+          "value": 0.53800727
+        },
+        {
+          "atoms": [
+            1,
+            12
+          ],
+          "value": 0.51764672
+        },
+        {
+          "atoms": [
+            1,
+            15
+          ],
+          "value": 0.70575052
+        },
+        {
+          "atoms": [
+            1,
+            16
+          ],
+          "value": 0.70672549
+        },
+        {
+          "atoms": [
+            2,
+            3
+          ],
+          "value": 0.53868698
+        },
+        {
+          "atoms": [
+            2,
+            4
+          ],
+          "value": 0.70908903
+        },
+        {
+          "atoms": [
+            2,
+            5
+          ],
+          "value": 0.70680408
+        },
+        {
+          "atoms": [
+            3,
+            6
+          ],
+          "value": 0.51922744
+        },
+        {
+          "atoms": [
+            3,
+            7
+          ],
+          "value": 0.70704773
+        },
+        {
+          "atoms": [
+            3,
+            8
+          ],
+          "value": 0.70653457
+        },
+        {
+          "atoms": [
+            6,
+            9
+          ],
+          "value": 0.4543809
+        },
+        {
+          "atoms": [
+            6,
+            10
+          ],
+          "value": 0.6888324
+        },
+        {
+          "atoms": [
+            6,
+            11
+          ],
+          "value": 0.68669022
+        },
+        {
+          "atoms": [
+            9,
+            12
+          ],
+          "value": 0.45388931
+        },
+        {
+          "atoms": [
+            9,
+            17
+          ],
+          "value": 0.45437743
+        },
+        {
+          "atoms": [
+            9,
+            27
+          ],
+          "value": 0.45389956
+        },
+        {
+          "atoms": [
+            12,
+            13
+          ],
+          "value": 0.69323818
+        },
+        {
+          "atoms": [
+            12,
+            14
+          ],
+          "value": 0.68690612
+        },
+        {
+          "atoms": [
+            17,
+            18
+          ],
+          "value": 0.51921069
+        },
+        {
+          "atoms": [
+            17,
+            19
+          ],
+          "value": 0.68668577
+        },
+        {
+          "atoms": [
+            17,
+            20
+          ],
+          "value": 0.68883151
+        },
+        {
+          "atoms": [
+            18,
+            21
+          ],
+          "value": 0.53867709
+        },
+        {
+          "atoms": [
+            18,
+            22
+          ],
+          "value": 0.70653485
+        },
+        {
+          "atoms": [
+            18,
+            23
+          ],
+          "value": 0.70703435
+        },
+        {
+          "atoms": [
+            21,
+            24
+          ],
+          "value": 0.53801338
+        },
+        {
+          "atoms": [
+            21,
+            25
+          ],
+          "value": 0.7068049
+        },
+        {
+          "atoms": [
+            21,
+            26
+          ],
+          "value": 0.70908271
+        },
+        {
+          "atoms": [
+            24,
+            27
+          ],
+          "value": 0.51764069
+        },
+        {
+          "atoms": [
+            24,
+            28
+          ],
+          "value": 0.70576492
+        },
+        {
+          "atoms": [
+            24,
+            29
+          ],
+          "value": 0.70672861
+        },
+        {
+          "atoms": [
+            27,
+            30
+          ],
+          "value": 0.68692266
+        },
+        {
+          "atoms": [
+            27,
+            31
+          ],
+          "value": 0.69325047
+        }
+      ],
+      "bonds": [
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          12
+        ],
+        [
+          1,
+          15
+        ],
+        [
+          1,
+          16
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          8
+        ],
+        [
+          6,
+          9
+        ],
+        [
+          6,
+          10
+        ],
+        [
+          6,
+          11
+        ],
+        [
+          9,
+          12
+        ],
+        [
+          9,
+          17
+        ],
+        [
+          9,
+          27
+        ],
+        [
+          12,
+          13
+        ],
+        [
+          12,
+          14
+        ],
+        [
+          17,
+          18
+        ],
+        [
+          17,
+          19
+        ],
+        [
+          17,
+          20
+        ],
+        [
+          18,
+          21
+        ],
+        [
+          18,
+          22
+        ],
+        [
+          18,
+          23
+        ],
+        [
+          21,
+          24
+        ],
+        [
+          21,
+          25
+        ],
+        [
+          21,
+          26
+        ],
+        [
+          24,
+          27
+        ],
+        [
+          24,
+          28
+        ],
+        [
+          24,
+          29
+        ],
+        [
+          27,
+          30
+        ],
+        [
+          27,
+          31
+        ]
+      ],
+      "fragment_count": 1,
+      "fragments": [
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31
+        ]
+      ],
+      "id": "spiro",
+      "ring_basis": {
+        "allowed_atom_count": 31,
+        "allowed_edge_count": 32,
+        "candidate_count": 2,
+        "count": 2,
+        "excluded_atoms": [],
+        "policy": "CHORDLESS_NONMETAL_MINIMUM_CYCLE_BASIS",
+        "rank": 2
+      },
+      "ring_count": 2,
+      "ring_relation_count": 1,
+      "rings": [
+        {
+          "atoms": [
+            1,
+            2,
+            3,
+            6,
+            9,
+            12
+          ],
+          "index": 1,
+          "size": 6
+        },
+        {
+          "atoms": [
+            9,
+            17,
+            18,
+            21,
+            24,
+            27
+          ],
+          "index": 2,
+          "size": 6
+        }
+      ],
+      "selected_ring_relations": [
+        {
+          "kind": "SPIRO",
+          "left": 1,
+          "right": 2,
+          "shared_atoms": [
+            9
+          ],
+          "shared_bonds": []
+        }
+      ],
+      "source": "tests/fixtures/test_molecules/molecules/spiro.inp",
+      "topology_schema": "matrix.xyz.topology.v1",
+      "topology_sha256": "32a5d8c41ae2cc7da3d2dcec48a35ed42a6e0a68e121f62d9abc5b2ed8132e6a"
+    },
+    {
+      "aromatic_atoms": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "aromatic_bonds": [],
+      "bond_count": 20,
+      "bond_orders": [
+        {
+          "atoms": [
+            1,
+            2
+          ],
+          "value": 0.41712078
+        },
+        {
+          "atoms": [
+            1,
+            4
+          ],
+          "value": 0.41712078
+        },
+        {
+          "atoms": [
+            1,
+            5
+          ],
+          "value": 0.41712078
+        },
+        {
+          "atoms": [
+            1,
+            9
+          ],
+          "value": 0.67406752
+        },
+        {
+          "atoms": [
+            2,
+            3
+          ],
+          "value": 0.41712078
+        },
+        {
+          "atoms": [
+            2,
+            8
+          ],
+          "value": 0.41712078
+        },
+        {
+          "atoms": [
+            2,
+            10
+          ],
+          "value": 0.67406752
+        },
+        {
+          "atoms": [
+            3,
+            4
+          ],
+          "value": 0.41712078
+        },
+        {
+          "atoms": [
+            3,
+            7
+          ],
+          "value": 0.41712078
+        },
+        {
+          "atoms": [
+            3,
+            11
+          ],
+          "value": 0.67406752
+        },
+        {
+          "atoms": [
+            4,
+            6
+          ],
+          "value": 0.41712078
+        },
+        {
+          "atoms": [
+            4,
+            12
+          ],
+          "value": 0.67406752
+        },
+        {
+          "atoms": [
+            5,
+            6
+          ],
+          "value": 0.41712078
+        },
+        {
+          "atoms": [
+            5,
+            8
+          ],
+          "value": 0.41712078
+        },
+        {
+          "atoms": [
+            5,
+            13
+          ],
+          "value": 0.67406752
+        },
+        {
+          "atoms": [
+            6,
+            7
+          ],
+          "value": 0.41712078
+        },
+        {
+          "atoms": [
+            6,
+            14
+          ],
+          "value": 0.67406752
+        },
+        {
+          "atoms": [
+            7,
+            8
+          ],
+          "value": 0.41712078
+        },
+        {
+          "atoms": [
+            7,
+            15
+          ],
+          "value": 0.67406752
+        },
+        {
+          "atoms": [
+            8,
+            16
+          ],
+          "value": 0.67406752
+        }
+      ],
+      "bonds": [
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          1,
+          5
+        ],
+        [
+          1,
+          9
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          8
+        ],
+        [
+          2,
+          10
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          3,
+          7
+        ],
+        [
+          3,
+          11
+        ],
+        [
+          4,
+          6
+        ],
+        [
+          4,
+          12
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          5,
+          8
+        ],
+        [
+          5,
+          13
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          6,
+          14
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          7,
+          15
+        ],
+        [
+          8,
+          16
+        ]
+      ],
+      "fragment_count": 1,
+      "fragments": [
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16
+        ]
+      ],
+      "id": "cubane",
+      "ring_basis": {
+        "allowed_atom_count": 16,
+        "allowed_edge_count": 20,
+        "candidate_count": 10,
+        "count": 5,
+        "excluded_atoms": [],
+        "policy": "CHORDLESS_NONMETAL_MINIMUM_CYCLE_BASIS",
+        "rank": 5
+      },
+      "ring_count": 5,
+      "ring_relation_count": 8,
+      "rings": [
+        {
+          "atoms": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "index": 1,
+          "size": 4
+        },
+        {
+          "atoms": [
+            1,
+            2,
+            8,
+            5
+          ],
+          "index": 2,
+          "size": 4
+        },
+        {
+          "atoms": [
+            1,
+            4,
+            6,
+            5
+          ],
+          "index": 3,
+          "size": 4
+        },
+        {
+          "atoms": [
+            2,
+            3,
+            7,
+            8
+          ],
+          "index": 4,
+          "size": 4
+        },
+        {
+          "atoms": [
+            3,
+            4,
+            6,
+            7
+          ],
+          "index": 5,
+          "size": 4
+        }
+      ],
+      "selected_ring_relations": [
+        {
+          "kind": "FUSED",
+          "left": 1,
+          "right": 2,
+          "shared_atoms": [
+            1,
+            2
+          ],
+          "shared_bonds": [
+            [
+              1,
+              2
+            ]
+          ]
+        },
+        {
+          "kind": "FUSED",
+          "left": 1,
+          "right": 3,
+          "shared_atoms": [
+            1,
+            4
+          ],
+          "shared_bonds": [
+            [
+              1,
+              4
+            ]
+          ]
+        },
+        {
+          "kind": "FUSED",
+          "left": 1,
+          "right": 4,
+          "shared_atoms": [
+            2,
+            3
+          ],
+          "shared_bonds": [
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "kind": "FUSED",
+          "left": 1,
+          "right": 5,
+          "shared_atoms": [
+            3,
+            4
+          ],
+          "shared_bonds": [
+            [
+              3,
+              4
+            ]
+          ]
+        },
+        {
+          "kind": "FUSED",
+          "left": 2,
+          "right": 3,
+          "shared_atoms": [
+            1,
+            5
+          ],
+          "shared_bonds": [
+            [
+              1,
+              5
+            ]
+          ]
+        },
+        {
+          "kind": "FUSED",
+          "left": 2,
+          "right": 4,
+          "shared_atoms": [
+            2,
+            8
+          ],
+          "shared_bonds": [
+            [
+              2,
+              8
+            ]
+          ]
+        },
+        {
+          "kind": "FUSED",
+          "left": 3,
+          "right": 5,
+          "shared_atoms": [
+            4,
+            6
+          ],
+          "shared_bonds": [
+            [
+              4,
+              6
+            ]
+          ]
+        },
+        {
+          "kind": "FUSED",
+          "left": 4,
+          "right": 5,
+          "shared_atoms": [
+            3,
+            7
+          ],
+          "shared_bonds": [
+            [
+              3,
+              7
+            ]
+          ]
+        }
+      ],
+      "source": "tests/fixtures/test_molecules/molecules/cubane.inp",
+      "topology_schema": "matrix.xyz.topology.v1",
+      "topology_sha256": "43b6acb6b8e2d45d818f105032f4a999c2c2900ac47edd11ab0dd66aa915aa41"
+    },
+    {
+      "aromatic_atoms": [
+        1,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "aromatic_bonds": [],
+      "bond_count": 30,
+      "bond_orders": [
+        {
+          "atoms": [
+            1,
+            2
+          ],
+          "value": 0.88323466
+        },
+        {
+          "atoms": [
+            1,
+            3
+          ],
+          "value": 0.88620491
+        },
+        {
+          "atoms": [
+            1,
+            4
+          ],
+          "value": 0.88620491
+        },
+        {
+          "atoms": [
+            1,
+            12
+          ],
+          "value": 0.83537351
+        },
+        {
+          "atoms": [
+            2,
+            3
+          ],
+          "value": 0.88323476
+        },
+        {
+          "atoms": [
+            2,
+            4
+          ],
+          "value": 0.88323476
+        },
+        {
+          "atoms": [
+            2,
+            5
+          ],
+          "value": 0.88323524
+        },
+        {
+          "atoms": [
+            2,
+            6
+          ],
+          "value": 0.88323524
+        },
+        {
+          "atoms": [
+            2,
+            7
+          ],
+          "value": 0.88323466
+        },
+        {
+          "atoms": [
+            2,
+            8
+          ],
+          "value": 0.88323476
+        },
+        {
+          "atoms": [
+            2,
+            9
+          ],
+          "value": 0.88323524
+        },
+        {
+          "atoms": [
+            2,
+            10
+          ],
+          "value": 0.88323524
+        },
+        {
+          "atoms": [
+            2,
+            11
+          ],
+          "value": 0.88323476
+        },
+        {
+          "atoms": [
+            3,
+            6
+          ],
+          "value": 0.88620807
+        },
+        {
+          "atoms": [
+            3,
+            13
+          ],
+          "value": 0.83537564
+        },
+        {
+          "atoms": [
+            4,
+            5
+          ],
+          "value": 0.88620807
+        },
+        {
+          "atoms": [
+            4,
+            14
+          ],
+          "value": 0.83537564
+        },
+        {
+          "atoms": [
+            5,
+            6
+          ],
+          "value": 0.88620593
+        },
+        {
+          "atoms": [
+            5,
+            15
+          ],
+          "value": 0.83537562
+        },
+        {
+          "atoms": [
+            6,
+            16
+          ],
+          "value": 0.83537562
+        },
+        {
+          "atoms": [
+            7,
+            8
+          ],
+          "value": 0.88620491
+        },
+        {
+          "atoms": [
+            7,
+            11
+          ],
+          "value": 0.88620491
+        },
+        {
+          "atoms": [
+            7,
+            17
+          ],
+          "value": 0.83537351
+        },
+        {
+          "atoms": [
+            8,
+            9
+          ],
+          "value": 0.88620807
+        },
+        {
+          "atoms": [
+            8,
+            18
+          ],
+          "value": 0.83537564
+        },
+        {
+          "atoms": [
+            9,
+            10
+          ],
+          "value": 0.88620593
+        },
+        {
+          "atoms": [
+            9,
+            19
+          ],
+          "value": 0.83537562
+        },
+        {
+          "atoms": [
+            10,
+            11
+          ],
+          "value": 0.88620807
+        },
+        {
+          "atoms": [
+            10,
+            20
+          ],
+          "value": 0.83537562
+        },
+        {
+          "atoms": [
+            11,
+            21
+          ],
+          "value": 0.83537564
+        }
+      ],
+      "bonds": [
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          1,
+          12
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          2,
+          7
+        ],
+        [
+          2,
+          8
+        ],
+        [
+          2,
+          9
+        ],
+        [
+          2,
+          10
+        ],
+        [
+          2,
+          11
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          3,
+          13
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          14
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          5,
+          15
+        ],
+        [
+          6,
+          16
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          7,
+          11
+        ],
+        [
+          7,
+          17
+        ],
+        [
+          8,
+          9
+        ],
+        [
+          8,
+          18
+        ],
+        [
+          9,
+          10
+        ],
+        [
+          9,
+          19
+        ],
+        [
+          10,
+          11
+        ],
+        [
+          10,
+          20
+        ],
+        [
+          11,
+          21
+        ]
+      ],
+      "fragment_count": 1,
+      "fragments": [
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21
+        ]
+      ],
+      "id": "ferrocene",
+      "ring_basis": {
+        "allowed_atom_count": 20,
+        "allowed_edge_count": 20,
+        "candidate_count": 2,
+        "count": 2,
+        "excluded_atoms": [
+          2
+        ],
+        "policy": "CHORDLESS_NONMETAL_MINIMUM_CYCLE_BASIS",
+        "rank": 2
+      },
+      "ring_count": 2,
+      "ring_relation_count": 0,
+      "rings": [
+        {
+          "atoms": [
+            1,
+            3,
+            6,
+            5,
+            4
+          ],
+          "index": 1,
+          "size": 5
+        },
+        {
+          "atoms": [
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "index": 2,
+          "size": 5
+        }
+      ],
+      "selected_ring_relations": [],
+      "source": "tests/fixtures/test_molecules/molecules/ferrocene.inp",
+      "topology_schema": "matrix.xyz.topology.v1",
+      "topology_sha256": "47ff501354b7aa324049575e089c1ba6b7c6ec820c2b8d75e4ca81f42afe4072"
+    },
+    {
+      "aromatic_atoms": [
+        1,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "aromatic_bonds": [],
+      "bond_count": 30,
+      "bond_orders": [
+        {
+          "atoms": [
+            1,
+            2
+          ],
+          "value": 0.88323466
+        },
+        {
+          "atoms": [
+            1,
+            3
+          ],
+          "value": 0.88620491
+        },
+        {
+          "atoms": [
+            1,
+            4
+          ],
+          "value": 0.88620491
+        },
+        {
+          "atoms": [
+            1,
+            12
+          ],
+          "value": 0.83537351
+        },
+        {
+          "atoms": [
+            2,
+            3
+          ],
+          "value": 0.88323476
+        },
+        {
+          "atoms": [
+            2,
+            4
+          ],
+          "value": 0.88323476
+        },
+        {
+          "atoms": [
+            2,
+            5
+          ],
+          "value": 0.88323524
+        },
+        {
+          "atoms": [
+            2,
+            6
+          ],
+          "value": 0.88323524
+        },
+        {
+          "atoms": [
+            2,
+            7
+          ],
+          "value": 0.88323547
+        },
+        {
+          "atoms": [
+            2,
+            8
+          ],
+          "value": 0.88323648
+        },
+        {
+          "atoms": [
+            2,
+            9
+          ],
+          "value": 0.88323584
+        },
+        {
+          "atoms": [
+            2,
+            10
+          ],
+          "value": 0.88323648
+        },
+        {
+          "atoms": [
+            2,
+            11
+          ],
+          "value": 0.88323547
+        },
+        {
+          "atoms": [
+            3,
+            6
+          ],
+          "value": 0.88620807
+        },
+        {
+          "atoms": [
+            3,
+            13
+          ],
+          "value": 0.83537564
+        },
+        {
+          "atoms": [
+            4,
+            5
+          ],
+          "value": 0.88620807
+        },
+        {
+          "atoms": [
+            4,
+            14
+          ],
+          "value": 0.83537564
+        },
+        {
+          "atoms": [
+            5,
+            6
+          ],
+          "value": 0.88620593
+        },
+        {
+          "atoms": [
+            5,
+            15
+          ],
+          "value": 0.83537562
+        },
+        {
+          "atoms": [
+            6,
+            16
+          ],
+          "value": 0.83537562
+        },
+        {
+          "atoms": [
+            7,
+            8
+          ],
+          "value": 0.88620925
+        },
+        {
+          "atoms": [
+            7,
+            11
+          ],
+          "value": 0.88620634
+        },
+        {
+          "atoms": [
+            7,
+            17
+          ],
+          "value": 0.83537579
+        },
+        {
+          "atoms": [
+            8,
+            9
+          ],
+          "value": 0.88620808
+        },
+        {
+          "atoms": [
+            8,
+            18
+          ],
+          "value": 0.83537407
+        },
+        {
+          "atoms": [
+            9,
+            10
+          ],
+          "value": 0.88620808
+        },
+        {
+          "atoms": [
+            9,
+            19
+          ],
+          "value": 0.83537439
+        },
+        {
+          "atoms": [
+            10,
+            11
+          ],
+          "value": 0.88620925
+        },
+        {
+          "atoms": [
+            10,
+            20
+          ],
+          "value": 0.83537407
+        },
+        {
+          "atoms": [
+            11,
+            21
+          ],
+          "value": 0.83537579
+        }
+      ],
+      "bonds": [
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          1,
+          12
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          2,
+          7
+        ],
+        [
+          2,
+          8
+        ],
+        [
+          2,
+          9
+        ],
+        [
+          2,
+          10
+        ],
+        [
+          2,
+          11
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          3,
+          13
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          14
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          5,
+          15
+        ],
+        [
+          6,
+          16
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          7,
+          11
+        ],
+        [
+          7,
+          17
+        ],
+        [
+          8,
+          9
+        ],
+        [
+          8,
+          18
+        ],
+        [
+          9,
+          10
+        ],
+        [
+          9,
+          19
+        ],
+        [
+          10,
+          11
+        ],
+        [
+          10,
+          20
+        ],
+        [
+          11,
+          21
+        ]
+      ],
+      "fragment_count": 1,
+      "fragments": [
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21
+        ]
+      ],
+      "id": "ferrocene_staggered",
+      "ring_basis": {
+        "allowed_atom_count": 20,
+        "allowed_edge_count": 20,
+        "candidate_count": 2,
+        "count": 2,
+        "excluded_atoms": [
+          2
+        ],
+        "policy": "CHORDLESS_NONMETAL_MINIMUM_CYCLE_BASIS",
+        "rank": 2
+      },
+      "ring_count": 2,
+      "ring_relation_count": 0,
+      "rings": [
+        {
+          "atoms": [
+            1,
+            3,
+            6,
+            5,
+            4
+          ],
+          "index": 1,
+          "size": 5
+        },
+        {
+          "atoms": [
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "index": 2,
+          "size": 5
+        }
+      ],
+      "selected_ring_relations": [],
+      "source": "tests/fixtures/test_molecules/molecules/ferrocene_staggered.inp",
+      "topology_schema": "matrix.xyz.topology.v1",
+      "topology_sha256": "4db77cecc7ed6d4779ca539597d486143c62dfb85847d780ae4987ba6222628a"
+    },
+    {
+      "aromatic_atoms": [],
+      "aromatic_bonds": [],
+      "bond_count": 24,
+      "bond_orders": [
+        {
+          "atoms": [
+            1,
+            2
+          ],
+          "value": 0.53257926
+        },
+        {
+          "atoms": [
+            1,
+            5
+          ],
+          "value": 0.54043196
+        },
+        {
+          "atoms": [
+            1,
+            16
+          ],
+          "value": 0.71458309
+        },
+        {
+          "atoms": [
+            1,
+            17
+          ],
+          "value": 0.71995879
+        },
+        {
+          "atoms": [
+            2,
+            3
+          ],
+          "value": 0.51978636
+        },
+        {
+          "atoms": [
+            2,
+            18
+          ],
+          "value": 0.71893044
+        },
+        {
+          "atoms": [
+            2,
+            19
+          ],
+          "value": 0.71033414
+        },
+        {
+          "atoms": [
+            3,
+            4
+          ],
+          "value": 0.50492817
+        },
+        {
+          "atoms": [
+            3,
+            6
+          ],
+          "value": 0.59764528
+        },
+        {
+          "atoms": [
+            3,
+            15
+          ],
+          "value": 0.71125699
+        },
+        {
+          "atoms": [
+            4,
+            5
+          ],
+          "value": 0.50520401
+        },
+        {
+          "atoms": [
+            4,
+            24
+          ],
+          "value": 0.7337459
+        },
+        {
+          "atoms": [
+            5,
+            13
+          ],
+          "value": 0.72005763
+        },
+        {
+          "atoms": [
+            5,
+            14
+          ],
+          "value": 0.71102071
+        },
+        {
+          "atoms": [
+            6,
+            7
+          ],
+          "value": 0.98658465
+        },
+        {
+          "atoms": [
+            6,
+            8
+          ],
+          "value": 0.84884857
+        },
+        {
+          "atoms": [
+            8,
+            9
+          ],
+          "value": 0.66751307
+        },
+        {
+          "atoms": [
+            8,
+            20
+          ],
+          "value": 0.81269535
+        },
+        {
+          "atoms": [
+            9,
+            10
+          ],
+          "value": 0.63445402
+        },
+        {
+          "atoms": [
+            9,
+            21
+          ],
+          "value": 0.75443371
+        },
+        {
+          "atoms": [
+            9,
+            22
+          ],
+          "value": 0.75615529
+        },
+        {
+          "atoms": [
+            10,
+            11
+          ],
+          "value": 1.01322895
+        },
+        {
+          "atoms": [
+            10,
+            12
+          ],
+          "value": 0.70856275
+        },
+        {
+          "atoms": [
+            12,
+            23
+          ],
+          "value": 0.75612858
+        }
+      ],
+      "bonds": [
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          5
+        ],
+        [
+          1,
+          16
+        ],
+        [
+          1,
+          17
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          18
+        ],
+        [
+          2,
+          19
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          3,
+          15
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          24
+        ],
+        [
+          5,
+          13
+        ],
+        [
+          5,
+          14
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          6,
+          8
+        ],
+        [
+          8,
+          9
+        ],
+        [
+          8,
+          20
+        ],
+        [
+          9,
+          10
+        ],
+        [
+          9,
+          21
+        ],
+        [
+          9,
+          22
+        ],
+        [
+          10,
+          11
+        ],
+        [
+          10,
+          12
+        ],
+        [
+          12,
+          23
+        ]
+      ],
+      "fragment_count": 1,
+      "fragments": [
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24
+        ]
+      ],
+      "id": "progly1_nohbond",
+      "ring_basis": {
+        "allowed_atom_count": 24,
+        "allowed_edge_count": 24,
+        "candidate_count": 1,
+        "count": 1,
+        "excluded_atoms": [],
+        "policy": "CHORDLESS_NONMETAL_MINIMUM_CYCLE_BASIS",
+        "rank": 1
+      },
+      "ring_count": 1,
+      "ring_relation_count": 0,
+      "rings": [
+        {
+          "atoms": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "index": 1,
+          "size": 5
+        }
+      ],
+      "selected_ring_relations": [],
+      "source": "tests/fixtures/test_molecules/molecules/progly1_nohbond.inp",
+      "topology_schema": "matrix.xyz.topology.v1",
+      "topology_sha256": "fb84e48abd3ea20bf9931430bcb2dc23051c79ca4ff7dd7c0621975e2654a0ff"
+    },
+    {
+      "aromatic_atoms": [],
+      "aromatic_bonds": [],
+      "bond_count": 19,
+      "bond_orders": [
+        {
+          "atoms": [
+            1,
+            2
+          ],
+          "value": 0.53856708
+        },
+        {
+          "atoms": [
+            1,
+            17
+          ],
+          "value": 0.52004814
+        },
+        {
+          "atoms": [
+            2,
+            3
+          ],
+          "value": 0.55313347
+        },
+        {
+          "atoms": [
+            2,
+            5
+          ],
+          "value": 0.71907569
+        },
+        {
+          "atoms": [
+            2,
+            6
+          ],
+          "value": 0.55133011
+        },
+        {
+          "atoms": [
+            3,
+            4
+          ],
+          "value": 0.75484369
+        },
+        {
+          "atoms": [
+            6,
+            7
+          ],
+          "value": 0.71728484
+        },
+        {
+          "atoms": [
+            6,
+            8
+          ],
+          "value": 0.72271184
+        },
+        {
+          "atoms": [
+            6,
+            9
+          ],
+          "value": 0.53590484
+        },
+        {
+          "atoms": [
+            9,
+            10
+          ],
+          "value": 0.53775248
+        },
+        {
+          "atoms": [
+            9,
+            12
+          ],
+          "value": 0.71336207
+        },
+        {
+          "atoms": [
+            9,
+            13
+          ],
+          "value": 0.53202818
+        },
+        {
+          "atoms": [
+            10,
+            11
+          ],
+          "value": 0.75011856
+        },
+        {
+          "atoms": [
+            13,
+            14
+          ],
+          "value": 0.52162224
+        },
+        {
+          "atoms": [
+            13,
+            16
+          ],
+          "value": 0.7132102
+        },
+        {
+          "atoms": [
+            13,
+            17
+          ],
+          "value": 0.54825125
+        },
+        {
+          "atoms": [
+            14,
+            15
+          ],
+          "value": 0.75217054
+        },
+        {
+          "atoms": [
+            17,
+            18
+          ],
+          "value": 0.72032058
+        },
+        {
+          "atoms": [
+            17,
+            19
+          ],
+          "value": 0.71322614
+        }
+      ],
+      "bonds": [
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          17
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          2,
+          6
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          6,
+          7
+        ],
+        [
+          6,
+          8
+        ],
+        [
+          6,
+          9
+        ],
+        [
+          9,
+          10
+        ],
+        [
+          9,
+          12
+        ],
+        [
+          9,
+          13
+        ],
+        [
+          10,
+          11
+        ],
+        [
+          13,
+          14
+        ],
+        [
+          13,
+          16
+        ],
+        [
+          13,
+          17
+        ],
+        [
+          14,
+          15
+        ],
+        [
+          17,
+          18
+        ],
+        [
+          17,
+          19
+        ]
+      ],
+      "fragment_count": 1,
+      "fragments": [
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19
+        ]
+      ],
+      "id": "ribose",
+      "ring_basis": {
+        "allowed_atom_count": 19,
+        "allowed_edge_count": 19,
+        "candidate_count": 1,
+        "count": 1,
+        "excluded_atoms": [],
+        "policy": "CHORDLESS_NONMETAL_MINIMUM_CYCLE_BASIS",
+        "rank": 1
+      },
+      "ring_count": 1,
+      "ring_relation_count": 0,
+      "rings": [
+        {
+          "atoms": [
+            1,
+            2,
+            6,
+            9,
+            13,
+            17
+          ],
+          "index": 1,
+          "size": 6
+        }
+      ],
+      "selected_ring_relations": [],
+      "source": "tests/fixtures/test_molecules/molecules/ribose.inp",
+      "topology_schema": "matrix.xyz.topology.v1",
+      "topology_sha256": "5b21bdf7789045b50caf98aea864367ef28fd7cca6623d7389ff47faf4e5c6f8"
+    },
+    {
+      "aromatic_atoms": [
+        1,
+        5,
+        6
+      ],
+      "aromatic_bonds": [],
+      "bond_count": 28,
+      "bond_orders": [
+        {
+          "atoms": [
+            1,
+            2
+          ],
+          "value": 0.57607177
+        },
+        {
+          "atoms": [
+            1,
+            5
+          ],
+          "value": 0.59078924
+        },
+        {
+          "atoms": [
+            1,
+            6
+          ],
+          "value": 0.61193955
+        },
+        {
+          "atoms": [
+            1,
+            7
+          ],
+          "value": 0.57538179
+        },
+        {
+          "atoms": [
+            2,
+            3
+          ],
+          "value": 0.55620821
+        },
+        {
+          "atoms": [
+            2,
+            12
+          ],
+          "value": 0.7145409
+        },
+        {
+          "atoms": [
+            2,
+            13
+          ],
+          "value": 0.7218386
+        },
+        {
+          "atoms": [
+            3,
+            4
+          ],
+          "value": 0.5489224
+        },
+        {
+          "atoms": [
+            3,
+            22
+          ],
+          "value": 0.91612533
+        },
+        {
+          "atoms": [
+            4,
+            5
+          ],
+          "value": 0.58106767
+        },
+        {
+          "atoms": [
+            4,
+            23
+          ],
+          "value": 0.71525617
+        },
+        {
+          "atoms": [
+            4,
+            24
+          ],
+          "value": 0.53125744
+        },
+        {
+          "atoms": [
+            5,
+            6
+          ],
+          "value": 0.60877701
+        },
+        {
+          "atoms": [
+            5,
+            15
+          ],
+          "value": 0.75625614
+        },
+        {
+          "atoms": [
+            6,
+            10
+          ],
+          "value": 0.75866139
+        },
+        {
+          "atoms": [
+            6,
+            11
+          ],
+          "value": 0.76343346
+        },
+        {
+          "atoms": [
+            7,
+            8
+          ],
+          "value": 0.53650551
+        },
+        {
+          "atoms": [
+            7,
+            9
+          ],
+          "value": 0.53614443
+        },
+        {
+          "atoms": [
+            7,
+            14
+          ],
+          "value": 0.70766317
+        },
+        {
+          "atoms": [
+            8,
+            16
+          ],
+          "value": 0.71539119
+        },
+        {
+          "atoms": [
+            8,
+            17
+          ],
+          "value": 0.71677485
+        },
+        {
+          "atoms": [
+            8,
+            18
+          ],
+          "value": 0.71636163
+        },
+        {
+          "atoms": [
+            9,
+            19
+          ],
+          "value": 0.71449904
+        },
+        {
+          "atoms": [
+            9,
+            20
+          ],
+          "value": 0.71643711
+        },
+        {
+          "atoms": [
+            9,
+            21
+          ],
+          "value": 0.71670231
+        },
+        {
+          "atoms": [
+            24,
+            25
+          ],
+          "value": 0.71676201
+        },
+        {
+          "atoms": [
+            24,
+            26
+          ],
+          "value": 0.71842808
+        },
+        {
+          "atoms": [
+            24,
+            27
+          ],
+          "value": 0.71396975
+        }
+      ],
+      "bonds": [
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          5
+        ],
+        [
+          1,
+          6
+        ],
+        [
+          1,
+          7
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          12
+        ],
+        [
+          2,
+          13
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          3,
+          22
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          23
+        ],
+        [
+          4,
+          24
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          5,
+          15
+        ],
+        [
+          6,
+          10
+        ],
+        [
+          6,
+          11
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          7,
+          9
+        ],
+        [
+          7,
+          14
+        ],
+        [
+          8,
+          16
+        ],
+        [
+          8,
+          17
+        ],
+        [
+          8,
+          18
+        ],
+        [
+          9,
+          19
+        ],
+        [
+          9,
+          20
+        ],
+        [
+          9,
+          21
+        ],
+        [
+          24,
+          25
+        ],
+        [
+          24,
+          26
+        ],
+        [
+          24,
+          27
+        ]
+      ],
+      "fragment_count": 1,
+      "fragments": [
+        [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27
+        ]
+      ],
+      "id": "thujone",
+      "ring_basis": {
+        "allowed_atom_count": 27,
+        "allowed_edge_count": 28,
+        "candidate_count": 2,
+        "count": 2,
+        "excluded_atoms": [],
+        "policy": "CHORDLESS_NONMETAL_MINIMUM_CYCLE_BASIS",
+        "rank": 2
+      },
+      "ring_count": 2,
+      "ring_relation_count": 1,
+      "rings": [
+        {
+          "atoms": [
+            1,
+            5,
+            6
+          ],
+          "index": 1,
+          "size": 3
+        },
+        {
+          "atoms": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "index": 2,
+          "size": 5
+        }
+      ],
+      "selected_ring_relations": [
+        {
+          "kind": "FUSED",
+          "left": 1,
+          "right": 2,
+          "shared_atoms": [
+            1,
+            5
+          ],
+          "shared_bonds": [
+            [
+              1,
+              5
+            ]
+          ]
+        }
+      ],
+      "source": "tests/fixtures/test_molecules/molecules/thujone.inp",
+      "topology_schema": "matrix.xyz.topology.v1",
+      "topology_sha256": "d423b0613415529523832d026084c128742316760539fc79acf346d73de51418"
+    }
+  ],
+  "rounding_decimals": 8,
+  "schema": "matrix.chem.topology_snapshot.v1",
+  "selected_ring_relations": 24
+}

@@ -35,6 +35,7 @@ from .fchk import (
     lower_to_symmetric,
     promote_gaussian_fchk_to_xyzin,
     read_gaussian_fchk,
+    read_gaussian_fchk_geometry,
     read_gaussian_fchk_qff,
     read_indexed_qff_text,
 )
@@ -115,6 +116,7 @@ __all__ = [
     "promote_gaussian_quadrupole_properties_to_xyzin",
     "promote_gaussian_rovib_to_xyzin",
     "read_gaussian_fchk",
+    "read_gaussian_fchk_geometry",
     "read_gaussian_fchk_qff",
     "read_gaussian_input",
     "read_gaussian_cartesian_input",

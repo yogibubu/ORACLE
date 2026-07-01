@@ -70,7 +70,8 @@ class DiscreteGraph:
 
                 rij = np.linalg.norm(self.coords[i] - self.coords[j])
 
-                if rij > REFF_SCALE * (ri + rj):
+                override = (i, j) in getattr(self.graph, "bond_order_overrides", {})
+                if not override and rij > REFF_SCALE * (ri + rj):
                     continue
 
                 self._add_bond(i, j)

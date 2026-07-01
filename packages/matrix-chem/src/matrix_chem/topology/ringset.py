@@ -1,19 +1,23 @@
 # ============================================================
-# RingSet class for ORACLE (robust version)
+# RingSet class for MATRIX
 #
 # Responsibilities:
-#   - detect all simple cycles in the molecular graph
+#   - detect elementary covalent rings in the molecular graph
 #   - optionally limit ring size (ring_max)
 #   - build Ring objects
 #   - manage atom-ring and bond-ring mappings
 #   - detect fused / connected rings
 #
 # Notes:
-#   - speed is not a priority
-#   - accuracy and completeness are preferred
+#   - rings are chordless cycles in the non-metal covalent graph
+#   - metal-ring interactions are represented by special centers, not by
+#     artificial metal-containing topology rings
 # ============================================================
 
 from collections import defaultdict
+
+from .cycle_basis import CycleBasisDiagnostics, elementary_cycle_basis
+from .metals import is_metal_atomic_number
 
 try:
     from .rings import Ring
@@ -49,104 +53,51 @@ class RingSet:
         self.rings = []
         self.atom_to_rings = defaultdict(list)
         self.bond_to_rings = defaultdict(list)
+        self.cycle_basis_diagnostics = CycleBasisDiagnostics(0, 0, 0, 0, 0, ())
 
         # --- build ---
         self._detect_rings()
         self._build_connectivity()
 
     # ============================================================
-    # Ring detection (ROBUST DFS)
+    # Ring detection
     # ============================================================
 
     def _detect_rings(self):
         """
-        Detect all simple cycles up to ring_max using DFS.
-        """
-        seen_cycles = set()
-        ring_index = 0
+        Detect elementary rings.
 
+        MATRIX stores rings as chordless cycles of the covalent, non-metal
+        graph.  This removes perimeter cycles in fused systems, diagonal cycles
+        in cage systems and artificial metal-containing cycles in metallocenes.
+        """
         nat = getattr(self.graph, "natoms", getattr(self.graph, "n_atoms", None))
         if nat is None:
             raise AttributeError("Graph must define natoms or n_atoms")
 
-        for start in range(nat):
-            self._dfs_cycles(
-                start=start,
-                current=start,
-                visited=[start],
-                seen_cycles=seen_cycles,
-                ring_index_ref=[ring_index],
+        allowed_atoms = {atom for atom in range(nat) if not self._is_metal_atom(atom)}
+        selected_cycles, self.cycle_basis_diagnostics = elementary_cycle_basis(
+            self.graph,
+            allowed_atoms=allowed_atoms,
+            ring_max=self.ring_max,
+        )
+        for ring_index, atoms in enumerate(selected_cycles):
+            ring = Ring(
+                index=ring_index,
+                atoms=list(atoms),
+                coords=self.coords,
             )
-            ring_index = len(self.rings)
+            self.rings.append(ring)
 
-    def _dfs_cycles(self, start, current, visited, seen_cycles, ring_index_ref):
-        """
-        Depth-first search for cycles.
-        """
-        if self.ring_max is not None and len(visited) > self.ring_max:
-            return
+            for atom in atoms:
+                self.atom_to_rings[atom].append(ring_index)
 
-        for nbr in self.graph.neighbors(current):
-            if nbr == start and len(visited) >= 3:
-                cycle = visited[:]
-                canonical = self._canonical_cycle(cycle)
+            for bond in ring.bonds:
+                self.bond_to_rings[bond].append(ring_index)
 
-                if canonical in seen_cycles:
-                    continue
-
-                seen_cycles.add(canonical)
-
-                atoms = list(canonical)
-                ring = Ring(
-                    index=ring_index_ref[0],
-                    atoms=atoms,
-                    coords=self.coords,
-                )
-
-                self.rings.append(ring)
-
-                for a in atoms:
-                    self.atom_to_rings[a].append(ring_index_ref[0])
-
-                for b in ring.bonds:
-                    self.bond_to_rings[b].append(ring_index_ref[0])
-
-                ring_index_ref[0] += 1
-                continue
-
-            if nbr in visited:
-                continue
-
-            # enforce ordering to avoid mirrored duplicates
-            if nbr < start:
-                continue
-
-            self._dfs_cycles(
-                start=start,
-                current=nbr,
-                visited=visited + [nbr],
-                seen_cycles=seen_cycles,
-                ring_index_ref=ring_index_ref,
-            )
-
-    # ============================================================
-    # Canonicalization
-    # ============================================================
-
-    def _canonical_cycle(self, cycle):
-        """
-        Return a canonical tuple representation of a cycle.
-        """
-        n = len(cycle)
-        rotations = []
-
-        for i in range(n):
-            r1 = cycle[i:] + cycle[:i]
-            r2 = list(reversed(r1))
-            rotations.append(tuple(r1))
-            rotations.append(tuple(r2))
-
-        return min(rotations)
+    def _is_metal_atom(self, atom):
+        Z = int(getattr(self.graph, "Z", [0] * (atom + 1))[atom])
+        return is_metal_atomic_number(Z)
 
     # ============================================================
     # Ring connectivity

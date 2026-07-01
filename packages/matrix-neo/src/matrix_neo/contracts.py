@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from matrix_core import read_sectioned_lines, replace_section, section_content
+from matrix_chem.topology.contracts import SUPPORTED_VALIDATION_SCHEMAS, schema_line_supported
 
 
 ORACLE_XYZ_GIC_SCHEMA = "oracle.xyz.gic.v1"
@@ -20,7 +21,7 @@ def validate_gicforge_prerequisites(path: Path) -> None:
     if not validation:
         raise GICForgeContractError("missing #VALIDATION section")
     expected = f"SCHEMA {REQUIRED_VALIDATION_SCHEMA}"
-    if validation[0].strip() != expected:
+    if not schema_line_supported(validation[0], SUPPORTED_VALIDATION_SCHEMAS):
         raise GICForgeContractError(
             f"#VALIDATION must start with {expected!r}; found {validation[0]!r}"
         )

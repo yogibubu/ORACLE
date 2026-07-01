@@ -22,6 +22,7 @@ from matrix_neo import (
 from .harmonic import solve_wilson_gf
 from .large_amplitude import (
     GFLargeAmplitudeAnalysis,
+    LargeAmplitudeTopologyContext,
     classify_gic_anharmonic_model,
     large_amplitude_analysis_from_gf_matrices,
 )
@@ -483,10 +484,23 @@ def _large_amplitude_topology_context_from_xyzin(
     coordinates_angstrom: np.ndarray,
 ):
     lines = read_sectioned_lines(Path(path))
+    topology_bonds = topology_bonds_from_xyzin(Path(path))
     topology_bond_orders = topology_bond_orders_from_lines(
         lines,
         natoms=int(len(atomic_numbers)),
     )
+    if topology_bonds:
+        return LargeAmplitudeTopologyContext(
+            atomic_numbers=tuple(int(value) for value in np.asarray(atomic_numbers).reshape(-1)),
+            bonds=topology_bonds,
+            bond_orders=topology_bond_orders,
+            synthon_signatures=_synthon_signatures_from_lines(lines),
+            coordinates_angstrom=tuple(
+                tuple(float(value) for value in row)
+                for row in np.asarray(coordinates_angstrom, dtype=float)
+            ),
+            bond_order_source=_topology_bond_order_source(lines),
+        )
     try:
         from matrix_chem.link import gaussian_topology_overrides_from_xyzin
 
@@ -504,6 +518,51 @@ def _large_amplitude_topology_context_from_xyzin(
             gaussian.get("bond_order_source") or "Topology Pauling continuous model"
         ),
     )
+
+
+def _synthon_signatures_from_lines(lines: list[str]) -> dict[int, tuple[object, ...]]:
+    synthons = section_content(lines, "SYNTHONS")
+    signatures: dict[int, tuple[object, ...]] = {}
+    for line in synthons:
+        text = line.strip()
+        if not text or text.startswith("[") or text.upper().startswith(("SCHEMA", "ALIAS_", "INDEXING", "CHARGE_", "BOND_", "COLUMNS")):
+            continue
+        parts = text.split()
+        if len(parts) < 8:
+            continue
+        try:
+            atom = int(parts[0])
+        except ValueError:
+            continue
+        signatures[atom] = _parse_synthon_signature_token(parts[-1])
+    return signatures
+
+
+def _parse_synthon_signature_token(token: str) -> tuple[object, ...]:
+    values: list[object] = []
+    for part in token.split(","):
+        text = part.strip()
+        if not text:
+            continue
+        try:
+            values.append(int(text))
+            continue
+        except ValueError:
+            pass
+        try:
+            values.append(float(text))
+            continue
+        except ValueError:
+            values.append(text)
+    return tuple(values)
+
+
+def _topology_bond_order_source(lines: list[str]) -> str:
+    for line in section_content(lines, "TOPOLOGY"):
+        text = line.strip()
+        if text.startswith("BOND_ORDER_SOURCE "):
+            return text.split(" ", 1)[1].strip()
+    return "Frozen #TOPOLOGY"
 
 
 def topology_bonds_from_xyzin(path: Path) -> tuple[tuple[int, int], ...]:

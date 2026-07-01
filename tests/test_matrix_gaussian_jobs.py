@@ -13,6 +13,7 @@ from matrix_gaussian import (
     gaussian_completion_message,
     gaussian_job_status,
     read_gaussian_fchk_qff,
+    read_gaussian_fchk_geometry,
     read_indexed_qff_text,
     run_gaussian_job,
     select_latest_log,
@@ -97,6 +98,14 @@ def test_matrix_gaussian_owns_fchk_qff_adapter():
     assert data.atomic_numbers.tolist() == [1, 8, 1]
     assert data.cartesian_hessian_lower.shape == (45,)
     assert np.allclose(anh.anharmonic_frequencies_cm[:3], [2123.50470, 4016.61987, 4266.73074])
+
+
+def test_gaussian_fchk_geometry_reader_does_not_require_hessian_consumers():
+    geometry = read_gaussian_fchk_geometry(FCHK)
+
+    assert geometry.source_format == "gaussian_fchk"
+    assert geometry.atoms == ("H", "O", "H")
+    assert geometry.coordinates_angstrom.shape == (3, 3)
 
 
 def test_indexed_qff_text_reader_lives_in_matrix_gaussian(tmp_path):

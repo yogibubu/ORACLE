@@ -1,8 +1,8 @@
 from pathlib import Path
 import numpy as np
 
+from .contracts import MATRIX_XYZ_TOPOLOGY_SCHEMA, ORACLE_XYZ_TOPOLOGY_SCHEMA
 
-ORACLE_XYZ_TOPOLOGY_SCHEMA = "oracle.xyz.topology.v1"
 
 
 def write_topology_section(
@@ -25,10 +25,25 @@ def write_topology_section(
     # ========================================================
 
     fh.write("\n#TOPOLOGY\n")
-    fh.write(f"SCHEMA {ORACLE_XYZ_TOPOLOGY_SCHEMA}\n")
+    fh.write(f"SCHEMA {MATRIX_XYZ_TOPOLOGY_SCHEMA}\n")
+    fh.write(f"ALIAS_SCHEMA {ORACLE_XYZ_TOPOLOGY_SCHEMA}\n")
     fh.write("INDEXING ATOMS=ONE_BASED\n")
     bond_order_source = getattr(synthons, "_bond_order_source", "Topology Pauling continuous model")
     fh.write(f"BOND_ORDER_SOURCE {bond_order_source}\n")
+    fh.write("RING_BASIS_POLICY CHORDLESS_NONMETAL_MINIMUM_CYCLE_BASIS\n")
+    diagnostics = getattr(ringset, "cycle_basis_diagnostics", None)
+    if diagnostics is not None:
+        excluded = (
+            ",".join(str(atom + 1) for atom in diagnostics.excluded_atoms)
+            if diagnostics.excluded_atoms
+            else "NONE"
+        )
+        fh.write(f"RING_CANDIDATE_COUNT {diagnostics.candidate_cycle_count}\n")
+        fh.write(f"RING_BASIS_RANK {diagnostics.cycle_rank}\n")
+        fh.write(f"RING_BASIS_COUNT {diagnostics.selected_cycle_count}\n")
+        fh.write(f"RING_BASIS_ALLOWED_ATOMS {diagnostics.allowed_atom_count}\n")
+        fh.write(f"RING_BASIS_ALLOWED_EDGES {diagnostics.allowed_edge_count}\n")
+        fh.write(f"RING_BASIS_EXCLUDED_ATOMS {excluded}\n")
 
     # ========================================================
     # ATOMS

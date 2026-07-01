@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 import re
+import shutil
+import subprocess
 
 import numpy as np
 
@@ -46,6 +48,15 @@ class OrcaOutputPromotion:
     output_path: Path
     wrote_geometry: bool
     wrote_cartesian_hessian: bool
+
+
+@dataclass(frozen=True)
+class OrcaMoldenPromotion:
+    xyzin: Path
+    gbw_path: Path
+    molden_path: Path
+    command: tuple[str, ...]
+    wrote_orbitals: bool
 
 
 def summarize_orca_output(path: Path | str) -> OrcaOutputSummary:
@@ -136,6 +147,86 @@ def promote_orca_output_to_xyzin(
         output_path=output,
         wrote_geometry=True,
         wrote_cartesian_hessian=wrote_hessian,
+    )
+
+
+def convert_orca_gbw_to_molden(
+    gbw: Path | str,
+    *,
+    output: Path | str | None = None,
+    executable: str = "orca_2mkl",
+    timeout: float | None = None,
+) -> OrcaMoldenPromotion:
+    """Run ORCA's orca_2mkl converter and return the generated Molden path.
+
+    The returned object has an empty xyzin path because this helper only creates
+    the external file. Use :func:`promote_orca_molden_to_xyzin` to register it.
+    """
+    source = Path(gbw)
+    if source.suffix.lower() != ".gbw":
+        raise ValueError("ORCA Molden conversion requires a .gbw file")
+    if not source.is_file():
+        raise FileNotFoundError(source)
+    basename = source.with_suffix("")
+    generated = basename.with_suffix(".molden.input")
+    command = (executable, str(basename), "-molden")
+    subprocess.run(
+        command,
+        check=True,
+        text=True,
+        capture_output=True,
+        timeout=timeout,
+    )
+    if not generated.is_file():
+        raise FileNotFoundError(f"orca_2mkl did not create expected Molden file: {generated}")
+    target = Path(output) if output is not None else generated
+    if target != generated:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(generated, target)
+    return OrcaMoldenPromotion(
+        xyzin=Path(),
+        gbw_path=source,
+        molden_path=target,
+        command=command,
+        wrote_orbitals=False,
+    )
+
+
+def promote_orca_molden_to_xyzin(
+    gbw: Path | str,
+    xyzin: Path | str,
+    *,
+    output: Path | str | None = None,
+    executable: str = "orca_2mkl",
+    timeout: float | None = None,
+) -> OrcaMoldenPromotion:
+    """Convert an ORCA GBW file to Molden and register it in #ORBITALS."""
+    from matrix_qm import merge_orbitals_section, orbital_file_record_from_path
+
+    target = Path(xyzin)
+    converted = convert_orca_gbw_to_molden(
+        gbw,
+        output=output,
+        executable=executable,
+        timeout=timeout,
+    )
+    merge_orbitals_section(
+        target,
+        (
+            orbital_file_record_from_path(
+                converted.molden_path,
+                role="orbitals",
+                label=converted.molden_path.stem,
+                source="orca_2mkl",
+            ),
+        ),
+    )
+    return OrcaMoldenPromotion(
+        xyzin=target,
+        gbw_path=converted.gbw_path,
+        molden_path=converted.molden_path,
+        command=converted.command,
+        wrote_orbitals=True,
     )
 
 

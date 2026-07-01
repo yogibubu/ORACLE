@@ -6,16 +6,27 @@ from pathlib import Path
 import numpy as np
 
 from matrix_chem import read_enriched_xyz
+from matrix_chem.topology.contracts import (
+    MATRIX_XYZ_FRAGMENTS_SCHEMA,
+    MATRIX_XYZ_SYNTHONS_SCHEMA,
+    MATRIX_XYZ_TOPOLOGY_SCHEMA,
+    ORACLE_XYZ_FRAGMENTS_SCHEMA,
+    SUPPORTED_SYNTHONS_SCHEMAS,
+    SUPPORTED_TOPOLOGY_SCHEMAS,
+    schema_line_supported,
+    supported_schema_text,
+)
 from matrix_core import read_sectioned_lines, replace_section, section_content
 
 
-ORACLE_XYZ_FRAGMENTS_SCHEMA = "oracle.xyz.fragments.v1"
+ORACLE_XYZ_FRAGMENTS_SCHEMA = ORACLE_XYZ_FRAGMENTS_SCHEMA
+MATRIX_XYZ_FRAGMENTS_SCHEMA = MATRIX_XYZ_FRAGMENTS_SCHEMA
 ORACLE_XYZ_FRAGMENT_LIBRARY_SCHEMA = "oracle.xyz.fragment_library.v1"
 ORACLE_XYZ_ASSEMBLY_SCHEMA = "oracle.xyz.assembly.v1"
 ORACLE_XYZ_INTERACTION_CENTERS_SCHEMA = "oracle.xyz.interaction_centers.v1"
 
-REQUIRED_TOPOLOGY_SCHEMA = "oracle.xyz.topology.v1"
-REQUIRED_SYNTHONS_SCHEMA = "oracle.xyz.synthons.v1"
+REQUIRED_TOPOLOGY_SCHEMA = MATRIX_XYZ_TOPOLOGY_SCHEMA
+REQUIRED_SYNTHONS_SCHEMA = MATRIX_XYZ_SYNTHONS_SCHEMA
 RANK_TOLERANCE = 1.0e-8
 METAL_SYMBOLS = frozenset(
     {
@@ -164,8 +175,8 @@ class InteractionCenterDefinition:
 def validate_fragment_prerequisites(path: Path) -> None:
     """Require saved topology and synthons before any fragment workflow starts."""
     lines = read_sectioned_lines(Path(path))
-    _require_schema(lines, "TOPOLOGY", REQUIRED_TOPOLOGY_SCHEMA)
-    _require_schema(lines, "SYNTHONS", REQUIRED_SYNTHONS_SCHEMA)
+    _require_schema(lines, "TOPOLOGY", SUPPORTED_TOPOLOGY_SCHEMAS)
+    _require_schema(lines, "SYNTHONS", SUPPORTED_SYNTHONS_SCHEMAS)
 
 
 def fragment_plan_section_lines(
@@ -175,9 +186,11 @@ def fragment_plan_section_lines(
 ) -> list[str]:
     """Return the initial #FRAGMENTS section without computing fragments yet."""
     return [
-        f"SCHEMA {ORACLE_XYZ_FRAGMENTS_SCHEMA}",
+        f"SCHEMA {MATRIX_XYZ_FRAGMENTS_SCHEMA}",
+        f"ALIAS_SCHEMA {ORACLE_XYZ_FRAGMENTS_SCHEMA}",
         f"STATUS {status.strip().upper()}",
-        "DEPENDENCIES TOPOLOGY=oracle.xyz.topology.v1 SYNTHONS=oracle.xyz.synthons.v1",
+        f"DEPENDENCIES TOPOLOGY={MATRIX_XYZ_TOPOLOGY_SCHEMA} "
+        f"SYNTHONS={MATRIX_XYZ_SYNTHONS_SCHEMA}",
         "INDEXING ATOMS=ONE_BASED",
         f"STRATEGY {strategy.strip().upper()}",
         "[FRAGMENTS]",
@@ -451,14 +464,14 @@ def read_interaction_center_definition(path: Path) -> InteractionCenterDefinitio
     )
 
 
-def _require_schema(lines: list[str], section_name: str, schema: str) -> None:
+def _require_schema(lines: list[str], section_name: str, schemas: tuple[str, ...]) -> None:
     content = section_content(lines, section_name)
     if not content:
         raise FragmentContractError(f"missing #{section_name} section")
-    expected = f"SCHEMA {schema}"
-    if content[0].strip() != expected:
+    if not schema_line_supported(content[0], schemas):
         raise FragmentContractError(
-            f"#{section_name} must start with {expected!r}; found {content[0]!r}"
+            f"#{section_name} must start with {supported_schema_text(schemas)!r}; "
+            f"found {content[0]!r}"
         )
 
 

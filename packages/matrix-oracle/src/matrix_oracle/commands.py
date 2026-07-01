@@ -581,6 +581,22 @@ def molpro_promote_command(
     )
 
 
+def molpro_molden_command(
+    output: Path | str,
+    xyzin: Path | str,
+    *,
+    molden: Path | str | None = None,
+) -> OracleGuiCommand:
+    argv = [*_matrix_cli(), "molpro", "molden", str(Path(output)), str(Path(xyzin))]
+    if molden is not None:
+        argv.extend(["--molden", str(Path(molden))])
+    return OracleGuiCommand(
+        "Register Molpro Molden file",
+        tuple(argv),
+        produced_sections=("ORBITALS",),
+    )
+
+
 def orca_status_command(
     workdir: Path | str,
     *,
@@ -652,6 +668,28 @@ def orca_promote_command(
         "Promote ORCA output",
         tuple(argv),
         produced_sections=("SOURCE", "BASIC", "SYMMETRY", "TOPOLOGY", "SYNTHONS", "CARTESIAN_HESSIAN"),
+    )
+
+
+def orca_molden_command(
+    gbw: Path | str,
+    xyzin: Path | str,
+    *,
+    output: Path | str | None = None,
+    executable: str | None = None,
+    timeout: float | None = None,
+) -> OracleGuiCommand:
+    argv = [*_matrix_cli(), "orca", "molden", str(Path(gbw)), str(Path(xyzin))]
+    if output is not None:
+        argv.extend(["--output", str(Path(output))])
+    if executable:
+        argv.extend(["--executable", executable])
+    if timeout is not None:
+        argv.extend(["--timeout", str(timeout)])
+    return OracleGuiCommand(
+        "Convert ORCA GBW to Molden",
+        tuple(argv),
+        produced_sections=("ORBITALS",),
     )
 
 

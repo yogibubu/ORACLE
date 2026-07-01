@@ -274,8 +274,8 @@ These tools are optional but used by specific MATRIX workflow and ORACLE GUIs:
 | --- | --- | --- |
 | Gaussian executable (`g16`, `gdv`, or site wrapper) | QM jobs, Hessians, FCHK, rovibrational logs | Configure in the QM Jobs GUI or CLI `--executable` |
 | `formchk` | Convert Gaussian checkpoint files to FCHK | Used by `matrix gaussian formchk` |
-| Molpro | External QM job launcher and output source | Launched by `matrix molpro run`; parsed only by `matrix-molpro` adapters |
-| ORCA | External QM job launcher and output source | Launched by `matrix orca run`; `matrix orca promote` writes final geometry and `#CARTESIAN_HESSIAN` when ORCA prints a Cartesian Hessian |
+| Molpro | External QM job launcher and output source | Launched by `matrix molpro run`; parsed only by `matrix-molpro` adapters; Molden files produced by the job are registered with `matrix molpro molden` |
+| ORCA | External QM job launcher and output source | Launched by `matrix orca run`; `matrix orca promote` writes final geometry and `#CARTESIAN_HESSIAN` when ORCA prints a Cartesian Hessian; `orca_2mkl` is used by `matrix orca molden` |
 | MRCC | External QM output source | Parsed only by `matrix-mrcc` adapters |
 | Browser | Opens MOrbVis and future HTML reports | Prefer Chrome/Edge/Safari versions with WebGPU support |
 
@@ -315,6 +315,7 @@ For viewer checks:
 ```bash
 command -v avogadro2 || echo "Use /Applications/Avogadro2.app/Contents/MacOS/Avogadro2 in the GUI"
 command -v molden || echo "Molden missing; use MOrbVis browser for Molden/Cube orbital files"
+command -v orca_2mkl || echo "orca_2mkl missing; ORCA GBW to Molden conversion is unavailable"
 open -a XQuartz
 python -m webbrowser -t https://yasuaki-ito.github.io/morbvis/
 ```

@@ -12,6 +12,8 @@ from matrix_link import (
     smiles_to_geometry,
 )
 from matrix_chem import (
+    MATRIX_XYZ_SYNTHONS_SCHEMA,
+    MATRIX_XYZ_TOPOLOGY_SCHEMA,
     MolecularGeometry,
     preprocess_to_enriched_xyz,
     read_enriched_xyz,
@@ -58,8 +60,8 @@ def test_link_preprocess_writes_avogadro_compatible_enriched_xyz(tmp_path):
     assert "OPERATION_COUNT 4" in symmetry
     assert "[OPERATIONS]" in symmetry
     assert any("LABEL=sigma_yz" in line for line in symmetry)
-    assert section_content(lines, "TOPOLOGY")[0] == "SCHEMA oracle.xyz.topology.v1"
-    assert section_content(lines, "SYNTHONS")[0] == "SCHEMA oracle.xyz.synthons.v1"
+    assert section_content(lines, "TOPOLOGY")[0] == f"SCHEMA {MATRIX_XYZ_TOPOLOGY_SCHEMA}"
+    assert section_content(lines, "SYNTHONS")[0] == f"SCHEMA {MATRIX_XYZ_SYNTHONS_SCHEMA}"
     assert result.topology_bond_count == 2
 
     geometry = read_enriched_xyz(target)
@@ -111,6 +113,103 @@ def test_link_preprocess_imports_gaussian_cm5_and_mayer_topology(tmp_path):
     assert any(line.startswith("1 3 0.91") for line in topology)
     oxygen_line = next(line for line in synthons if line.startswith("1 O "))
     assert float(oxygen_line.split()[3]) == -0.4
+
+
+def test_link_preprocess_imports_molfile_explicit_bonds(tmp_path):
+    source = tmp_path / "ethene.mol"
+    source.write_text(
+        "\n".join(
+            [
+                "ethene",
+                "MATRIX",
+                "",
+                "  2  1  0  0  0  0            999 V2000",
+                "    0.0000    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0",
+                "    1.3400    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0",
+                "  1  2  2  0  0  0  0",
+                "M  END",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    target = tmp_path / "ethene.xyzin"
+
+    preprocess_to_enriched_xyz(source, target)
+    topology = section_content(read_sectioned_lines(target), "TOPOLOGY")
+
+    assert "BOND_ORDER_SOURCE SDF/MOL explicit bond block" in topology
+    assert any(line.startswith("1 2 2") for line in topology)
+
+
+def test_link_preprocess_imports_mol2_explicit_bonds(tmp_path):
+    source = tmp_path / "benzene_fragment.mol2"
+    source.write_text(
+        "\n".join(
+            [
+                "@<TRIPOS>MOLECULE",
+                "benzene_fragment",
+                "2 1 0 0 0",
+                "SMALL",
+                "NO_CHARGES",
+                "@<TRIPOS>ATOM",
+                "1 C1 0.0 0.0 0.0 C.ar 1 BEN 0.0",
+                "2 C2 1.4 0.0 0.0 C.ar 1 BEN 0.0",
+                "@<TRIPOS>BOND",
+                "1 1 2 ar",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    target = tmp_path / "mol2.xyzin"
+
+    preprocess_to_enriched_xyz(source, target)
+    topology = section_content(read_sectioned_lines(target), "TOPOLOGY")
+
+    assert "BOND_ORDER_SOURCE MOL2 explicit bond block" in topology
+    assert any(line.startswith("1 2 1.5") for line in topology)
+
+
+def test_link_preprocess_imports_mol2_noncontiguous_atom_ids(tmp_path):
+    source = tmp_path / "noncontiguous.mol2"
+    source.write_text(
+        "\n".join(
+            [
+                "@<TRIPOS>MOLECULE",
+                "noncontiguous",
+                "2 1 0 0 0",
+                "SMALL",
+                "NO_CHARGES",
+                "@<TRIPOS>ATOM",
+                "10 C10 0.0 0.0 0.0 C.3 1 MOL 0.0",
+                "20 O20 1.43 0.0 0.0 O.3 1 MOL 0.0",
+                "@<TRIPOS>BOND",
+                "1 10 20 1",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    target = tmp_path / "noncontiguous.xyzin"
+
+    preprocess_to_enriched_xyz(source, target)
+    topology = section_content(read_sectioned_lines(target), "TOPOLOGY")
+
+    assert "BOND_ORDER_SOURCE MOL2 explicit bond block" in topology
+    assert any(line.startswith("1 2 1") for line in topology)
+
+
+def test_link_preprocess_imports_gaussian_fchk_geometry(tmp_path):
+    fchk = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "gf" / "h2o.fchk"
+    target = tmp_path / "h2o_from_fchk.xyzin"
+
+    result = preprocess_to_enriched_xyz(fchk, target)
+    geometry = read_enriched_xyz(target)
+
+    assert result.geometry.source_format == "gaussian_fchk"
+    assert geometry.atoms == ("H", "O", "H")
+    assert result.topology_bond_count == 2
 
 
 def test_symmetry_candidate_operations_include_nonprimitive_rotation_powers():

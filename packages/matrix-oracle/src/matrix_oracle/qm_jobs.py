@@ -13,6 +13,7 @@ from .commands import (
     gaussian_status_command,
     gaussian_summary_command,
     gicforge_gaussian_input_command,
+    molpro_molden_command,
     molpro_promote_command,
     molpro_run_command,
     molpro_summary_command,
@@ -22,6 +23,7 @@ from .commands import (
     qm_remote_fetch_command,
     qm_remote_status_command,
     qm_remote_submit_command,
+    orca_molden_command,
     orca_promote_command,
     orca_run_command,
     orca_summary_command,
@@ -228,6 +230,16 @@ class OracleQMJobsController:
             raise ValueError("no MATRIX xyzin project is loaded")
         return molpro_promote_command(output, self.xyzin)
 
+    def molpro_molden_command(
+        self,
+        output: Path | str,
+        *,
+        molden: Path | str | None = None,
+    ) -> OracleGuiCommand:
+        if self.xyzin is None:
+            raise ValueError("no MATRIX xyzin project is loaded")
+        return molpro_molden_command(output, self.xyzin, molden=molden)
+
     def orca_status_command(
         self,
         workdir: Path | str,
@@ -265,6 +277,24 @@ class OracleQMJobsController:
         if self.xyzin is None:
             raise ValueError("no MATRIX xyzin project is loaded")
         return orca_promote_command(output, self.xyzin)
+
+    def orca_molden_command(
+        self,
+        gbw: Path | str,
+        *,
+        output: Path | str | None = None,
+        executable: str | None = None,
+        timeout: float | None = None,
+    ) -> OracleGuiCommand:
+        if self.xyzin is None:
+            raise ValueError("no MATRIX xyzin project is loaded")
+        return orca_molden_command(
+            gbw,
+            self.xyzin,
+            output=output,
+            executable=executable,
+            timeout=timeout,
+        )
 
     def mrcc_summary_command(self, output: Path | str) -> OracleGuiCommand:
         return mrcc_summary_command(output)

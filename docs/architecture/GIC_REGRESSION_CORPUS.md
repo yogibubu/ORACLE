@@ -54,6 +54,19 @@ fixtures are a third gate: they test compatibility of the exported coordinate
 text with an external optimizer and subsequent GF/PED analysis from the final
 log geometry.
 
+The topology input to these GIC gates is pinned independently in:
+
+```text
+tests/fixtures/golden_corpus/matrix_topology_snapshots.json
+```
+
+The topology contract is documented in
+`docs/architecture/TOPOLOGY_CONTRACT.md`. Topology regressions must be fixed in
+LINK/topology first, not hidden by NEO-specific graph reconstruction.
+The current contract stores an elementary minimum cycle basis, not all simple
+cycles; metallocene metal-ring contacts are handled as interaction-center
+special coordinates rather than metal-containing topology rings.
+
 Create a compact snapshot from a frozen `xyzin` with:
 
 ```bash

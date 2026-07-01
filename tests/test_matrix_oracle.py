@@ -720,6 +720,9 @@ def test_qm_jobs_controller_builds_adapter_commands(tmp_path):
     fchk = default_qm_formchk_output(chk)
     log = tmp_path / "job.log"
     molpro_output = tmp_path / "molpro.out"
+    molpro_molden_file = tmp_path / "molpro.molden"
+    orca_gbw = tmp_path / "orca.gbw"
+    orca_molden_file = tmp_path / "orca.molden.input"
     mrcc_output = tmp_path / "mrcc.out"
 
     gaussian_input = controller.gaussian_input_command(
@@ -744,7 +747,14 @@ def test_qm_jobs_controller_builds_adapter_commands(tmp_path):
     fchk_promote = controller.gaussian_promote_fchk_command(fchk, qff=False)
     rovib = controller.gaussian_promote_rovib_command(log, exclude_modes=(1, 3))
     molpro = controller.molpro_promote_command(molpro_output)
+    molpro_molden = controller.molpro_molden_command(molpro_output, molden=molpro_molden_file)
     molpro_summary = controller.molpro_summary_command(molpro_output)
+    orca_molden = controller.orca_molden_command(
+        orca_gbw,
+        output=orca_molden_file,
+        executable="orca_2mkl-test",
+        timeout=7.0,
+    )
     mrcc = controller.mrcc_promote_command(mrcc_output)
     mrcc_summary = controller.mrcc_summary_command(mrcc_output)
 
@@ -771,7 +781,15 @@ def test_qm_jobs_controller_builds_adapter_commands(tmp_path):
     assert rovib.produced_sections == ("VIBRATIONAL", "ROTATIONAL", "DELTABVIB")
     assert molpro.argv[3:5] == ("molpro", "promote")
     assert molpro.produced_sections == ("SOURCE", "BASIC", "SYMMETRY", "TOPOLOGY", "SYNTHONS")
+    assert molpro_molden.argv[3:5] == ("molpro", "molden")
+    assert molpro_molden.argv[-2:] == ("--molden", str(molpro_molden_file))
+    assert molpro_molden.produced_sections == ("ORBITALS",)
     assert molpro_summary.argv[3:5] == ("molpro", "summary")
+    assert orca_molden.argv[3:5] == ("orca", "molden")
+    assert orca_molden.argv[orca_molden.argv.index("--output") + 1] == str(orca_molden_file)
+    assert orca_molden.argv[orca_molden.argv.index("--executable") + 1] == "orca_2mkl-test"
+    assert orca_molden.argv[orca_molden.argv.index("--timeout") + 1] == "7.0"
+    assert orca_molden.produced_sections == ("ORBITALS",)
     assert mrcc.argv[3:5] == ("mrcc", "promote")
     assert mrcc.produced_sections == ("SOURCE", "BASIC", "SYMMETRY", "TOPOLOGY", "SYNTHONS")
     assert mrcc_summary.argv[3:5] == ("mrcc", "summary")

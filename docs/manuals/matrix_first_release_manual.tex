@@ -139,13 +139,25 @@ back to the same \xyzin{} container.
 \begin{lstlisting}[style=matrix]
 matrix link preprocess input.xyz molecule.xyzin
 matrix link preprocess smiles.txt molecule.xyzin --source-kind auto
-oracle validate molecule.xyzin
+matrix link preprocess calc.fchk molecule.xyzin --source-kind fchk
+matrix link preprocess structure.sdf molecule.xyzin --source-kind sdf
+matrix link preprocess structure.mol2 molecule.xyzin --source-kind mol2
+matrix validate molecule.xyzin
 \end{lstlisting}
 
 The output sections are normally \sectionname{SOURCE}, \sectionname{BASIC},
 \sectionname{SYMMETRY}, \sectionname{TOPOLOGY} and \sectionname{SYNTHONS}.
 Downstream tools must consume those sections rather than re-detecting bonds,
 rings, point groups or atom classes.
+
+The supported direct geometry sources are XYZ, Gaussian geometry/log input,
+Gaussian formatted checkpoints (\texttt{.fchk}/\texttt{.fch}), MOL/SDF V2000,
+Tripos MOL2 and SMILES through RDKit.  When MOL, SDF or MOL2 provide explicit
+bonds, LINK imports those bond orders as overrides and then writes the same
+normalized \sectionname{TOPOLOGY} contract used by all MATRIX tools.  Ring
+records are an elementary non-metal minimum cycle basis with diagnostics stored
+in \sectionname{TOPOLOGY}; NEO/GICForge, GF and MORPHEUS must use that frozen
+section instead of rebuilding a private graph.
 
 Avogadro remains the preferred manual 3D inspection and editing tool.  After
 the user accepts the molecular structure, the GUI displays the 2D molecular
@@ -164,6 +176,8 @@ matrix gaussian promote-electronic calc.log molecule.xyzin
 matrix molpro promote molpro.out molecule.xyzin
 matrix orca promote orca.out molecule.xyzin
 matrix mrcc promote mrcc.out molecule.xyzin
+matrix molpro molden molpro.out molecule.xyzin --molden molpro.molden
+matrix orca molden orca.gbw molecule.xyzin --output orca.molden.input
 \end{lstlisting}
 
 The main promoted sections are \sectionname{CARTESIAN\_HESSIAN},
@@ -171,7 +185,11 @@ The main promoted sections are \sectionname{CARTESIAN\_HESSIAN},
 \sectionname{VIBRATIONAL}, \sectionname{DELTABVIB},
 \sectionname{ELECTRONIC}, \sectionname{TRANSITIONS} and
 \sectionname{ORBITALS}.  Orbital files are passed to Molden, Avogadro or
-MOrbVis-compatible viewers through the GUI command layer.
+MOrbVis-compatible viewers through the GUI command layer.  Molpro Molden files
+must be produced by the Molpro job and then registered with
+\texttt{matrix molpro molden}.  ORCA Molden files are generated from the
+\texttt{.gbw} file with \texttt{orca\_2mkl -molden} through
+\texttt{matrix orca molden}.
 
 General QM properties are stored in \sectionname{PROPERTIES}.  This section is
 owned by \texttt{matrix-qm} and records the property name, target, atom or
@@ -206,6 +224,12 @@ program-independent checks: it compares already-normalized rows in
 \sectionname{PROPERTIES} and therefore remains valid for future electric,
 magnetic and hyperfine properties without duplicating parsers in scientific
 tools.
+
+Orbital visualization and property conversion are separate contracts:
+\texttt{matrix molpro molden} and \texttt{matrix orca molden} only update
+\sectionname{ORBITALS}; quadrupole constants and their nontrivial Molpro/ORCA
+unit/sign conversions must go through the dedicated \texttt{promote-quadrupole}
+commands and \sectionname{PROPERTIES}.
 
 \subsection{Remote QM Execution}
 

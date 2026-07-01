@@ -201,6 +201,28 @@ GF/PED can then run from `matrix gf --xyzin molecule.xyzin` without reparsing
 Gaussian FCHK/log or ORCA text. VPT2/VCI loaders can read `#QFF` directly from
 the same container.
 
+Gaussian FCHK/FCH files are also valid LINK geometry sources:
+
+```bash
+matrix link preprocess calc.fchk molecule.xyzin --source-kind fchk
+```
+
+In that mode LINK reads only the FCHK geometry, charge and multiplicity, then
+computes symmetry, topology and synthons through the common MATRIX libraries.
+The Hessian/QFF/electronic payload remains owned by `matrix gaussian
+promote-fchk`, so scientific tools still consume shared sections rather than
+private FCHK parsing.
+
+MOL, SDF and MOL2 are accepted as structure-file geometry sources:
+
+```bash
+matrix link preprocess molecule.sdf molecule.xyzin --source-kind sdf
+matrix link preprocess molecule.mol2 molecule.xyzin --source-kind mol2
+```
+
+Their explicit bond blocks are imported as bond-order overrides and then frozen
+inside the same `#TOPOLOGY` contract used by XYZ, Gaussian and SMILES inputs.
+
 `matrix-qm` also owns the normalized electronic sections:
 
 - `#ELECTRONIC` stores electronic-state records with canonical columns
@@ -218,6 +240,13 @@ gaussian promote-electronic` promotes excited-state energies and oscillator
 strengths from Gaussian logs and can register associated Molden/Cube/FCHK files.
 GUI and scientific tools consume these sections; they must not parse Gaussian
 logs or FCHK files privately.
+
+Molpro and ORCA orbital visualization enters the same `#ORBITALS` layer.
+`matrix molpro molden` registers a Molden file already produced by the Molpro
+job. `matrix orca molden` runs `orca_2mkl basename -molden` from an ORCA `.gbw`
+file and registers the generated Molden file. These commands never write
+`#PROPERTIES`; nuclear quadrupole constants and other converted properties
+remain owned by the dedicated property adapters below.
 
 `matrix-qm` also owns `#PROPERTIES`, the generic property layer for data that
 is not naturally a Hessian, normal-mode block, QFF, electronic transition or

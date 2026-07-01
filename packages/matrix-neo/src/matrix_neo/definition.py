@@ -9,6 +9,7 @@ import numpy as np
 
 from matrix_chem.topology.elements import atomic_number
 from matrix_chem import read_enriched_xyz
+from matrix_chem.topology.contracts import SUPPORTED_TOPOLOGY_SCHEMAS, schema_line_supported
 from matrix_core.parameters.bdpcs3 import load_bdpcs3_parameters
 from matrix_core import read_sectioned_lines, replace_section, section_content
 
@@ -1349,8 +1350,7 @@ def _gaussian_definition_dependencies(line: str) -> tuple[str, ...]:
 
 def _topology_bonds(lines: list[str], *, natoms: int) -> tuple[tuple[int, int], ...]:
     topology = section_content(lines, "TOPOLOGY")
-    expected = "SCHEMA oracle.xyz.topology.v1"
-    if not topology or topology[0].strip() != expected:
+    if not topology or not schema_line_supported(topology[0], SUPPORTED_TOPOLOGY_SCHEMAS):
         raise GICForgeContractError("missing valid #TOPOLOGY section")
     bond_lines = _subsection(topology, "BONDS")
     if not bond_lines or any(line.strip().upper() == "NONE" for line in bond_lines):
@@ -1381,8 +1381,7 @@ def topology_bond_orders_from_lines(
 ) -> dict[tuple[int, int], float]:
     """Read optional one-based #TOPOLOGY [BOND_ORDERS] rows."""
     topology = section_content(lines, "TOPOLOGY")
-    expected = "SCHEMA oracle.xyz.topology.v1"
-    if not topology or topology[0].strip() != expected:
+    if not topology or not schema_line_supported(topology[0], SUPPORTED_TOPOLOGY_SCHEMAS):
         return {}
     bond_order_lines = _subsection(topology, "BOND_ORDERS")
     orders: dict[tuple[int, int], float] = {}
@@ -1405,8 +1404,7 @@ def topology_bond_orders_from_lines(
 
 def _topology_rings(lines: list[str], *, natoms: int) -> tuple[tuple[int, tuple[int, ...]], ...]:
     topology = section_content(lines, "TOPOLOGY")
-    expected = "SCHEMA oracle.xyz.topology.v1"
-    if not topology or topology[0].strip() != expected:
+    if not topology or not schema_line_supported(topology[0], SUPPORTED_TOPOLOGY_SCHEMAS):
         raise GICForgeContractError("missing valid #TOPOLOGY section")
     ring_lines = _subsection(topology, "RINGS")
     rings: list[tuple[int, tuple[int, ...]]] = []

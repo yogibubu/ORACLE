@@ -52,6 +52,18 @@ def build_parser(
     validate.add_argument("xyzin", type=Path)
     validate.add_argument("--require-fragments", action="store_true")
 
+    topology = sub.add_parser("topology", help="Inspect frozen MATRIX topology sections")
+    topology_sub = topology.add_subparsers(dest="topology_command")
+    topology_report = topology_sub.add_parser("report", help="Write a readable topology report")
+    topology_report.add_argument("xyzin", type=Path)
+    topology_report.add_argument("output", type=Path, nargs="?")
+    topology_snapshot = topology_sub.add_parser(
+        "snapshot",
+        help="Write a compact topology golden snapshot",
+    )
+    topology_snapshot.add_argument("xyzin", type=Path)
+    topology_snapshot.add_argument("output", type=Path)
+
     contracts = sub.add_parser("contracts", help="List standalone xyzin tool contracts")
     contracts.add_argument("--tool", help="Show one tool contract by key or planned name")
     contracts.add_argument("--framework", action="store_true", help="Show the planned MATRIX name")
@@ -285,6 +297,13 @@ def build_parser(
         "--isotope",
         help="Isotope label such as 14N; default uses MATRIX isotope table for the atom",
     )
+    molpro_molden = molpro_sub.add_parser(
+        "molden",
+        help="Register a Molpro-produced Molden orbital file in #ORBITALS",
+    )
+    molpro_molden.add_argument("output", type=Path)
+    molpro_molden.add_argument("xyzin", type=Path)
+    molpro_molden.add_argument("--molden", type=Path, help="Molden file produced by Molpro")
 
     orca = sub.add_parser("orca", help="ORCA job utilities")
     orca_sub = orca.add_subparsers(dest="orca_command")
@@ -317,6 +336,15 @@ def build_parser(
     )
     orca_promote_quadrupole.add_argument("output", type=Path)
     orca_promote_quadrupole.add_argument("xyzin", type=Path)
+    orca_molden = orca_sub.add_parser(
+        "molden",
+        help="Convert ORCA GBW to Molden with orca_2mkl and register #ORBITALS",
+    )
+    orca_molden.add_argument("gbw", type=Path)
+    orca_molden.add_argument("xyzin", type=Path)
+    orca_molden.add_argument("--output", type=Path, help="Destination Molden file")
+    orca_molden.add_argument("--executable", default="orca_2mkl")
+    orca_molden.add_argument("--timeout", type=float)
 
     mrcc = sub.add_parser("mrcc", help="MRCC output adapter utilities")
     mrcc_sub = mrcc.add_subparsers(dest="mrcc_command")
@@ -925,6 +953,21 @@ def main(
         result = write_validation_section(args.xyzin, require_fragments=args.require_fragments)
         print(f"Validated MATRIX molecule: {args.xyzin} ({result.status})")
         return 0
+    if args.command == "topology" and args.topology_command == "report":
+        from matrix_chem import topology_report_lines, write_topology_report
+
+        if args.output is None:
+            print("\n".join(topology_report_lines(args.xyzin)))
+            return 0
+        output = write_topology_report(args.xyzin, args.output)
+        print(f"Wrote MATRIX topology report: {output}")
+        return 0
+    if args.command == "topology" and args.topology_command == "snapshot":
+        from matrix_chem import write_topology_snapshot
+
+        output = write_topology_snapshot(args.output, args.xyzin)
+        print(f"Wrote MATRIX topology snapshot: {output}")
+        return 0
     if args.command == "contracts":
         from matrix_core import (
             PLANNED_FRAMEWORK_EXPANSION,
@@ -1398,6 +1441,17 @@ def main(
         print(f"wrote_properties: {int(result.wrote_properties)}")
         print(f"property_count: {result.property_count}")
         return 0
+    if args.command == "molpro" and args.molpro_command == "molden":
+        from matrix_molpro import promote_molpro_molden_to_xyzin
+
+        result = promote_molpro_molden_to_xyzin(
+            args.output,
+            args.xyzin,
+            molden=args.molden,
+        )
+        print(f"Registered Molpro Molden file: {result.molden_path} -> {result.xyzin}")
+        print(f"wrote_orbitals: {int(result.wrote_orbitals)}")
+        return 0
     if args.command == "orca" and args.orca_command == "status":
         from matrix_orca import orca_job_status
 
@@ -1458,6 +1512,20 @@ def main(
         print(f"Promoted ORCA quadrupole properties: {result.output_path} -> {result.xyzin}")
         print(f"wrote_properties: {int(result.wrote_properties)}")
         print(f"property_count: {result.property_count}")
+        return 0
+    if args.command == "orca" and args.orca_command == "molden":
+        from matrix_orca import promote_orca_molden_to_xyzin
+
+        result = promote_orca_molden_to_xyzin(
+            args.gbw,
+            args.xyzin,
+            output=args.output,
+            executable=args.executable,
+            timeout=args.timeout,
+        )
+        print(f"Converted ORCA GBW to Molden: {result.gbw_path} -> {result.molden_path}")
+        print(f"Registered ORCA Molden file: {result.molden_path} -> {result.xyzin}")
+        print(f"wrote_orbitals: {int(result.wrote_orbitals)}")
         return 0
     if args.command == "mrcc" and args.mrcc_command == "summary":
         from matrix_mrcc import summarize_mrcc_output
@@ -2655,7 +2723,19 @@ def _add_preprocess_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("output", type=Path)
     parser.add_argument(
         "--source-kind",
-        choices=("auto", "xyz", "enriched_xyz", "gaussian", "molpro", "mrcc", "orca"),
+        choices=(
+            "auto",
+            "xyz",
+            "enriched_xyz",
+            "gaussian",
+            "fchk",
+            "mol",
+            "sdf",
+            "mol2",
+            "molpro",
+            "mrcc",
+            "orca",
+        ),
         default="auto",
     )
     parser.add_argument("--symmetry-distance", type=float, default=1.0e-3)

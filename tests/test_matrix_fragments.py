@@ -75,9 +75,11 @@ def test_fragment_plan_section_preserves_existing_sections(tmp_path):
 
     assert section_content(lines, "GIC")[0] == "SCHEMA oracle.xyz.gic.v1"
     fragments = section_content(lines, "FRAGMENTS")
-    assert fragments[0] == "SCHEMA oracle.xyz.fragments.v1"
+    assert fragments[0] == "SCHEMA matrix.xyz.fragments.v1"
+    assert "ALIAS_SCHEMA oracle.xyz.fragments.v1" in fragments
     assert (
-        "DEPENDENCIES TOPOLOGY=oracle.xyz.topology.v1 SYNTHONS=oracle.xyz.synthons.v1" in fragments
+        "DEPENDENCIES TOPOLOGY=matrix.xyz.topology.v1 SYNTHONS=matrix.xyz.synthons.v1"
+        in fragments
     )
     assert "PENDING ROBUST_TOPOLOGY_CONTRACT" in fragments
 

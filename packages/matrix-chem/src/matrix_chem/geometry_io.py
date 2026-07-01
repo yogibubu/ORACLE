@@ -142,6 +142,10 @@ GeometrySourceKind = Literal[
     "xyz",
     "enriched_xyz",
     "gaussian",
+    "fchk",
+    "mol",
+    "sdf",
+    "mol2",
     "molpro",
     "mrcc",
     "orca",
@@ -160,6 +164,18 @@ def read_geometry_with_kind(
             return read_enriched_xyz(target)
         if suffix == ".xyz" or suffix == "":
             return read_xyz(target)
+        if suffix in {".mol", ".sdf"}:
+            from .structure_files import read_molfile
+
+            return read_molfile(target)
+        if suffix == ".mol2":
+            from .structure_files import read_mol2
+
+            return read_mol2(target)
+        if suffix in {".fchk", ".fch"}:
+            from matrix_gaussian import read_gaussian_fchk_geometry
+
+            return read_gaussian_fchk_geometry(target)
         if suffix in {".zmat", ".zmt"}:
             from .zmatrix import read_zmatrix
 
@@ -181,6 +197,18 @@ def read_geometry_with_kind(
         return read_xyz(target)
     if kind == "enriched_xyz":
         return read_enriched_xyz(target)
+    if kind in {"mol", "sdf"}:
+        from .structure_files import read_molfile
+
+        return read_molfile(target)
+    if kind == "mol2":
+        from .structure_files import read_mol2
+
+        return read_mol2(target)
+    if kind == "fchk":
+        from matrix_gaussian import read_gaussian_fchk_geometry
+
+        return read_gaussian_fchk_geometry(target)
     if kind == "gaussian":
         suffix = target.suffix.lower()
         if suffix in {".gjf", ".gau", ".com", ".inp"}:

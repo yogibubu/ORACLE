@@ -18,14 +18,17 @@ from matrix_gaussian import (
 )
 from matrix_molpro import (
     parse_molpro_quadrupole_properties,
+    promote_molpro_molden_to_xyzin,
     promote_molpro_quadrupole_properties_to_xyzin,
     read_molpro_output_geometry,
     summarize_molpro_output,
 )
 from matrix_mrcc import read_mrcc_output_geometry, summarize_mrcc_output
 from matrix_orca import (
+    convert_orca_gbw_to_molden,
     hessian_input_from_orca_output,
     parse_orca_quadrupole_properties,
+    promote_orca_molden_to_xyzin,
     promote_orca_output_to_xyzin,
     promote_orca_quadrupole_properties_to_xyzin,
     read_orca_output_geometry,
@@ -33,7 +36,12 @@ from matrix_orca import (
 )
 from matrix_gf import read_gf_ped_section, run_xyzin_gf_report_from_xyzin, write_gf_ped_section_from_report
 from matrix_neo import write_gicforge_build_sections
-from matrix_qm import EFG_AU_TO_NQCC_MHZ_PER_BARN, read_cartesian_hessian_section, read_properties_section
+from matrix_qm import (
+    EFG_AU_TO_NQCC_MHZ_PER_BARN,
+    read_cartesian_hessian_section,
+    read_orbitals_section,
+    read_properties_section,
+)
 from tools import matrix_run
 
 
@@ -477,7 +485,7 @@ def test_link_preprocess_imports_molpro_with_basic_section(tmp_path):
     assert basic.multiplicity == 2
     assert section_content(lines, "SOURCE")[2] == "FORMAT molpro_output"
     assert section_content(lines, "SYMMETRY")[0] == "SCHEMA oracle.xyz.symmetry.v1"
-    assert section_content(lines, "TOPOLOGY")[0] == "SCHEMA oracle.xyz.topology.v1"
+    assert section_content(lines, "TOPOLOGY")[0] == "SCHEMA matrix.xyz.topology.v1"
 
 
 def test_orca_promote_writes_geometry_and_cartesian_hessian_sections(tmp_path):
@@ -547,6 +555,38 @@ def test_molpro_promote_cli_calls_adapter(tmp_path, monkeypatch, capsys):
     assert "Promoted Molpro output" in capsys.readouterr().out
 
 
+def test_molpro_molden_registers_orbitals_without_properties(tmp_path):
+    output = tmp_path / "molpro.out"
+    molden = tmp_path / "molpro.molden"
+    xyzin = tmp_path / "molecule.xyzin"
+    output.write_text(_molpro_output(), encoding="utf-8")
+    molden.write_text("[Molden Format]\n", encoding="utf-8")
+    xyzin.write_text("1\nn\nN 0 0 0\n", encoding="utf-8")
+
+    result = promote_molpro_molden_to_xyzin(output, xyzin, molden=molden)
+    orbitals = read_orbitals_section(xyzin)
+
+    assert result.wrote_orbitals
+    assert orbitals.files[0].format == "MOLDEN"
+    assert orbitals.files[0].source == "molpro-molden"
+    assert read_properties_section(xyzin).records == ()
+
+
+def test_molpro_molden_cli_registers_orbitals(tmp_path, capsys):
+    output = tmp_path / "molpro.out"
+    molden = tmp_path / "molpro.molden.input"
+    xyzin = tmp_path / "molecule.xyzin"
+    output.write_text(_molpro_output(), encoding="utf-8")
+    molden.write_text("[Molden Format]\n", encoding="utf-8")
+    xyzin.write_text("1\nn\nN 0 0 0\n", encoding="utf-8")
+
+    assert matrix_run.main(["molpro", "molden", str(output), str(xyzin), "--molden", str(molden)]) == 0
+    out = capsys.readouterr().out
+
+    assert "Registered Molpro Molden file" in out
+    assert read_orbitals_section(xyzin).files[0].path == molden
+
+
 def test_mrcc_summary_cli_calls_adapter(tmp_path, monkeypatch, capsys):
     calls = {}
     output = tmp_path / "mrcc.out"
@@ -586,6 +626,72 @@ def test_orca_summary_and_promote_cli_use_adapter(tmp_path, capsys):
     assert "Promoted ORCA output" in promote_out
     assert "wrote_cartesian_hessian: 1" in promote_out
     assert read_cartesian_hessian_section(xyzin).cartesian_hessian.shape == (9, 9)
+
+
+def test_orca_molden_converter_runs_orca_2mkl_and_registers_orbitals(tmp_path, monkeypatch):
+    gbw = tmp_path / "orca.gbw"
+    xyzin = tmp_path / "molecule.xyzin"
+    gbw.write_text("gbw placeholder", encoding="utf-8")
+    xyzin.write_text("1\nn\nN 0 0 0\n", encoding="utf-8")
+    calls = {}
+
+    def fake_run(command, *, check, text, capture_output, timeout):
+        calls["command"] = command
+        calls["check"] = check
+        calls["text"] = text
+        calls["capture_output"] = capture_output
+        calls["timeout"] = timeout
+        gbw.with_suffix(".molden.input").write_text("[Molden Format]\n", encoding="utf-8")
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr("matrix_orca.parsers.subprocess.run", fake_run)
+
+    conversion = convert_orca_gbw_to_molden(gbw, executable="orca_2mkl", timeout=12.0)
+    result = promote_orca_molden_to_xyzin(gbw, xyzin, executable="orca_2mkl", timeout=12.0)
+    orbitals = read_orbitals_section(xyzin)
+
+    assert calls["command"] == ("orca_2mkl", str(gbw.with_suffix("")), "-molden")
+    assert calls["timeout"] == 12.0
+    assert conversion.molden_path == gbw.with_suffix(".molden.input")
+    assert result.wrote_orbitals
+    assert orbitals.files[0].format == "MOLDEN"
+    assert orbitals.files[0].source == "orca_2mkl"
+    assert read_properties_section(xyzin).records == ()
+
+
+def test_orca_molden_cli_registers_orbitals(tmp_path, monkeypatch, capsys):
+    gbw = tmp_path / "orca.gbw"
+    xyzin = tmp_path / "molecule.xyzin"
+    explicit_molden = tmp_path / "orbitals.molden"
+    gbw.write_text("gbw placeholder", encoding="utf-8")
+    xyzin.write_text("1\nn\nN 0 0 0\n", encoding="utf-8")
+
+    def fake_run(command, *, check, text, capture_output, timeout):
+        gbw.with_suffix(".molden.input").write_text("[Molden Format]\n", encoding="utf-8")
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr("matrix_orca.parsers.subprocess.run", fake_run)
+
+    assert (
+        matrix_run.main(
+            [
+                "orca",
+                "molden",
+                str(gbw),
+                str(xyzin),
+                "--output",
+                str(explicit_molden),
+                "--timeout",
+                "10",
+            ]
+        )
+        == 0
+    )
+    out = capsys.readouterr().out
+
+    assert "Converted ORCA GBW to Molden" in out
+    assert explicit_molden.is_file()
+    assert read_orbitals_section(xyzin).files[0].path == explicit_molden
 
 
 def test_quadrupole_promote_cli_updates_properties(tmp_path, capsys):

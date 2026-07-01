@@ -17,6 +17,12 @@ from matrix_core import (
 from .geometry import MolecularGeometry
 from .geometry_io import GeometrySourceKind, read_geometry_with_kind
 from .symmetry import analyze_molecular_symmetry, symmetry_section_lines
+from .topology.contracts import (
+    MATRIX_XYZ_SYNTHONS_SCHEMA,
+    MATRIX_XYZ_TOPOLOGY_SCHEMA,
+    ORACLE_XYZ_SYNTHONS_SCHEMA,
+    ORACLE_XYZ_TOPOLOGY_SCHEMA,
+)
 from .topology.pipeline import build_topology_objects
 
 
@@ -160,18 +166,28 @@ def write_topology_and_synthons_sections(
 ) -> tuple[int, int]:
     atomic_numbers = [_atomic_number(atom) for atom in geometry.atoms]
     gaussian = gaussian_topology_overrides_from_xyzin(Path(path))
+    explicit_bond_orders = dict(geometry.metadata.get("explicit_bond_orders", {}))
+    bond_orders = {**explicit_bond_orders, **gaussian["bond_orders"]}
+    bond_order_source = (
+        gaussian["bond_order_source"]
+        if gaussian["bond_orders"]
+        else geometry.metadata.get("bond_order_source", gaussian["bond_order_source"])
+    )
     continuous, discrete, ringset, synthons, aromaticity = build_topology_objects(
         geometry.coordinates_angstrom,
         atomic_numbers,
-        bond_order_overrides=gaussian["bond_orders"],
+        bond_order_overrides=bond_orders,
         external_charges=gaussian["charges"],
         charge_source=gaussian["charge_source"],
-        bond_order_source=gaussian["bond_order_source"],
+        bond_order_source=str(bond_order_source),
     )
     topology_lines = [
-        "SCHEMA oracle.xyz.topology.v1",
+        f"SCHEMA {MATRIX_XYZ_TOPOLOGY_SCHEMA}",
+        f"ALIAS_SCHEMA {ORACLE_XYZ_TOPOLOGY_SCHEMA}",
         "INDEXING ATOMS=ONE_BASED",
-        f"BOND_ORDER_SOURCE {gaussian['bond_order_source']}",
+        f"BOND_ORDER_SOURCE {bond_order_source}",
+        "RING_BASIS_POLICY CHORDLESS_NONMETAL_MINIMUM_CYCLE_BASIS",
+        *_ring_basis_diagnostic_lines(ringset),
         "[BONDS]",
     ]
     if discrete.bonds:
@@ -206,10 +222,11 @@ def write_topology_and_synthons_sections(
     replace_section(Path(path), "TOPOLOGY", topology_lines)
 
     synthon_lines = [
-        "SCHEMA oracle.xyz.synthons.v1",
+        f"SCHEMA {MATRIX_XYZ_SYNTHONS_SCHEMA}",
+        f"ALIAS_SCHEMA {ORACLE_XYZ_SYNTHONS_SCHEMA}",
         "INDEXING ATOMS=ONE_BASED",
         f"CHARGE_SOURCE {gaussian['charge_source']}",
-        f"BOND_ORDER_SOURCE {gaussian['bond_order_source']}",
+        f"BOND_ORDER_SOURCE {bond_order_source}",
         "COLUMNS ATOM Z ZEFF CHARGE COVALENCY DELOCALIZATION STRAIN SIGNATURE",
     ]
     for idx, atom in enumerate(geometry.atoms):
@@ -226,6 +243,25 @@ def write_topology_and_synthons_sections(
         )
     replace_section(Path(path), "SYNTHONS", synthon_lines)
     return len(discrete.bonds), len(ringset.rings)
+
+
+def _ring_basis_diagnostic_lines(ringset) -> list[str]:
+    diagnostics = getattr(ringset, "cycle_basis_diagnostics", None)
+    if diagnostics is None:
+        return []
+    excluded = (
+        ",".join(str(atom + 1) for atom in diagnostics.excluded_atoms)
+        if diagnostics.excluded_atoms
+        else "NONE"
+    )
+    return [
+        f"RING_CANDIDATE_COUNT {diagnostics.candidate_cycle_count}",
+        f"RING_BASIS_RANK {diagnostics.cycle_rank}",
+        f"RING_BASIS_COUNT {diagnostics.selected_cycle_count}",
+        f"RING_BASIS_ALLOWED_ATOMS {diagnostics.allowed_atom_count}",
+        f"RING_BASIS_ALLOWED_EDGES {diagnostics.allowed_edge_count}",
+        f"RING_BASIS_EXCLUDED_ATOMS {excluded}",
+    ]
 
 
 def gaussian_topology_overrides_from_xyzin(path: Path) -> dict[str, object]:

@@ -6,6 +6,7 @@ import re
 
 import numpy as np
 
+BOHR_TO_ANGSTROM = 0.529177210903
 
 _FLOAT_TOKEN_RE = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[DEde][-+]?\d+)?"
 _HEADER_RE = re.compile(
@@ -119,6 +120,28 @@ def read_gaussian_fchk(path: Path) -> FCHKData:
         alpha_orbital_energies_hartree=tuple(float(value) for value in alpha_orbital_energies),
         beta_orbital_energies_hartree=tuple(float(value) for value in beta_orbital_energies),
         has_total_scf_density="Total SCF Density" in blocks,
+    )
+
+
+def read_gaussian_fchk_geometry(path: Path):
+    """Read geometry, charge and multiplicity from a Gaussian FCHK/FCH file."""
+    from matrix_chem import MolecularGeometry
+    from matrix_chem.topology.elements import atomic_symbol
+
+    target = Path(path)
+    blocks = _read_fchk_blocks(target)
+    atomic_numbers = _first_array(blocks, "Atomic numbers").astype(int)
+    coords_bohr = _first_array(blocks, "Current cartesian coordinates").reshape((-1, 3))
+    charge = _optional_int_scalar(blocks, "Charge")
+    multiplicity = _optional_int_scalar(blocks, "Multiplicity")
+    return MolecularGeometry(
+        atoms=tuple(atomic_symbol(int(number)) for number in atomic_numbers),
+        coordinates_angstrom=np.asarray(coords_bohr, dtype=float) * BOHR_TO_ANGSTROM,
+        comment=target.stem,
+        source_format="gaussian_fchk",
+        source_path=target,
+        charge=charge,
+        multiplicity=multiplicity,
     )
 
 

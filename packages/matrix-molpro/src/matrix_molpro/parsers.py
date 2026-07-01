@@ -30,6 +30,14 @@ class MolproQuadrupolePromotion:
     property_count: int
 
 
+@dataclass(frozen=True)
+class MolproMoldenPromotion:
+    xyzin: Path
+    output_path: Path
+    molden_path: Path
+    wrote_orbitals: bool
+
+
 def summarize_molpro_output(path: Path | str) -> MolproOutputSummary:
     target = Path(path)
     lines = target.read_text(encoding="utf-8", errors="replace").splitlines()
@@ -77,6 +85,42 @@ def promote_molpro_output_to_xyzin(
             inertia_relative=symmetry_inertia,
             max_rotation_order=max_rotation_order,
         ),
+    )
+
+
+def promote_molpro_molden_to_xyzin(
+    output: Path | str,
+    xyzin: Path | str,
+    *,
+    molden: Path | str | None = None,
+) -> MolproMoldenPromotion:
+    """Register a Molden orbital file produced by a Molpro calculation."""
+    from matrix_qm import merge_orbitals_section, orbital_file_record_from_path
+
+    source = Path(output)
+    target = Path(xyzin)
+    molden_path = Path(molden) if molden is not None else _infer_molpro_molden_path(source)
+    if not molden_path.is_file():
+        raise FileNotFoundError(
+            "Molpro Molden file not found. Add a Molpro Molden output directive "
+            "to the job and pass --molden, or place the file next to the output."
+        )
+    merge_orbitals_section(
+        target,
+        (
+            orbital_file_record_from_path(
+                molden_path,
+                role="orbitals",
+                label=molden_path.stem,
+                source="molpro-molden",
+            ),
+        ),
+    )
+    return MolproMoldenPromotion(
+        xyzin=target,
+        output_path=source,
+        molden_path=molden_path,
+        wrote_orbitals=True,
     )
 
 
@@ -195,6 +239,20 @@ def _parse_atomic_coordinates(lines: list[str]) -> tuple[list[str], list[list[fl
     if not atoms:
         raise GeometryParseError("Molpro ATOMIC COORDINATES section contains no atoms")
     return atoms, coords
+
+
+def _infer_molpro_molden_path(output: Path) -> Path:
+    candidates = (
+        output.with_suffix(".molden"),
+        output.with_suffix(".molden.input"),
+        output.with_suffix(".mol"),
+        output.parent / f"{output.stem}.molden",
+        output.parent / f"{output.stem}.molden.input",
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return candidates[0]
 
 
 def _parse_charge_multiplicity(lines: list[str]) -> tuple[int, int]:
