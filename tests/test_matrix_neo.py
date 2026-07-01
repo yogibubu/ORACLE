@@ -58,12 +58,16 @@ from matrix_neo.definition import (
 )
 from matrix_neo.runtime.gicforge_python import (
     _LOCAL_COORDINATION_TEMPLATES,
+    _bond_length_coordinates,
+    _bond_primitives_by_equivalence,
     _high_coord_angle_coordinates,
     _high_coord_angle_primitives_by_ligand_equivalence,
     _high_coord_angle_primitives_by_template_or_equivalence,
     _local_ligand_equivalence_classes,
+    _primitive_coordinate,
     _recognize_local_coordination_template,
 )
+from matrix_neo.survibfit.primitives import Primitive
 
 
 def _tetrahedral_methane_coordinates() -> np.ndarray:
@@ -412,6 +416,49 @@ def test_local_ligand_equivalence_uses_atom_type_and_radial_shell():
     )
 
     assert classes == ((1, 2, 3, 4), (5, 6))
+
+
+def test_bond_length_equivalence_uses_endpoint_classes_and_length():
+    coords = np.array(
+        [
+            (0.0, 0.0, 0.0),
+            (1.0, 0.0, 0.0),
+            (-1.0, 0.0, 0.0),
+            (0.0, 1.2, 0.0),
+            (0.0, -1.2, 0.0),
+        ],
+        dtype=float,
+    )
+    bond_coordinates = [
+        _primitive_coordinate("Stre", index, Primitive("bond", atoms))
+        for index, atoms in enumerate(((0, 1), (0, 2), (0, 3), (0, 4)), start=1)
+    ]
+    groups = _bond_primitives_by_equivalence(
+        bond_coordinates,
+        effective_atomic_numbers=(6.0, 1.0, 1.0, 1.0, 1.0),
+        coords=coords,
+    )
+
+    assert tuple(len(group) for group in groups) == (2, 2)
+
+
+def test_bond_length_salc_generation_keeps_equivalent_stretches_together():
+    coords = _tetrahedral_methane_coordinates()
+    bond_coordinates = [
+        _primitive_coordinate("Stre", index, Primitive("bond", atoms))
+        for index, atoms in enumerate(((0, 1), (0, 2), (0, 3), (0, 4)), start=1)
+    ]
+    coordinates = _bond_length_coordinates(
+        bond_coordinates,
+        effective_atomic_numbers=(6.0, 1.0, 1.0, 1.0, 1.0),
+        coords=coords,
+    )
+
+    assert len(coordinates) == 4
+    assert all(coordinate.block == "Stre" for coordinate in coordinates)
+    assert all(coordinate.dominant_kind == "bond" for coordinate in coordinates)
+    assert len({coordinate.name for coordinate in coordinates}) == len(coordinates)
+    assert any(len(coordinate.terms) > 1 for coordinate in coordinates)
 
 
 def test_high_coord_angle_primitives_do_not_mix_ligand_equivalence_classes():
@@ -2411,7 +2458,8 @@ def test_gicforge_pyrrole_c2v_projector_keeps_ring_coordinates(tmp_path):
     write_gicforge_gaussian_input(xyzin, gjf, route="#p hf/sto-3g opt=readallgic")
     text = gjf.read_text(encoding="utf-8")
     assert "#p hf/sto-3g opt=readallgic output=pickett" in text
-    assert "A1Str001 = R(1,2)" in text
+    assert "A1Str001 = 0.707106781187*(R(1,4))+0.707106781187*(R(2,6))" in text
+    assert "A1Str004 = R(1,2)" in text
     assert "A1CyBe001 = " in text
     assert "A2RPck001(Frozen) = " in text
     assert "B1RPck001(Frozen) = " in text

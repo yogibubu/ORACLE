@@ -362,7 +362,7 @@ def _fortran_like_primitive_blocks(
     max_linear_angle_pairs_per_center: int,
     linear_threshold: float,
 ):
-    bonds: list[GICForgePythonCoordinate] = []
+    bond_primitives: list[GICForgePythonCoordinate] = []
     bends: list[GICForgePythonCoordinate] = []
     linears: list[GICForgePythonCoordinate] = []
     torsions: list[GICForgePythonCoordinate] = []
@@ -389,8 +389,12 @@ def _fortran_like_primitive_blocks(
         for first in neigh:
             if first < center:
                 continue
-            bonds.append(
-                _primitive_coordinate("Stre", len(bonds) + 1, Primitive("bond", (center, first)))
+            bond_primitives.append(
+                _primitive_coordinate(
+                    "Stre",
+                    len(bond_primitives) + 1,
+                    Primitive("bond", (center, first)),
+                )
             )
         if svd_local and len(neigh) > 1:
             exo_primitives, exo_linears = _exocyclic_angle_primitives(
@@ -515,7 +519,7 @@ def _fortran_like_primitive_blocks(
                 _cyclic_coordinates(ring, valence_angle=True, prefix="RDef", start=len(bends) + 1)
             )
 
-    for bond in bonds:
+    for bond in bond_primitives:
         _coef, primitive = bond.terms[0]
         center, right = primitive.atoms
         if tuple(sorted((center, right))) in bridge_bonds:
@@ -584,6 +588,11 @@ def _fortran_like_primitive_blocks(
             primitive = Primitive("out_of_plane", (center, first, second, third))
         oops.append(_primitive_coordinate(oop_prefix, len(oops) + 1, primitive))
 
+    bonds = _bond_length_coordinates(
+        bond_primitives,
+        effective_atomic_numbers=effective_atomic_numbers,
+        coords=coords,
+    )
     return bonds, bends, linears, torsions, oops
 
 
@@ -596,7 +605,7 @@ def _primitive_fallback_blocks(
     impdih: bool,
     linear_threshold: float,
 ):
-    bonds: list[GICForgePythonCoordinate] = []
+    bond_primitives: list[GICForgePythonCoordinate] = []
     bends: list[GICForgePythonCoordinate] = []
     linears: list[GICForgePythonCoordinate] = []
     torsions: list[GICForgePythonCoordinate] = []
@@ -616,8 +625,12 @@ def _primitive_fallback_blocks(
         for first in neigh:
             if first < center:
                 continue
-            bonds.append(
-                _primitive_coordinate("Stre", len(bonds) + 1, Primitive("bond", (center, first)))
+            bond_primitives.append(
+                _primitive_coordinate(
+                    "Stre",
+                    len(bond_primitives) + 1,
+                    Primitive("bond", (center, first)),
+                )
             )
         for ib, first_angle in enumerate(neigh[:-1]):
             for second_angle in neigh[ib + 1 :]:
@@ -641,7 +654,7 @@ def _primitive_fallback_blocks(
                         )
                     )
 
-    for bond in bonds:
+    for bond in bond_primitives:
         _coef, primitive = bond.terms[0]
         center, right = primitive.atoms
         if len(neighbors[center]) == 1 or len(neighbors[right]) == 1:
@@ -678,6 +691,11 @@ def _primitive_fallback_blocks(
             primitive = Primitive("out_of_plane", (center, first, second, third))
         oops.append(_primitive_coordinate(oop_prefix, len(oops) + 1, primitive))
 
+    bonds = _bond_length_coordinates(
+        bond_primitives,
+        effective_atomic_numbers=effective_atomic_numbers,
+        coords=coords,
+    )
     return bonds, bends, linears, torsions, oops
 
 
@@ -1385,6 +1403,75 @@ def _canonical_svd_coefficients(coefficients: np.ndarray) -> np.ndarray:
         coefficients = -coefficients
     coefficients[np.abs(coefficients) < 1.0e-14] = 0.0
     return coefficients
+
+
+def _bond_length_coordinates(
+    bond_primitives: list[GICForgePythonCoordinate],
+    *,
+    effective_atomic_numbers: tuple[float, ...],
+    coords: np.ndarray,
+) -> list[GICForgePythonCoordinate]:
+    groups = _bond_primitives_by_equivalence(
+        bond_primitives,
+        effective_atomic_numbers=effective_atomic_numbers,
+        coords=coords,
+    )
+    coordinates: list[GICForgePythonCoordinate] = []
+    for primitives in groups:
+        if len(primitives) == 1:
+            coordinates.append(
+                _primitive_coordinate("Stre", len(coordinates) + 1, primitives[0])
+            )
+            continue
+        coordinates.extend(
+            _svd_local_coordinates(
+                list(primitives),
+                coords=coords,
+                prefix="Stre",
+                start=len(coordinates) + 1,
+                kind_type_index=0,
+            )
+        )
+    return coordinates
+
+
+def _bond_primitives_by_equivalence(
+    bond_coordinates: list[GICForgePythonCoordinate],
+    *,
+    effective_atomic_numbers: tuple[float, ...],
+    coords: np.ndarray,
+    zeff_tolerance: float = 5.0e-4,
+    distance_tolerance: float = 1.0e-3,
+) -> tuple[tuple[Primitive, ...], ...]:
+    groups: list[list[Primitive]] = []
+    keys: list[tuple[float, float, float]] = []
+    for coordinate in bond_coordinates:
+        _coefficient, primitive = coordinate.terms[0]
+        first, second = primitive.atoms
+        endpoint_key = sorted(
+            (
+                float(effective_atomic_numbers[int(first)]),
+                float(effective_atomic_numbers[int(second)]),
+            )
+        )
+        distance = float(np.linalg.norm(coords[int(first)] - coords[int(second)]))
+        key = (endpoint_key[0], endpoint_key[1], distance)
+        match = next(
+            (
+                index
+                for index, other in enumerate(keys)
+                if abs(key[0] - other[0]) <= zeff_tolerance
+                and abs(key[1] - other[1]) <= zeff_tolerance
+                and abs(key[2] - other[2]) <= distance_tolerance
+            ),
+            None,
+        )
+        if match is None:
+            keys.append(key)
+            groups.append([primitive])
+            continue
+        groups[match].append(primitive)
+    return tuple(tuple(group) for _key, group in sorted(zip(keys, groups)))
 
 
 def _cyclic_index(index_1based: int, ncyc: int) -> int:
